@@ -12,6 +12,7 @@
       "sharp"
     ]
   },
+  
   "scripts": {
     "dev": "turbo dev --filter=@popwam/web",
     "build": "pnpm db:generate && turbo run build",
