@@ -48,6 +48,8 @@ pnpm dev
 
 On PowerShell, use `Copy-Item .env.example .env`. Replace every example secret before using a shared or production environment. `.env`, `.env.*`, and the pre-existing `.evn` typo are ignored; only `.env.example` is committed.
 
+For local development, create the `.env` file at the monorepo root. For Railway or Vercel deployments, set the same environment variables in the hosting provider dashboard.
+
 Useful commands:
 
 ```bash

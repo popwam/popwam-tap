@@ -11,6 +11,8 @@ coverage/
 
 # Never commit local secrets (including the pre-existing typo file).
 .env
+.env.local
+.env.*.local
 .env.*
 !.env.example
 .evn
