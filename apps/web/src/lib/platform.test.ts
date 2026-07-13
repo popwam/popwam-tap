@@ -5,13 +5,16 @@ import { decideTagResolution } from "./tag-resolution";
 import { mergeEntitlements } from "./plans";
 import { normalizeEmail, isUniqueConstraintError, runAtomicUserCreation } from "./user-validation";
 import { resolveProfileFieldUrl, visibleProfileFields } from "./profile-fields";
+import { activationTokenMatches, createOpaqueToken, hashActivationToken, MAX_BATCH_QUANTITY, normalizeBatchPrefix } from "./card-tokens";
+import { normalizePhone } from "./phone";
+import { createVCard, escapeVCard, safeVCardFilename } from "./vcard";
 import ar from "../../locales/ar.json";
 import en from "../../locales/en.json";
 
 describe("localization and themes", () => {
   it("contains matching Arabic and English dictionaries", () => expect(Object.keys(ar)).toEqual(Object.keys(en)));
   it("provides Arabic/English UI and RTL/LTR values", () => { expect(ar.auth.signIn).toContain("تسجيل"); expect(en.auth.signIn).toBe("Sign in"); expect((["ar","en"] as const).map(locale => locale === "ar" ? "rtl" : "ltr")).toEqual(["rtl","ltr"]); });
-  it("contains all four localized themes", () => { for (const key of ["classicDark","classicLight","elegantDark","elegantLight"] as const) { expect(ar.profile[key]).toBeTruthy(); expect(en.profile[key]).toBeTruthy(); } });
+  it("contains all six localized themes", () => { for (const key of ["classicDark","classicLight","elegantDark","elegantLight","businessDark","businessLight"] as const) { expect(ar.profile[key]).toBeTruthy(); expect(en.profile[key]).toBeTruthy(); } });
 });
 
 describe("duplicate user safety", () => {
@@ -41,4 +44,14 @@ describe("custom fields, uploads and icons", () => {
   it("makes actionable fields clickable", () => { expect(resolveProfileFieldUrl({ type:"PHONE",value:"+37360000000",actionUrl:null })).toBe("tel:+37360000000"); expect(resolveProfileFieldUrl({ type:"TEXT",value:"hello",actionUrl:null })).toBeNull(); });
   it("rejects executable and oversized uploads", () => { expect(validateFileUpload({ filename:"bad.exe",contentType:"application/pdf",size:100 }).valid).toBe(false); expect(validateImageUpload({ filename:"large.jpg",contentType:"image/jpeg",size:99*1024*1024 }).valid).toBe(false); });
   it("has a default icon for every known type", () => { for (const value of Object.values(defaultIconKeys)) expect(value).toMatch(/^[a-z]+$/); expect(defaultIconKeys.FILE).toBe("file"); });
+});
+
+describe("physical card activation architecture", () => {
+  it("stores only a deterministic SHA-256 hash", () => { const token=createOpaqueToken();const hash=hashActivationToken(token);expect(token).not.toBe(hash);expect(hash).toMatch(/^[a-f0-9]{64}$/);expect(activationTokenMatches(token,hash)).toBe(true);expect(activationTokenMatches(`${token}x`,hash)).toBe(false); });
+  it("uses a safe batch maximum and normalized permanent slug prefix", () => { expect(MAX_BATCH_QUANTITY).toBe(1000);expect(normalizeBatchPrefix(" PW Cards ","pw")).toBe("pw-cards"); });
+});
+
+describe("phone OTP and dynamic contacts",()=>{
+  it("normalizes Egyptian mobiles and international E.164",()=>{expect(normalizePhone("010 1234 5678")).toEqual({valid:true,e164:"+201012345678"});expect(normalizePhone("+37360000000")).toEqual({valid:true,e164:"+37360000000"});expect(normalizePhone("123").valid).toBe(false)});
+  it("generates UTF-8-safe vCard text with escaped values",()=>{const value=createVCard({kind:"individual",displayName:"ممدوح، POPWAM",firstName:"ممدوح",phones:["+201000000000"],notes:"line 1\nline 2"});expect(value).toContain("BEGIN:VCARD\r\nVERSION:4.0");expect(value).toContain("FN:ممدوح، POPWAM");expect(value).toContain("NOTE:line 1\\nline 2");expect(escapeVCard("a;b,c")).toBe("a\\;b\\,c");expect(safeVCardFilename("Mamdouh / POPWAM")).toBe("Mamdouh-POPWAM.vcf")});
 });

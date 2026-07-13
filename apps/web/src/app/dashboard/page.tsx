@@ -9,15 +9,15 @@ export const metadata = { title: "Dashboard" };
 export default async function DashboardPage() {
   const user = await requireUser();
   const [tagCount, activeTags, scans, destinationCount, profile] = await Promise.all([
-    prisma.tag.count({ where: { ownerId: user.id } }),
-    prisma.tag.count({ where: { ownerId: user.id, status: "ACTIVE" } }),
-    prisma.tag.aggregate({ where: { ownerId: user.id }, _sum: { scanCount: true } }),
+    prisma.card.count({ where: { ownerId: user.id } }),
+    prisma.card.count({ where: { ownerId: user.id, cardStatus: "ACTIVE" } }),
+    prisma.card.aggregate({ where: { ownerId: user.id }, _sum: { openCount: true } }),
     prisma.destination.count({ where: { userId: user.id } }),
     prisma.profile.findFirst({ where: { userId: user.id, organizationId: null } }),
   ]);
   const stats = [
-    ["Total tags", tagCount, Nfc, "text-cyan-300"], ["Active tags", activeTags, Activity, "text-emerald-300"],
-    ["Total scans", scans._sum.scanCount || 0, MousePointer2, "text-violet-300"], ["Destinations", destinationCount, CreditCard, "text-amber-300"],
+    ["Total cards", tagCount, Nfc, "text-cyan-300"], ["Active cards", activeTags, Activity, "text-emerald-300"],
+    ["Total opens", scans._sum.openCount || 0, MousePointer2, "text-violet-300"], ["Destinations", destinationCount, CreditCard, "text-amber-300"],
   ] as const;
   return <>
     <PageHeading eyebrow="Personal workspace" title={`Hello${user.name ? `, ${user.name.split(" ")[0]}` : ""}`} description="A live view of your smart cards, profiles, and engagement."/>

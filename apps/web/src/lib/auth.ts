@@ -5,9 +5,21 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@popwam/db";
 import bcrypt from "bcryptjs";
 import { ensureUserDefaults } from "./ensure-user";
+import { hashActivationToken } from "./card-tokens";
 
 const providers: NextAuthOptions["providers"] = [
   CredentialsProvider({
+    id: "phone-otp",
+    name: "Phone OTP",
+    credentials: { ticket: { label: "One-time ticket", type: "text" } },
+    async authorize(credentials) {
+      const ticket=credentials?.ticket;if(!ticket||ticket.length<32)return null;
+      const user=await prisma.$transaction(async tx=>{const record=await tx.authTicket.findUnique({where:{tokenHash:hashActivationToken(ticket)},include:{user:true}});if(!record||record.consumedAt||record.expiresAt<=new Date()||record.user.status!=="ACTIVE")return null;await tx.authTicket.update({where:{id:record.id},data:{consumedAt:new Date()}});await tx.user.update({where:{id:record.user.id},data:{lastLoginAt:new Date()}});return record.user;});
+      if(!user)return null;return{id:user.id,email:user.email,name:user.name,image:user.image,role:user.role};
+    },
+  }),
+  CredentialsProvider({
+    id: "credentials",
     name: "Email and password",
     credentials: { email: { label: "Email", type: "email" }, password: { label: "Password", type: "password" } },
     async authorize(credentials) {
@@ -26,7 +38,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   providers.push(GoogleProvider({
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    allowDangerousEmailAccountLinking: true,
+    allowDangerousEmailAccountLinking: false,
   }));
 }
 
@@ -41,10 +53,11 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) { if (user.id) await ensureUserDefaults(user.id); },
   },
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
+      if(account?.provider==="google"&&profile&&"email_verified" in profile&&profile.email_verified!==true)return false;
       if (!user.id) return false;
-      const account = await prisma.user.findUnique({ where: { id: user.id }, select: { status: true } });
-      if (account?.status !== "ACTIVE") return false;
+      const dbAccount = await prisma.user.findUnique({ where: { id: user.id }, select: { status: true } });
+      if (dbAccount?.status !== "ACTIVE") return false;
       await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
       return true;
     },

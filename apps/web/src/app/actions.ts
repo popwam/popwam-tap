@@ -5,9 +5,9 @@ import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import {
   AccountStatus, DestinationType, Prisma, ProfileFieldType, ProfileTheme, prisma, SubscriptionStatus,
-  SystemRole, TagEventType, TagMode, TagStatus,
+  SystemRole, TagEventType, TagMode, TagStatus, ProfileType,
 } from "@popwam/db";
-import { defaultIconKeys, validateShortCode } from "@popwam/shared";
+import { defaultIconKeys, safeIconKey, validateShortCode } from "@popwam/shared";
 import { requireAdmin, requireUser } from "@/lib/session";
 import { canManageDestination, canManageTag } from "@/lib/permissions";
 import { isSafeDestinationUrl, normalizeAndValidate } from "@/lib/url";
@@ -24,6 +24,9 @@ function publicRevalidate(profile?: { id: string; slug?: string | null }) {
   revalidatePath("/dashboard");
   if (profile) {
     revalidatePath(`/p/id/${profile.id}`);
+    revalidatePath(`/manifest/profile/${profile.slug || profile.id}.webmanifest`);
+    revalidatePath(`/api/profile/${profile.slug || profile.id}/icon/192`);
+    revalidatePath(`/api/profile/${profile.slug || profile.id}/icon/512`);
     if (profile.slug) revalidatePath(`/p/${profile.slug}`);
   }
 }
@@ -56,6 +59,7 @@ export async function updateProfile(data: FormData) {
   const theme = Object.values(ProfileTheme).includes(text(data, "theme") as ProfileTheme) ? text(data, "theme") as ProfileTheme : profile.theme;
   const { effective } = await getUserEntitlements(profile.userId);
   if (theme !== "CLASSIC_DARK" && !effective.allowThemes) throw new Error("FEATURE_THEMES_REQUIRED");
+  if(Array.isArray(effective.availableThemes)&&!effective.availableThemes.map(String).includes(theme))throw new Error("THEME_NOT_AVAILABLE");
   const parseCrop = (key: string) => { try { return JSON.parse(text(data, key)) as Prisma.InputJsonValue; } catch { return undefined; } };
   const nextAvatarKey = optional(data, "avatarStorageKey"); const nextCoverKey = optional(data, "coverStorageKey");
   const visibility = Object.fromEntries([
@@ -79,8 +83,16 @@ export async function updateProfile(data: FormData) {
 }
 
 export async function updateProfileTheme(data: FormData) {
-  const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),...(user.role==="ADMIN"?{}:{userId:user.id})}});const theme=text(data,"theme") as ProfileTheme;if(!profile||!Object.values(ProfileTheme).includes(theme))throw new Error("THEME_INVALID");const {effective}=await getUserEntitlements(profile.userId);if(theme!==profile.theme&&!effective.allowThemes)throw new Error("FEATURE_THEMES_REQUIRED");await prisma.profile.update({where:{id:profile.id},data:{theme}});revalidatePath("/dashboard/appearance");revalidatePath("/dashboard/profile");publicRevalidate(profile);
+  const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),...(user.role==="ADMIN"?{}:{userId:user.id})}});const theme=text(data,"theme") as ProfileTheme;if(!profile||!Object.values(ProfileTheme).includes(theme))throw new Error("THEME_INVALID");const {effective}=await getUserEntitlements(profile.userId);if(theme!==profile.theme&&!effective.allowThemes)throw new Error("FEATURE_THEMES_REQUIRED");if(Array.isArray(effective.availableThemes)&&!effective.availableThemes.map(String).includes(theme))throw new Error("THEME_NOT_AVAILABLE");await prisma.profile.update({where:{id:profile.id},data:{theme}});revalidatePath("/dashboard/appearance");revalidatePath("/dashboard/profile");publicRevalidate(profile);
 }
+
+export async function createProfile(data:FormData){const user=await requireUser();const {effective}=await assertWithinLimit(user.id,"profiles");const type=text(data,"type") as ProfileType;if(!Object.values(ProfileType).includes(type))throw new Error("PROFILE_TYPE_INVALID");const available=Array.isArray(effective.availableProfileTypes)?effective.availableProfileTypes.map(String):["PERSONAL","ORGANIZATION"];if(!available.includes(type))throw new Error("PROFILE_TYPE_NOT_ALLOWED");const displayName=text(data,"displayName");if(!displayName)throw new Error("PROFILE_NAME_REQUIRED");const profile=await prisma.profile.create({data:{userId:user.id,type,displayName,displayNameAr:optional(data,"displayNameAr"),displayNameEn:optional(data,"displayNameEn"),organizationNameAr:type==="ORGANIZATION"?optional(data,"displayNameAr"):null,organizationNameEn:type==="ORGANIZATION"?optional(data,"displayNameEn"):null,primaryLanguage:text(data,"primaryLanguage")==="en"?"en":"ar",email:user.email}});await prisma.destination.createMany({data:[{userId:user.id,profileId:profile.id,type:"PROFILE",title:"Public profile",titleAr:"الملف العام",titleEn:"Public profile",url:`/p/id/${profile.id}`,iconKey:"profile"},{userId:user.id,profileId:profile.id,type:"VCF",title:"Save contact",titleAr:"حفظ جهة الاتصال",titleEn:"Save Contact",url:`/api/profiles/${profile.id}/contact.vcf`,iconKey:"contact"}]});revalidatePath("/dashboard/profiles");}
+
+export async function updateProfileContent(data:FormData){const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),userId:user.id}});if(!profile)throw new Error("PROFILE_NOT_FOUND");const type=text(data,"type") as ProfileType;if(!Object.values(ProfileType).includes(type))throw new Error("PROFILE_TYPE_INVALID");const website=optional(data,"website");if(website&&!isSafeDestinationUrl(website))throw new Error("INVALID_URL");const displayName=optional(data,"displayNameAr")||optional(data,"displayNameEn")||profile.displayName;await prisma.profile.update({where:{id:profile.id},data:{type,primaryLanguage:text(data,"primaryLanguage")==="en"?"en":"ar",displayName,firstName:optional(data,"firstName"),lastName:optional(data,"lastName"),displayNameAr:optional(data,"displayNameAr"),displayNameEn:optional(data,"displayNameEn"),jobTitleAr:optional(data,"jobTitleAr"),jobTitleEn:optional(data,"jobTitleEn"),company:optional(data,"company"),bioAr:optional(data,"bioAr"),bioEn:optional(data,"bioEn"),organizationNameAr:type==="ORGANIZATION"?optional(data,"displayNameAr"):null,organizationNameEn:type==="ORGANIZATION"?optional(data,"displayNameEn"):null,industryAr:optional(data,"industryAr"),industryEn:optional(data,"industryEn"),descriptionAr:optional(data,"descriptionAr"),descriptionEn:optional(data,"descriptionEn"),phone:optional(data,"phone"),alternatePhone:optional(data,"alternatePhone"),whatsappBusiness:optional(data,"whatsapp"),email:optional(data,"email"),website,addressAr:optional(data,"addressAr"),addressEn:optional(data,"addressEn"),contactNotesAr:optional(data,"contactNotesAr"),contactNotesEn:optional(data,"contactNotesEn")}});revalidatePath("/dashboard/profiles");publicRevalidate(profile);}
+
+export async function addProfileService(data:FormData){const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),userId:user.id,type:"ORGANIZATION"}});if(!profile)throw new Error("PROFILE_NOT_FOUND");const nameAr=optional(data,"nameAr"),nameEn=optional(data,"nameEn");if(!nameAr&&!nameEn)throw new Error("SERVICE_NAME_REQUIRED");const sortOrder=await prisma.profileService.count({where:{profileId:profile.id}});await prisma.profileService.create({data:{profileId:profile.id,nameAr,nameEn,descriptionAr:optional(data,"descriptionAr"),descriptionEn:optional(data,"descriptionEn"),sortOrder}});revalidatePath("/dashboard/profiles");publicRevalidate(profile);}
+
+export async function addProfileBranch(data:FormData){const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),userId:user.id,type:"ORGANIZATION"}});if(!profile)throw new Error("PROFILE_NOT_FOUND");const nameAr=optional(data,"nameAr"),nameEn=optional(data,"nameEn");if(!nameAr&&!nameEn)throw new Error("BRANCH_NAME_REQUIRED");const sortOrder=await prisma.profileBranch.count({where:{profileId:profile.id}});await prisma.profileBranch.create({data:{profileId:profile.id,nameAr,nameEn,addressAr:optional(data,"addressAr"),addressEn:optional(data,"addressEn"),phone:optional(data,"phone"),sortOrder}});revalidatePath("/dashboard/profiles");publicRevalidate(profile);}
 
 function destinationInput(data: FormData, profileId?: string) {
   const title = text(data, "title");
@@ -91,7 +103,7 @@ function destinationInput(data: FormData, profileId?: string) {
   if (!normalized.valid) throw new Error("INVALID_URL");
   const customIconUrl = optional(data, "customIconUrl");
   if (customIconUrl && !isSafeDestinationUrl(customIconUrl)) throw new Error("INVALID_URL");
-  return { title, type, url: normalized.url, iconKey: optional(data, "iconKey") || defaultIconKeys[type], customIconUrl, isActive: data.get("isActive") === "on", isOfflineCapable: data.get("isOfflineCapable") === "on" };
+  return { title, titleAr: optional(data,"titleAr"), titleEn: optional(data,"titleEn"), type, url: normalized.url, iconKey: safeIconKey(optional(data, "iconKey"), defaultIconKeys[type]), customIconUrl, isActive: data.get("isActive") === "on", isOfflineCapable: data.get("isOfflineCapable") === "on" };
 }
 
 export async function createDestination(data: FormData) {
@@ -197,7 +209,7 @@ export async function updateOwnedTag(data: FormData) {
   }
   await prisma.$transaction([
     prisma.tag.update({ where: { id }, data: { status, activeDestinationId, mode: destination?.type === DestinationType.PROFILE ? TagMode.PROFILE : TagMode.REDIRECT } }),
-    prisma.tagEvent.create({ data: { tagId: id, type: status !== tag.status ? TagEventType.STATUS_CHANGE : TagEventType.UPDATED, metadata: { activeDestinationId, destinationType: destination?.type || null } } }),
+    prisma.tagEvent.create({ data: { tagId: id, type: status !== tag.status ? TagEventType.STATUS_CHANGE : TagEventType.UPDATED } }),
   ]);
   revalidatePath("/dashboard"); revalidatePath("/dashboard/tags"); revalidatePath(`/dashboard/tags/${id}`); revalidatePath(`/${tag.shortCode}`); revalidatePath(`/t/${tag.token}`);
 }
@@ -206,7 +218,7 @@ export async function updateTagDetails(data: FormData) {
   const user = await requireUser(); const id = text(data, "id"); const existing = await prisma.tag.findFirst({ where: { id, ownerId: user.id } });
   if (!existing) throw new Error("TAG_NOT_FOUND"); const name = text(data, "name"); const result = validateShortCode(text(data, "shortCode")); if (!name || !result.valid) throw new Error(result.valid ? "TAG_INVALID" : `SHORT_CODE_${result.reason.toUpperCase()}`);
   if (result.code !== existing.shortCode) { const { effective } = await getUserEntitlements(user.id); if (!effective.allowCustomSlug) throw new Error("FEATURE_CUSTOM_SLUG_REQUIRED"); }
-  try { await prisma.$transaction(async tx => { const [collision,alias] = await Promise.all([tx.tag.findUnique({ where: { shortCode: result.code } }),tx.tagAlias.findUnique({ where: { code: result.code } })]); if ((collision && collision.id !== existing.id) || (alias && alias.tagId !== existing.id)) throw new Error("SHORT_CODE_IN_USE"); if (!alias) await tx.tagAlias.create({ data: { code: result.code, tagId: existing.id } }); await tx.tag.update({ where: { id }, data: { name, shortCode: result.code } }); await tx.tagEvent.create({ data: { tagId: id, type: TagEventType.UPDATED, metadata: { previousName: existing.name, previousShortCode: existing.shortCode, shortCode: result.code } } }); }); }
+  try { await prisma.$transaction(async tx => { const [collision,alias] = await Promise.all([tx.tag.findUnique({ where: { shortCode: result.code } }),tx.tagAlias.findUnique({ where: { code: result.code } })]); if ((collision && collision.id !== existing.id) || (alias && alias.tagId !== existing.id)) throw new Error("SHORT_CODE_IN_USE"); if (!alias) await tx.tagAlias.create({ data: { code: result.code, tagId: existing.id } }); await tx.tag.update({ where: { id }, data: { name, shortCode: result.code } }); await tx.tagEvent.create({ data: { tagId: id, type: TagEventType.UPDATED } }); }); }
   catch (error) { if (isUniqueConstraintError(error)) throw new Error("SHORT_CODE_IN_USE"); throw error; }
   revalidatePath("/dashboard/tags"); revalidatePath(`/dashboard/tags/${id}`); revalidatePath(`/${existing.shortCode}`); revalidatePath(`/${result.code}`);
 }
@@ -248,7 +260,7 @@ export async function updateAdminTag(data: FormData) {
   if (ownerChanged) await assertWithinLimit(ownerId, "tags");
   await prisma.$transaction([
     prisma.tag.update({ where: { id }, data: { ownerId, status, ...(ownerChanged ? { profileId: null, activeDestinationId: null, organizationId: null, mode: TagMode.REDIRECT } : {}), ...(data.get("programmed") === "on" && !existing.programmedAt ? { programmedAt: new Date() } : {}), ...(data.get("locked") === "on" && !existing.lockedAt ? { lockedAt: new Date() } : {}) } }),
-    prisma.tagEvent.create({ data: { tagId: id, type: existing.status !== status ? TagEventType.STATUS_CHANGE : TagEventType.UPDATED, metadata: { admin: true, previousOwnerId: existing.ownerId, ownerId } } }),
+    prisma.tagEvent.create({ data: { tagId: id, type: existing.status !== status ? TagEventType.STATUS_CHANGE : TagEventType.UPDATED } }),
   ]);
   await audit(admin.id, "admin.tag.update", id, { ownerId, status }); revalidatePath("/admin/tags"); revalidatePath("/dashboard/tags");
 }
@@ -270,9 +282,18 @@ export async function assignUserPlan(data: FormData) {
 }
 
 export type PlanActionState={ok:boolean;code?:string;id?:string};
-export async function saveAdminPlan(_previous:PlanActionState,data:FormData):Promise<PlanActionState>{const admin=await requireAdmin();const id=optional(data,"id");const slug=text(data,"slug").toLowerCase();const nameEn=text(data,"nameEn");const nameAr=text(data,"nameAr");if(!/^[a-z0-9-]{2,48}$/.test(slug)||!nameEn||!nameAr)return{ok:false,code:"PLAN_INVALID_TEXT"};const numericKeys=["maxProfiles","maxLinks","maxCustomFields","maxTags","maxUploads","maxStorageBytes","sortOrder"] as const;const values:Record<string,number|bigint>={};for(const key of numericKeys){const raw=text(data,key);if(!/^\d+$/.test(raw))return{ok:false,code:"PLAN_INVALID_LIMIT"};values[key]=key==="maxStorageBytes"?BigInt(raw):Number(raw);}const payload={name:nameEn,nameEn,nameAr,slug,description:optional(data,"descriptionEn"),descriptionEn:optional(data,"descriptionEn"),descriptionAr:optional(data,"descriptionAr"),isActive:data.get("isActive")==="on",sortOrder:Number(values.sortOrder),maxProfiles:Number(values.maxProfiles),maxLinks:Number(values.maxLinks),maxCustomFields:Number(values.maxCustomFields),maxTags:Number(values.maxTags),maxUploads:Number(values.maxUploads),maxStorageBytes:BigInt(values.maxStorageBytes),allowCustomSlug:data.get("allowCustomSlug")==="on",allowThemes:data.get("allowThemes")==="on",allowCustomTheme:data.get("allowCustomTheme")==="on",allowAnalytics:data.get("allowAnalytics")==="on",allowFileUploads:data.get("allowFileUploads")==="on",allowCustomIcons:data.get("allowCustomIcons")==="on"};try{const plan=id?await prisma.plan.update({where:{id},data:payload}):await prisma.plan.create({data:payload});await audit(admin.id,id?"admin.plan.update":"admin.plan.create",plan.id);revalidatePath("/admin/plans");revalidatePath(`/admin/plans/${plan.id}`);return{ok:true,id:plan.id};}catch(error){if(isUniqueConstraintError(error))return{ok:false,code:"PLAN_SLUG_IN_USE"};console.error("plan save failed",{operation:id?"plan.update":"plan.create",adminId:admin.id});return{ok:false,code:"PLAN_SAVE_FAILED"};}}
+export async function saveAdminPlan(_previous:PlanActionState,data:FormData):Promise<PlanActionState>{
+  const admin=await requireAdmin();const id=optional(data,"id");const slug=text(data,"slug").toLowerCase();const nameEn=text(data,"nameEn");const nameAr=text(data,"nameAr");
+  if(!/^[a-z0-9-]{2,48}$/.test(slug)||!nameEn||!nameAr)return{ok:false,code:"PLAN_INVALID_TEXT"};
+  const numericKeys=["maxProfiles","maxLinks","maxCustomFields","maxCards","maxFiles","maxStorageBytes","sortOrder"] as const;const values:Record<string,number|bigint>={};
+  for(const key of numericKeys){const raw=text(data,key);if(!/^\d+$/.test(raw))return{ok:false,code:"PLAN_INVALID_LIMIT"};values[key]=key==="maxStorageBytes"?BigInt(raw):Number(raw);}
+  let availableProfileTypes:Prisma.InputJsonValue;let availableThemes:Prisma.InputJsonValue;try{availableProfileTypes=JSON.parse(text(data,"availableProfileTypes"));availableThemes=JSON.parse(text(data,"availableThemes"));if(!Array.isArray(availableProfileTypes)||!Array.isArray(availableThemes))throw new Error();}catch{return{ok:false,code:"PLAN_INVALID_TEXT"};}
+  const customSlugAllowed=data.get("customSlugAllowed")==="on";const analyticsAllowed=data.get("analyticsAllowed")==="on";const maxCards=Number(values.maxCards);const maxFiles=Number(values.maxFiles);
+  const payload={name:nameEn,nameEn,nameAr,slug,description:optional(data,"descriptionEn"),descriptionEn:optional(data,"descriptionEn"),descriptionAr:optional(data,"descriptionAr"),isActive:data.get("isActive")==="on",sortOrder:Number(values.sortOrder),maxProfiles:Number(values.maxProfiles),maxLinks:Number(values.maxLinks),maxCustomFields:Number(values.maxCustomFields),maxCards,maxTags:maxCards,maxFiles,maxUploads:maxFiles,maxStorageBytes:BigInt(values.maxStorageBytes),customSlugAllowed,allowCustomSlug:customSlugAllowed,allowThemes:data.get("allowThemes")==="on",allowCustomTheme:data.get("allowCustomTheme")==="on",analyticsAllowed,allowAnalytics:analyticsAllowed,allowFileUploads:data.get("allowFileUploads")==="on",allowCustomIcons:data.get("allowCustomIcons")==="on",availableProfileTypes,availableThemes};
+  try{const plan=id?await prisma.plan.update({where:{id},data:payload}):await prisma.plan.create({data:payload});await audit(admin.id,id?"admin.plan.update":"admin.plan.create",plan.id);revalidatePath("/admin/plans");revalidatePath(`/admin/plans/${plan.id}`);return{ok:true,id:plan.id};}catch(error){if(isUniqueConstraintError(error))return{ok:false,code:"PLAN_SLUG_IN_USE"};console.error("plan save failed",{operation:id?"plan.update":"plan.create",adminId:admin.id});return{ok:false,code:"PLAN_SAVE_FAILED"};}
+}
 
-export async function duplicateAdminPlan(data:FormData){const admin=await requireAdmin();const source=await prisma.plan.findUnique({where:{id:text(data,"id")}});if(!source)throw new Error("PLAN_NOT_FOUND");const {id,createdAt,updatedAt,...copy}=source;let suffix=1;let slug=`${source.slug}-copy`;while(await prisma.plan.findUnique({where:{slug}}))slug=`${source.slug}-copy-${++suffix}`;const plan=await prisma.plan.create({data:{...copy,name:`${source.name} Copy`,nameEn:`${source.nameEn||source.name} Copy`,nameAr:`نسخة ${source.nameAr||source.name}`,slug,isActive:false,sortOrder:source.sortOrder+1}});await audit(admin.id,"admin.plan.duplicate",plan.id,{sourceId:id});revalidatePath("/admin/plans");}
+export async function duplicateAdminPlan(data:FormData){const admin=await requireAdmin();const source=await prisma.plan.findUnique({where:{id:text(data,"id")}});if(!source)throw new Error("PLAN_NOT_FOUND");const {id,createdAt,updatedAt,availableProfileTypes,availableThemes,...copy}=source;let suffix=1;let slug=`${source.slug}-copy`;while(await prisma.plan.findUnique({where:{slug}}))slug=`${source.slug}-copy-${++suffix}`;const plan=await prisma.plan.create({data:{...copy,availableProfileTypes:availableProfileTypes===null?Prisma.JsonNull:availableProfileTypes as Prisma.InputJsonValue,availableThemes:availableThemes===null?Prisma.JsonNull:availableThemes as Prisma.InputJsonValue,name:`${source.name} Copy`,nameEn:`${source.nameEn||source.name} Copy`,nameAr:`نسخة ${source.nameAr||source.name}`,slug,isActive:false,sortOrder:source.sortOrder+1}});await audit(admin.id,"admin.plan.duplicate",plan.id,{sourceId:id});revalidatePath("/admin/plans");}
 
 export async function deleteAdminPlan(data:FormData){const admin=await requireAdmin();const id=text(data,"id");const assigned=await prisma.userPlan.count({where:{planId:id}});if(assigned>0)throw new Error("PLAN_ASSIGNED_USERS");await prisma.plan.delete({where:{id}});await audit(admin.id,"admin.plan.delete",id);revalidatePath("/admin/plans");}
 
@@ -280,9 +301,9 @@ export async function updateUserLimits(data: FormData) {
   const admin = await requireAdmin(); const userId = text(data, "userId");
   await prisma.userLimitOverride.upsert({ where: { userId }, create: { userId }, update: {}, });
   await prisma.userLimitOverride.update({ where: { userId }, data: {
-    maxProfiles: nullableNumber(data, "maxProfiles"), maxLinks: nullableNumber(data, "maxLinks"), maxCustomFields: nullableNumber(data, "maxCustomFields"), maxTags: nullableNumber(data, "maxTags"), maxUploads: nullableNumber(data, "maxUploads"),
+    maxProfiles: nullableNumber(data, "maxProfiles"), maxLinks: nullableNumber(data, "maxLinks"), maxCustomFields: nullableNumber(data, "maxCustomFields"), maxCards: nullableNumber(data, "maxCards"), maxTags: nullableNumber(data, "maxCards"), maxFiles: nullableNumber(data, "maxFiles"), maxUploads: nullableNumber(data, "maxFiles"),
     maxStorageBytes: text(data, "maxStorageBytes") ? BigInt(text(data, "maxStorageBytes")) : null,
-    allowCustomSlug: optionalBoolean(data, "allowCustomSlug"), allowThemes: optionalBoolean(data, "allowThemes"), allowCustomTheme: optionalBoolean(data, "allowCustomTheme"), allowAnalytics: optionalBoolean(data, "allowAnalytics"), allowFileUploads: optionalBoolean(data, "allowFileUploads"), allowCustomIcons: optionalBoolean(data, "allowCustomIcons"),
+    customSlugAllowed: optionalBoolean(data, "customSlugAllowed"), allowCustomSlug: optionalBoolean(data, "customSlugAllowed"), allowThemes: optionalBoolean(data, "allowThemes"), allowCustomTheme: optionalBoolean(data, "allowCustomTheme"), analyticsAllowed: optionalBoolean(data, "analyticsAllowed"), allowAnalytics: optionalBoolean(data, "analyticsAllowed"), allowFileUploads: optionalBoolean(data, "allowFileUploads"), allowCustomIcons: optionalBoolean(data, "allowCustomIcons"),
   }});
   await audit(admin.id, "admin.user.limits", userId); revalidatePath(`/admin/users/${userId}`);
 }

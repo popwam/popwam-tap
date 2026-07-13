@@ -1,3 +1,3 @@
-export { default } from "next-auth/middleware";
-
-export const config = { matcher: ["/dashboard/:path*", "/admin/:path*"] };
+import {NextResponse,type NextRequest} from "next/server";import {getToken} from "next-auth/jwt";
+export async function middleware(request:NextRequest){const host=(request.headers.get("host")||"").split(":")[0];const path=request.nextUrl.pathname;if(host==="go.popwam.com"&&(path==="/login"||path.startsWith("/dashboard")||path.startsWith("/admin"))){const url=request.nextUrl.clone();url.hostname="app.popwam.com";url.protocol="https:";url.port="";return NextResponse.redirect(url)}if(path.startsWith("/dashboard")||path.startsWith("/admin")){const token=await getToken({req:request,secret:process.env.NEXTAUTH_SECRET});if(!token){const url=request.nextUrl.clone();url.pathname="/login";url.searchParams.set("callbackUrl",path);return NextResponse.redirect(url)}if(path.startsWith("/admin")&&token.role!=="ADMIN"){const url=request.nextUrl.clone();url.pathname="/dashboard";return NextResponse.redirect(url)}}return NextResponse.next()}
+export const config={matcher:["/login","/dashboard/:path*","/admin/:path*"]};

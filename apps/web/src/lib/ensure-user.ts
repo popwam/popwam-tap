@@ -11,7 +11,9 @@ type DbClient = Prisma.TransactionClient | typeof prisma;
 
 export async function ensurePlans(db: DbClient = prisma) {
   for (const plan of DEFAULT_PLANS) {
-    await db.plan.upsert({ where: { slug: plan.slug }, update: plan, create: plan });
+    const allThemes=["CLASSIC_DARK","CLASSIC_LIGHT","ELEGANT_DARK","ELEGANT_LIGHT","BUSINESS_DARK","BUSINESS_LIGHT"];
+    const normalized={...plan,maxCards:plan.maxTags,maxFiles:plan.maxUploads,customSlugAllowed:plan.allowCustomSlug,analyticsAllowed:plan.allowAnalytics,availableProfileTypes:plan.slug==="free"||plan.slug==="personal"?["PERSONAL"]:["PERSONAL","ORGANIZATION"],availableThemes:plan.slug==="free"?["CLASSIC_DARK"]:plan.slug==="personal"?allThemes.slice(0,4):allThemes};
+    await db.plan.upsert({ where: { slug: plan.slug }, update: normalized, create: normalized });
   }
 }
 
@@ -35,11 +37,13 @@ export async function ensureUserDefaultsInTransaction(db: Prisma.TransactionClie
   });
 
   let profile = await db.profile.findFirst({ where: { userId: user.id, organizationId: null } });
-  if (!profile) profile = await db.profile.create({ data: { userId: user.id, displayName: user.name || slugBase, email: user.email } });
+  if (!profile) profile = await db.profile.create({ data: { userId: user.id, displayName: user.name || slugBase, displayNameAr: user.name || slugBase, type: "PERSONAL", primaryLanguage: "ar", email: user.email } });
   const profileDestination = await db.destination.findFirst({ where: { userId: user.id, profileId: profile.id, type: DestinationType.PROFILE } });
   if (!profileDestination) {
-    await db.destination.create({ data: { userId: user.id, profileId: profile.id, type: DestinationType.PROFILE, title: "Public profile", url: `/p/id/${profile.id}`, icon: "profile" } });
+    await db.destination.create({ data: { userId: user.id, profileId: profile.id, type: DestinationType.PROFILE, title: "Public profile", titleAr: "الملف العام", titleEn: "Public profile", url: `/p/id/${profile.id}`, icon: "profile", iconKey: "profile" } });
   }
+  const vcardDestination = await db.destination.findFirst({ where: { userId: user.id, profileId: profile.id, type: DestinationType.VCF } });
+  if (!vcardDestination) await db.destination.create({ data: { userId: user.id, profileId: profile.id, type: DestinationType.VCF, title: "Save contact", titleAr: "حفظ جهة الاتصال", titleEn: "Save Contact", url: `/api/profiles/${profile.id}/contact.vcf`, icon: "contact", iconKey: "contact" } });
   const activePlan = await db.userPlan.findFirst({ where: { userId: user.id, status: "ACTIVE" } });
   if (!activePlan) await db.userPlan.create({ data: { userId: user.id, planId: freePlan.id } });
   return { user, organization, profile, plan: freePlan };

@@ -71,6 +71,33 @@ enum ProfileTheme {
   CLASSIC_LIGHT
   ELEGANT_DARK
   ELEGANT_LIGHT
+  BUSINESS_DARK
+  BUSINESS_LIGHT
+}
+
+enum ProfileType {
+  PERSONAL
+  ORGANIZATION
+}
+
+enum OtpPurpose {
+  LOGIN
+  ACTIVATION
+}
+
+enum OtpDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  VERIFIED
+  EXPIRED
+}
+
+enum ActivationClaimStatus {
+  PENDING_OTP
+  VERIFIED
+  CONSUMED
+  EXPIRED
 }
 
 enum TagMode {
@@ -94,59 +121,159 @@ enum TagEventType {
   UPDATED
 }
 
+enum CardType {
+  NFC_CARD
+  NFC_STICKER
+  WRISTBAND
+  QR_ONLY
+}
+
+enum AssignmentStatus {
+  UNASSIGNED
+  SELF_CLAIMED
+  ADMIN_ASSIGNED
+  TRANSFER_PENDING
+  TRANSFERRED
+  REVOKED
+}
+
+enum CardStatus {
+  CREATED
+  PROGRAMMED
+  ACTIVE
+  PAUSED
+  LOST
+  DISABLED
+  ARCHIVED
+}
+
+enum CardInventoryStatus {
+  AVAILABLE
+  RESERVED
+  PROGRAMMED
+  ASSIGNED
+  SOLD
+  DAMAGED
+  LOST
+}
+
+enum InventoryItemType {
+  BLANK_CARD
+  BLANK_STICKER
+  BLANK_WRISTBAND
+  QR_PRODUCT
+  PACKAGING
+  ACCESSORY
+  OTHER
+}
+
+enum InventoryMovementType {
+  PURCHASE
+  CARD_BATCH_CREATED
+  RESERVED
+  SOLD
+  RETURNED
+  DAMAGED
+  LOST
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+}
+
+enum PurchaseStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  REFUNDED
+}
+
 model User {
-  id                 String         @id @default(cuid())
+  id                 String                   @id @default(cuid())
   name               String?
-  email              String         @unique
+  email              String                   @unique
   emailVerified      DateTime?
   image              String?
   passwordHash       String?
-  role               SystemRole     @default(USER)
-  status             AccountStatus  @default(ACTIVE)
+  phone              String?                  @unique
+  phoneVerifiedAt    DateTime?
+  role               SystemRole               @default(USER)
+  status             AccountStatus            @default(ACTIVE)
   locale             String?
   lastLoginAt        DateTime?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
   accounts           Account[]
   sessions           Session[]
   profiles           Profile[]
   destinations       Destination[]
-  ownedTags           Tag[]          @relation("TagOwner")
-  organizationsOwned Organization[] @relation("OrganizationOwner")
+  ownedTags          Tag[]                    @relation("TagOwner")
+  organizationsOwned Organization[]           @relation("OrganizationOwner")
   memberships        Membership[]
   subscriptions      UserPlan[]
   limitOverride      UserLimitOverride?
   profileFields      ProfileField[]
-  uploads            UploadedFile[] @relation("UploadedBy")
-  auditLogs          AuditLog[]      @relation("AuditActor")
+  uploads            UploadedFile[]           @relation("UploadedBy")
+  auditLogs          AuditLog[]               @relation("AuditActor")
+  ownedCards         Card[]                   @relation("CardOwner")
+  createdCardBatches CardBatch[]              @relation("CardBatchCreator")
+  inventoryMovements InventoryMovement[]      @relation("InventoryMovementCreator")
+  createdPurchases   Purchase[]               @relation("PurchaseCreator")
+  createdExpenses    Expense[]                @relation("ExpenseCreator")
+  createdOrders      Order[]                  @relation("OrderCreator")
+  customer           Customer?
+  activationClaims   ActivationClaimSession[]
+  authTickets        AuthTicket[]
 }
 
 model Plan {
-  id               String   @id @default(cuid())
-  name             String
-  nameAr           String?
-  nameEn           String?
-  slug             String   @unique
-  description      String?
-  descriptionAr    String?
-  descriptionEn    String?
-  isActive         Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  maxProfiles      Int      @default(1)
-  maxLinks         Int      @default(5)
-  maxCustomFields  Int      @default(3)
-  maxTags          Int      @default(1)
-  maxUploads       Int      @default(0)
-  maxStorageBytes  BigInt   @default(0)
-  allowCustomSlug  Boolean  @default(false)
-  allowThemes      Boolean  @default(false)
-  allowCustomTheme Boolean  @default(false)
-  allowAnalytics   Boolean  @default(false)
-  allowFileUploads Boolean  @default(false)
-  allowCustomIcons Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  subscriptions    UserPlan[]
+  id                    String     @id @default(cuid())
+  name                  String
+  nameAr                String?
+  nameEn                String?
+  slug                  String     @unique
+  description           String?
+  descriptionAr         String?
+  descriptionEn         String?
+  isActive              Boolean    @default(true)
+  sortOrder             Int        @default(0)
+  maxProfiles           Int        @default(1)
+  maxLinks              Int        @default(5)
+  maxCustomFields       Int        @default(3)
+  maxTags               Int        @default(1)
+  maxCards              Int        @default(1)
+  maxUploads            Int        @default(0)
+  maxFiles              Int        @default(0)
+  maxStorageBytes       BigInt     @default(0)
+  allowCustomSlug       Boolean    @default(false)
+  customSlugAllowed     Boolean    @default(false)
+  allowThemes           Boolean    @default(false)
+  allowCustomTheme      Boolean    @default(false)
+  allowAnalytics        Boolean    @default(false)
+  analyticsAllowed      Boolean    @default(false)
+  availableProfileTypes Json?
+  availableThemes       Json?
+  allowFileUploads      Boolean    @default(false)
+  allowCustomIcons      Boolean    @default(false)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  subscriptions         UserPlan[]
 }
 
 model UserPlan {
@@ -160,28 +287,35 @@ model UserPlan {
   updatedAt DateTime           @updatedAt
   user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan      Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+
   @@index([userId, status])
   @@index([planId])
 }
 
 model UserLimitOverride {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  maxProfiles      Int?
-  maxLinks         Int?
-  maxCustomFields  Int?
-  maxTags          Int?
-  maxUploads       Int?
-  maxStorageBytes  BigInt?
-  allowCustomSlug  Boolean?
-  allowThemes      Boolean?
-  allowCustomTheme Boolean?
-  allowAnalytics   Boolean?
-  allowFileUploads Boolean?
-  allowCustomIcons Boolean?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  maxProfiles           Int?
+  maxLinks              Int?
+  maxCustomFields       Int?
+  maxTags               Int?
+  maxCards              Int?
+  maxUploads            Int?
+  maxFiles              Int?
+  maxStorageBytes       BigInt?
+  allowCustomSlug       Boolean?
+  customSlugAllowed     Boolean?
+  allowThemes           Boolean?
+  allowCustomTheme      Boolean?
+  allowAnalytics        Boolean?
+  analyticsAllowed      Boolean?
+  availableProfileTypes Json?
+  availableThemes       Json?
+  allowFileUploads      Boolean?
+  allowCustomIcons      Boolean?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {
@@ -197,7 +331,8 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([provider, providerAccountId])
 }
 
@@ -206,13 +341,14 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
+
   @@unique([identifier, token])
 }
 
@@ -228,6 +364,8 @@ model Organization {
   profiles     Profile[]
   destinations Destination[]
   tags         Tag[]
+  cards        Card[]
+  cardBatches  CardBatch[]
 }
 
 model Membership {
@@ -239,60 +377,89 @@ model Membership {
   updatedAt      DateTime     @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([organizationId, userId])
   @@index([userId])
 }
 
 model Profile {
-  id                String        @id @default(cuid())
-  userId            String
-  organizationId    String?
-  slug              String?       @unique
-  displayName       String
-  title             String?
-  bio               String?
-  avatarUrl          String?
-  avatarStorageKey  String?
-  coverUrl           String?
-  coverStorageKey   String?
-  phone              String?
-  whatsappBusiness  String?
-  whatsappPrivate   String?
-  email              String?
-  website            String?
-  facebook           String?
-  linkedin           String?
-  github             String?
-  tiktok             String?
-  vcfUrl             String?
-  locationText       String?
-  isPublic           Boolean       @default(true)
-  theme              ProfileTheme  @default(CLASSIC_DARK)
-  avatarCrop         Json?
-  coverCrop          Json?
-  showAvatar         Boolean       @default(true)
-  showCover          Boolean       @default(true)
-  showDisplayName    Boolean       @default(true)
-  showTitle          Boolean       @default(true)
-  showBio            Boolean       @default(true)
-  showPhone          Boolean       @default(true)
-  showEmail          Boolean       @default(true)
-  showWebsite        Boolean       @default(true)
-  showLocation       Boolean       @default(true)
-  showWhatsappBusiness Boolean     @default(true)
-  showWhatsappPrivate  Boolean     @default(true)
-  showSocialLinks    Boolean       @default(true)
-  showCustomFields   Boolean       @default(true)
-  showUploadedFiles  Boolean       @default(true)
-  showSaveContact    Boolean       @default(true)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  destinations       Destination[]
-  tags               Tag[]
-  fields             ProfileField[]
-  uploads            UploadedFile[]
+  id                   String           @id @default(cuid())
+  userId               String
+  organizationId       String?
+  slug                 String?          @unique
+  displayName          String
+  type                 ProfileType      @default(PERSONAL)
+  primaryLanguage      String           @default("ar")
+  firstName            String?
+  lastName             String?
+  displayNameAr        String?
+  displayNameEn        String?
+  title                String?
+  jobTitleAr           String?
+  jobTitleEn           String?
+  company              String?
+  bio                  String?
+  bioAr                String?
+  bioEn                String?
+  organizationNameAr   String?
+  organizationNameEn   String?
+  industryAr           String?
+  industryEn           String?
+  descriptionAr        String?
+  descriptionEn        String?
+  avatarUrl            String?
+  avatarStorageKey     String?
+  coverUrl             String?
+  coverStorageKey      String?
+  logoUrl              String?
+  logoStorageKey       String?
+  phone                String?
+  alternatePhone       String?
+  whatsappBusiness     String?
+  whatsappPrivate      String?
+  email                String?
+  website              String?
+  facebook             String?
+  linkedin             String?
+  github               String?
+  tiktok               String?
+  vcfUrl               String?
+  locationText         String?
+  addressAr            String?
+  addressEn            String?
+  contactNotesAr       String?
+  contactNotesEn       String?
+  isPublic             Boolean          @default(true)
+  theme                ProfileTheme     @default(CLASSIC_DARK)
+  avatarCrop           Json?
+  coverCrop            Json?
+  showAvatar           Boolean          @default(true)
+  showCover            Boolean          @default(true)
+  showDisplayName      Boolean          @default(true)
+  showTitle            Boolean          @default(true)
+  showBio              Boolean          @default(true)
+  showPhone            Boolean          @default(true)
+  showEmail            Boolean          @default(true)
+  showWebsite          Boolean          @default(true)
+  showLocation         Boolean          @default(true)
+  showWhatsappBusiness Boolean          @default(true)
+  showWhatsappPrivate  Boolean          @default(true)
+  showSocialLinks      Boolean          @default(true)
+  showCustomFields     Boolean          @default(true)
+  showUploadedFiles    Boolean          @default(true)
+  showSaveContact      Boolean          @default(true)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization         Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  destinations         Destination[]
+  tags                 Tag[]
+  cards                Card[]
+  fields               ProfileField[]
+  uploads              UploadedFile[]
+  services             ProfileService[]
+  branches             ProfileBranch[]
+
   @@index([userId])
   @@index([organizationId])
   @@index([slug])
@@ -303,6 +470,8 @@ model ProfileField {
   profileId     String
   userId        String
   label         String
+  labelAr       String?
+  labelEn       String?
   value         String
   type          ProfileFieldType @default(TEXT)
   iconKey       String?
@@ -314,81 +483,92 @@ model ProfileField {
   updatedAt     DateTime         @updatedAt
   profile       Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([profileId, isVisible, sortOrder])
   @@index([userId])
 }
 
 model UploadedFile {
-  id               String   @id @default(cuid())
-  profileId        String?
-  uploaderUserId   String
-  storageKey       String   @unique
-  publicUrl        String
-  originalFilename String
-  mimeType         String
-  sizeBytes        BigInt
-  title            String?
-  isVisible        Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  profile          Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  uploader         User     @relation("UploadedBy", fields: [uploaderUserId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(cuid())
+  profileId          String?
+  uploaderUserId     String
+  storageKey         String    @unique
+  publicUrl          String
+  originalFilename   String
+  originalName       String?
+  mimeType           String
+  sizeBytes          BigInt
+  title              String?
+  displayTitleAr     String?
+  displayTitleEn     String?
+  isVisible          Boolean   @default(true)
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  profile            Profile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  uploader           User      @relation("UploadedBy", fields: [uploaderUserId], references: [id], onDelete: Cascade)
+  expenseAttachments Expense[]
+
   @@index([uploaderUserId, createdAt])
   @@index([profileId, isVisible])
 }
 
 model Destination {
-  id               String          @id @default(cuid())
-  userId           String
-  organizationId   String?
-  profileId        String?
-  title            String
-  type             DestinationType
-  url              String
-  icon             String?
-  iconKey          String?
-  customIconUrl    String?
+  id                   String          @id @default(cuid())
+  userId               String
+  organizationId       String?
+  profileId            String?
+  title                String
+  titleAr              String?
+  titleEn              String?
+  type                 DestinationType
+  url                  String
+  icon                 String?
+  iconKey              String?
+  customIconUrl        String?
   customIconStorageKey String?
-  customIconType   String?
-  isActive         Boolean         @default(true)
-  isVisible        Boolean         @default(true)
-  sortOrder        Int             @default(0)
-  isOfflineCapable Boolean         @default(false)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization     Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  profile          Profile?        @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  activeForTags    Tag[]            @relation("ActiveDestination")
+  customIconType       String?
+  isActive             Boolean         @default(true)
+  isVisible            Boolean         @default(true)
+  sortOrder            Int             @default(0)
+  isOfflineCapable     Boolean         @default(false)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization         Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  profile              Profile?        @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  activeForTags        Tag[]           @relation("ActiveDestination")
+  activeForCards       Card[]          @relation("CardActiveDestination")
+
   @@index([userId])
   @@index([organizationId])
   @@index([profileId])
 }
 
 model Tag {
-  id                  String       @id @default(cuid())
-  token               String       @unique
-  shortCode           String       @unique
+  id                  String        @id @default(cuid())
+  token               String        @unique
+  shortCode           String        @unique
   ownerId             String
   organizationId      String?
   profileId           String?
   activeDestinationId String?
   name                String
-  mode                 TagMode      @default(PROFILE)
-  status               TagStatus    @default(ACTIVE)
-  programmedAt         DateTime?
-  lockedAt             DateTime?
-  lastScannedAt        DateTime?
-  scanCount            Int          @default(0)
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
-  owner                User         @relation("TagOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  organization         Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  profile              Profile?     @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  activeDestination    Destination? @relation("ActiveDestination", fields: [activeDestinationId], references: [id], onDelete: SetNull)
-  events               TagEvent[]
-  aliases              TagAlias[]
+  mode                TagMode       @default(PROFILE)
+  status              TagStatus     @default(ACTIVE)
+  programmedAt        DateTime?
+  lockedAt            DateTime?
+  lastScannedAt       DateTime?
+  scanCount           Int           @default(0)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  owner               User          @relation("TagOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  profile             Profile?      @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  activeDestination   Destination?  @relation("ActiveDestination", fields: [activeDestinationId], references: [id], onDelete: SetNull)
+  events              TagEvent[]
+  aliases             TagAlias[]
+
   @@index([token])
   @@index([shortCode])
   @@index([ownerId])
@@ -401,6 +581,7 @@ model TagAlias {
   tagId     String
   createdAt DateTime @default(now())
   tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
   @@index([tagId])
 }
 
@@ -408,13 +589,382 @@ model TagEvent {
   id        String       @id @default(cuid())
   tagId     String
   type      TagEventType
-  ipAddress String?
-  userAgent String?
-  referrer  String?
-  metadata  Json?
   createdAt DateTime     @default(now())
   tag       Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
   @@index([tagId, createdAt])
+}
+
+model CardBatch {
+  id                   String         @id @default(cuid())
+  name                 String
+  supplierId           String?
+  inventoryItemId      String?
+  cardType             CardType
+  quantity             Int
+  serialPrefix         String
+  startingSerialNumber Int
+  publicSlugPrefix     String
+  unitPurchaseCost     Decimal        @default(0) @db.Decimal(14, 2)
+  unitProgrammingCost  Decimal        @default(0) @db.Decimal(14, 2)
+  unitPackagingCost    Decimal        @default(0) @db.Decimal(14, 2)
+  expectedSellingPrice Decimal        @default(0) @db.Decimal(14, 2)
+  notes                String?
+  createdBy            String
+  createdAt            DateTime       @default(now())
+  supplier             Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  inventoryItem        InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  creator              User           @relation("CardBatchCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  cards                Card[]
+  organization         Organization?  @relation(fields: [organizationId], references: [id])
+  organizationId       String?
+
+  @@index([supplierId])
+  @@index([createdAt])
+}
+
+model Card {
+  id                        String                   @id @default(cuid())
+  serialNumber              String                   @unique
+  publicSlug                String                   @unique
+  publicToken               String                   @unique
+  activationTokenHash       String
+  activationTokenConsumedAt DateTime?
+  cardType                  CardType
+  batchId                   String?
+  ownerId                   String?
+  organizationId            String?
+  profileId                 String?
+  activeDestinationId       String?
+  assignmentStatus          AssignmentStatus         @default(UNASSIGNED)
+  cardStatus                CardStatus               @default(CREATED)
+  inventoryStatus           CardInventoryStatus      @default(AVAILABLE)
+  programmedAt              DateTime?
+  assignedAt                DateTime?
+  activatedAt               DateTime?
+  lastOpenedAt              DateTime?
+  openCount                 Int                      @default(0)
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  batch                     CardBatch?               @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  owner                     User?                    @relation("CardOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  organization              Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  profile                   Profile?                 @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  activeDestination         Destination?             @relation("CardActiveDestination", fields: [activeDestinationId], references: [id], onDelete: SetNull)
+  dailyOpens                CardOpenDaily[]
+  orderItems                OrderItem[]
+  activationClaims          ActivationClaimSession[]
+  activationAttempts        ActivationAttempt[]
+
+  @@index([batchId])
+  @@index([ownerId])
+  @@index([organizationId])
+  @@index([assignmentStatus, cardStatus])
+  @@index([inventoryStatus])
+}
+
+model ProfileService {
+  id            String   @id @default(cuid())
+  profileId     String
+  nameAr        String?
+  nameEn        String?
+  descriptionAr String?
+  descriptionEn String?
+  url           String?
+  iconKey       String?
+  isVisible     Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, isVisible, sortOrder])
+}
+
+model ProfileBranch {
+  id        String   @id @default(cuid())
+  profileId String
+  nameAr    String?
+  nameEn    String?
+  addressAr String?
+  addressEn String?
+  phone     String?
+  mapUrl    String?
+  isVisible Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, isVisible, sortOrder])
+}
+
+model ActivationClaimSession {
+  id                  String                @id @default(cuid())
+  sessionTokenHash    String                @unique
+  activationTokenHash String
+  cardId              String
+  userId              String?
+  phone               String?
+  status              ActivationClaimStatus @default(PENDING_OTP)
+  attemptCount        Int                   @default(0)
+  expiresAt           DateTime
+  verifiedAt          DateTime?
+  consumedAt          DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  card                Card                  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user                User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  otpChallenges       OtpChallenge[]
+
+  @@index([cardId, status])
+  @@index([expiresAt])
+}
+
+model ActivationAttempt {
+  id        String   @id @default(cuid())
+  cardId    String
+  success   Boolean
+  createdAt DateTime @default(now())
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, createdAt])
+}
+
+model OtpChallenge {
+  id                String                  @id @default(cuid())
+  phone             String
+  purpose           OtpPurpose
+  claimSessionId    String?
+  otpHash           String
+  expiresAt         DateTime
+  attempts          Int                     @default(0)
+  maxAttempts       Int                     @default(5)
+  consumedAt        DateTime?
+  deliveryStatus    OtpDeliveryStatus       @default(PENDING)
+  provider          String
+  providerMessageId String?
+  lastSentAt        DateTime                @default(now())
+  createdAt         DateTime                @default(now())
+  claimSession      ActivationClaimSession? @relation(fields: [claimSessionId], references: [id], onDelete: Cascade)
+
+  @@index([phone, createdAt])
+  @@index([claimSessionId])
+  @@index([expiresAt])
+}
+
+model OtpSendLog {
+  id        String            @id @default(cuid())
+  phoneHash String
+  purpose   OtpPurpose
+  status    OtpDeliveryStatus
+  provider  String
+  createdAt DateTime          @default(now())
+
+  @@index([phoneHash, createdAt])
+}
+
+model AuthTicket {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model CardOpenDaily {
+  id        String   @id @default(cuid())
+  cardId    String
+  date      DateTime @db.Date
+  openCount Int      @default(0)
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, date])
+  @@index([date])
+}
+
+model Supplier {
+  id             String          @id @default(cuid())
+  name           String
+  contactName    String?
+  phone          String?
+  email          String?
+  address        String?
+  notes          String?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  inventoryItems InventoryItem[]
+  cardBatches    CardBatch[]
+  purchases      Purchase[]
+}
+
+model InventoryItem {
+  id               String              @id @default(cuid())
+  sku              String              @unique
+  nameAr           String
+  nameEn           String
+  type             InventoryItemType
+  supplierId       String?
+  quantityOnHand   Int                 @default(0)
+  quantityReserved Int                 @default(0)
+  reorderLevel     Int                 @default(0)
+  unitCost         Decimal             @default(0) @db.Decimal(14, 2)
+  sellingPrice     Decimal             @default(0) @db.Decimal(14, 2)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  supplier         Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  movements        InventoryMovement[]
+  purchaseItems    PurchaseItem[]
+  orderItems       OrderItem[]
+  cardBatches      CardBatch[]
+
+  @@index([supplierId])
+  @@index([quantityOnHand])
+}
+
+model InventoryMovement {
+  id              String                @id @default(cuid())
+  inventoryItemId String
+  type            InventoryMovementType
+  quantity        Int
+  unitCost        Decimal?              @db.Decimal(14, 2)
+  referenceType   String?
+  referenceId     String?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime              @default(now())
+  inventoryItem   InventoryItem         @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  creator         User                  @relation("InventoryMovementCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([inventoryItemId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model Purchase {
+  id            String         @id @default(cuid())
+  supplierId    String
+  invoiceNumber String?
+  status        PurchaseStatus @default(DRAFT)
+  subtotal      Decimal        @default(0) @db.Decimal(14, 2)
+  shippingCost  Decimal        @default(0) @db.Decimal(14, 2)
+  customsCost   Decimal        @default(0) @db.Decimal(14, 2)
+  otherCost     Decimal        @default(0) @db.Decimal(14, 2)
+  totalCost     Decimal        @default(0) @db.Decimal(14, 2)
+  paidAmount    Decimal        @default(0) @db.Decimal(14, 2)
+  purchaseDate  DateTime
+  receivedDate  DateTime?
+  notes         String?
+  createdBy     String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  supplier      Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  creator       User           @relation("PurchaseCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  items         PurchaseItem[]
+
+  @@index([supplierId, purchaseDate])
+  @@index([status])
+}
+
+model PurchaseItem {
+  id              String        @id @default(cuid())
+  purchaseId      String
+  inventoryItemId String
+  quantity        Int
+  unitCost        Decimal       @db.Decimal(14, 2)
+  totalCost       Decimal       @db.Decimal(14, 2)
+  purchase        Purchase      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseId])
+  @@index([inventoryItemId])
+}
+
+model ExpenseCategory {
+  id       String    @id @default(cuid())
+  nameAr   String
+  nameEn   String
+  isActive Boolean   @default(true)
+  expenses Expense[]
+}
+
+model Expense {
+  id               String          @id @default(cuid())
+  categoryId       String
+  title            String
+  description      String?
+  amount           Decimal         @db.Decimal(14, 2)
+  expenseDate      DateTime
+  paymentMethod    String?
+  referenceNumber  String?
+  attachmentFileId String?
+  createdBy        String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  category         ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  attachment       UploadedFile?   @relation(fields: [attachmentFileId], references: [id], onDelete: SetNull)
+  creator          User            @relation("ExpenseCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([categoryId, expenseDate])
+}
+
+model Customer {
+  id               String   @id @default(cuid())
+  userId           String?  @unique
+  name             String
+  phone            String
+  email            String?
+  organizationName String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orders           Order[]
+
+  @@index([phone])
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  customerId    String
+  status        OrderStatus   @default(DRAFT)
+  subtotal      Decimal       @default(0) @db.Decimal(14, 2)
+  discount      Decimal       @default(0) @db.Decimal(14, 2)
+  shippingCost  Decimal       @default(0) @db.Decimal(14, 2)
+  total         Decimal       @default(0) @db.Decimal(14, 2)
+  paidAmount    Decimal       @default(0) @db.Decimal(14, 2)
+  paymentStatus PaymentStatus @default(UNPAID)
+  notes         String?
+  createdBy     String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  creator       User          @relation("OrderCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  items         OrderItem[]
+
+  @@index([customerId, createdAt])
+  @@index([status, paymentStatus])
+}
+
+model OrderItem {
+  id              String         @id @default(cuid())
+  orderId         String
+  cardId          String?
+  inventoryItemId String?
+  description     String
+  quantity        Int
+  unitPrice       Decimal        @db.Decimal(14, 2)
+  total           Decimal        @db.Decimal(14, 2)
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  card            Card?          @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([cardId])
 }
 
 model SystemSetting {
@@ -424,24 +974,24 @@ model SystemSetting {
 }
 
 model BrandSettings {
-  id                    String   @id @default("default")
-  mainLogoUrl           String?
-  mainLogoStorageKey    String?
-  lightLogoUrl          String?
-  lightLogoStorageKey   String?
-  darkLogoUrl           String?
-  darkLogoStorageKey    String?
-  appIconUrl            String?
-  appIconStorageKey     String?
-  faviconUrl            String?
-  faviconStorageKey     String?
-  appleTouchIconUrl     String?
+  id                       String   @id @default("default")
+  mainLogoUrl              String?
+  mainLogoStorageKey       String?
+  lightLogoUrl             String?
+  lightLogoStorageKey      String?
+  darkLogoUrl              String?
+  darkLogoStorageKey       String?
+  appIconUrl               String?
+  appIconStorageKey        String?
+  faviconUrl               String?
+  faviconStorageKey        String?
+  appleTouchIconUrl        String?
   appleTouchIconStorageKey String?
-  pwaIcon192Url         String?
-  pwaIcon512Url         String?
-  defaultOgImageUrl     String?
+  pwaIcon192Url            String?
+  pwaIcon512Url            String?
+  defaultOgImageUrl        String?
   defaultOgImageStorageKey String?
-  updatedAt             DateTime @updatedAt
+  updatedAt                DateTime @updatedAt
 }
 
 model AuditLog {
@@ -453,6 +1003,7 @@ model AuditLog {
   metadata  Json?
   createdAt DateTime @default(now())
   actor     User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
   @@index([createdAt])
   @@index([actorId])
 }
