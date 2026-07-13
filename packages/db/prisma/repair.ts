@@ -4,10 +4,10 @@ import { resolve } from "node:path";
 config({ path: resolve(process.cwd(), "../../.env"), quiet: true });
 const prisma = new PrismaClient();
 const plans = [
-  { name:"Free",slug:"free",maxProfiles:1,maxLinks:5,maxCustomFields:3,maxTags:1,maxUploads:0,maxStorageBytes:0n,allowCustomSlug:false,allowThemes:false,allowCustomTheme:false,allowAnalytics:false,allowFileUploads:false },
-  { name:"Personal",slug:"personal",maxProfiles:2,maxLinks:15,maxCustomFields:10,maxTags:2,maxUploads:10,maxStorageBytes:52428800n,allowCustomSlug:true,allowThemes:true,allowCustomTheme:false,allowAnalytics:true,allowFileUploads:true },
-  { name:"Pro",slug:"pro",maxProfiles:5,maxLinks:50,maxCustomFields:30,maxTags:5,maxUploads:50,maxStorageBytes:524288000n,allowCustomSlug:true,allowThemes:true,allowCustomTheme:true,allowAnalytics:true,allowFileUploads:true },
-  { name:"Business",slug:"business",maxProfiles:25,maxLinks:250,maxCustomFields:100,maxTags:100,maxUploads:500,maxStorageBytes:5368709120n,allowCustomSlug:true,allowThemes:true,allowCustomTheme:true,allowAnalytics:true,allowFileUploads:true },
+  { name:"Free",nameEn:"Free",nameAr:"مجانية",slug:"free",sortOrder:10,maxProfiles:1,maxLinks:5,maxCustomFields:3,maxTags:1,maxUploads:0,maxStorageBytes:0n,allowCustomSlug:false,allowThemes:false,allowCustomTheme:false,allowAnalytics:false,allowFileUploads:false,allowCustomIcons:false },
+  { name:"Personal",nameEn:"Personal",nameAr:"شخصية",slug:"personal",sortOrder:20,maxProfiles:2,maxLinks:15,maxCustomFields:10,maxTags:2,maxUploads:10,maxStorageBytes:52428800n,allowCustomSlug:true,allowThemes:true,allowCustomTheme:false,allowAnalytics:true,allowFileUploads:true,allowCustomIcons:false },
+  { name:"Pro",nameEn:"Pro",nameAr:"احترافية",slug:"pro",sortOrder:30,maxProfiles:5,maxLinks:50,maxCustomFields:30,maxTags:5,maxUploads:50,maxStorageBytes:524288000n,allowCustomSlug:true,allowThemes:true,allowCustomTheme:true,allowAnalytics:true,allowFileUploads:true,allowCustomIcons:true },
+  { name:"Business",nameEn:"Business",nameAr:"أعمال",slug:"business",sortOrder:40,maxProfiles:25,maxLinks:250,maxCustomFields:100,maxTags:100,maxUploads:500,maxStorageBytes:5368709120n,allowCustomSlug:true,allowThemes:true,allowCustomTheme:true,allowAnalytics:true,allowFileUploads:true,allowCustomIcons:true },
 ];
 async function main() {
   for (const plan of plans) await prisma.plan.upsert({ where: { slug: plan.slug }, update: plan, create: plan });

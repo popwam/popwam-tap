@@ -1,7 +1,7 @@
 import { prisma } from "@popwam/db";
 
 export const LIMIT_KEYS = ["maxProfiles", "maxLinks", "maxCustomFields", "maxTags", "maxUploads", "maxStorageBytes"] as const;
-export const FEATURE_KEYS = ["allowCustomSlug", "allowThemes", "allowCustomTheme", "allowAnalytics", "allowFileUploads"] as const;
+export const FEATURE_KEYS = ["allowCustomSlug", "allowThemes", "allowCustomTheme", "allowAnalytics", "allowFileUploads", "allowCustomIcons"] as const;
 export type LimitKey = (typeof LIMIT_KEYS)[number];
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 

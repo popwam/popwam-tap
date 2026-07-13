@@ -6,7 +6,7 @@ import { prisma } from "@popwam/db";
 export async function requireUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
-  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true, role: true, status: true } });
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true, image: true, role: true, status: true } });
   if (!user || user.status !== "ACTIVE") redirect("/login?error=AccountUnavailable");
   return user;
 }

@@ -1,16 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
-
-type InstallPrompt = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
-export function PwaClient({ installLabel }: { installLabel: string }) {
-  const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
-  useEffect(() => {
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    const listener = (event: Event) => { event.preventDefault(); setPrompt(event as InstallPrompt); };
-    window.addEventListener("beforeinstallprompt", listener); return () => window.removeEventListener("beforeinstallprompt", listener);
-  }, []);
-  if (!prompt) return null;
-  return <button className="btn-primary fixed bottom-4 end-4 z-50 shadow-xl" onClick={async () => { await prompt.prompt(); await prompt.userChoice; setPrompt(null); }}><Download size={16}/>{installLabel}</button>;
-}
+import { useEffect,useState } from "react";
+import { usePathname } from "next/navigation";
+import { CheckCircle2,Download,Wifi,WifiOff } from "lucide-react";
+type InstallPrompt=Event&{prompt():Promise<void>;userChoice:Promise<{outcome:"accepted"|"dismissed"}>};
+export function PwaClient({installLabel,mode="floating"}:{installLabel:string;mode?:"floating"|"settings"}){const pathname=usePathname();const [prompt,setPrompt]=useState<InstallPrompt|null>(null);const [online,setOnline]=useState(true);const [installed,setInstalled]=useState(false);const [ios,setIos]=useState(false);const [allowedHost,setAllowedHost]=useState(false);
+useEffect(()=>{const host=window.location.hostname;setAllowedHost(!host.startsWith("go."));setOnline(navigator.onLine);setInstalled(window.matchMedia("(display-mode: standalone)").matches||Boolean((navigator as Navigator&{standalone?:boolean}).standalone));setIos(/iphone|ipad|ipod/i.test(navigator.userAgent));if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>undefined);const before=(event:Event)=>{event.preventDefault();setPrompt(event as InstallPrompt)};const on=()=>setOnline(true),off=()=>setOnline(false),done=()=>{setInstalled(true);setPrompt(null)};window.addEventListener("beforeinstallprompt",before);window.addEventListener("online",on);window.addEventListener("offline",off);window.addEventListener("appinstalled",done);return()=>{window.removeEventListener("beforeinstallprompt",before);window.removeEventListener("online",on);window.removeEventListener("offline",off);window.removeEventListener("appinstalled",done)};},[]);
+const dashboard=pathname.startsWith("/dashboard");if(!allowedHost||!dashboard)return null;async function install(){if(!prompt)return;await prompt.prompt();const result=await prompt.userChoice;if(result.outcome==="accepted")setInstalled(true);setPrompt(null);}
+if(mode==="floating"){if(installed||!prompt)return null;return <button className="btn-primary fixed bottom-4 end-4 z-50 shadow-xl" onClick={install}><Download size={16}/>{installLabel}</button>;}
+return <div className="card p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold">Dashboard app</h2><p className="mt-1 text-sm text-slate-400">{installed?"Installed in standalone mode":prompt?"Ready to install":"Installation prompt is not available in this browser"}</p></div><span className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs ${online?"bg-emerald-500/10 text-emerald-300":"bg-red-500/10 text-red-300"}`}>{online?<Wifi size={14}/>:<WifiOff size={14}/>} {online?"Online":"Offline"}</span></div>{installed?<p className="mt-4 flex items-center gap-2 text-emerald-300"><CheckCircle2 size={17}/>Installed</p>:prompt?<button className="btn-primary mt-4" onClick={install}><Download size={16}/>{installLabel}</button>:ios?<div className="mt-4 rounded-xl bg-white/5 p-4 text-sm">iPhone / iPad: <strong>Share → Add to Home Screen</strong></div>:null}</div>;}

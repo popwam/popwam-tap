@@ -124,9 +124,14 @@ model User {
 model Plan {
   id               String   @id @default(cuid())
   name             String
+  nameAr           String?
+  nameEn           String?
   slug             String   @unique
   description      String?
+  descriptionAr    String?
+  descriptionEn    String?
   isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
   maxProfiles      Int      @default(1)
   maxLinks         Int      @default(5)
   maxCustomFields  Int      @default(3)
@@ -138,6 +143,7 @@ model Plan {
   allowCustomTheme Boolean  @default(false)
   allowAnalytics   Boolean  @default(false)
   allowFileUploads Boolean  @default(false)
+  allowCustomIcons Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   subscriptions    UserPlan[]
@@ -172,6 +178,7 @@ model UserLimitOverride {
   allowCustomTheme Boolean?
   allowAnalytics   Boolean?
   allowFileUploads Boolean?
+  allowCustomIcons Boolean?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -263,6 +270,21 @@ model Profile {
   theme              ProfileTheme  @default(CLASSIC_DARK)
   avatarCrop         Json?
   coverCrop          Json?
+  showAvatar         Boolean       @default(true)
+  showCover          Boolean       @default(true)
+  showDisplayName    Boolean       @default(true)
+  showTitle          Boolean       @default(true)
+  showBio            Boolean       @default(true)
+  showPhone          Boolean       @default(true)
+  showEmail          Boolean       @default(true)
+  showWebsite        Boolean       @default(true)
+  showLocation       Boolean       @default(true)
+  showWhatsappBusiness Boolean     @default(true)
+  showWhatsappPrivate  Boolean     @default(true)
+  showSocialLinks    Boolean       @default(true)
+  showCustomFields   Boolean       @default(true)
+  showUploadedFiles  Boolean       @default(true)
+  showSaveContact    Boolean       @default(true)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -307,6 +329,7 @@ model UploadedFile {
   sizeBytes        BigInt
   title            String?
   isVisible        Boolean  @default(true)
+  sortOrder        Int      @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   profile          Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
@@ -326,7 +349,11 @@ model Destination {
   icon             String?
   iconKey          String?
   customIconUrl    String?
+  customIconStorageKey String?
+  customIconType   String?
   isActive         Boolean         @default(true)
+  isVisible        Boolean         @default(true)
+  sortOrder        Int             @default(0)
   isOfflineCapable Boolean         @default(false)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -394,6 +421,27 @@ model SystemSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+model BrandSettings {
+  id                    String   @id @default("default")
+  mainLogoUrl           String?
+  mainLogoStorageKey    String?
+  lightLogoUrl          String?
+  lightLogoStorageKey   String?
+  darkLogoUrl           String?
+  darkLogoStorageKey    String?
+  appIconUrl            String?
+  appIconStorageKey     String?
+  faviconUrl            String?
+  faviconStorageKey     String?
+  appleTouchIconUrl     String?
+  appleTouchIconStorageKey String?
+  pwaIcon192Url         String?
+  pwaIcon512Url         String?
+  defaultOgImageUrl     String?
+  defaultOgImageStorageKey String?
+  updatedAt             DateTime @updatedAt
 }
 
 model AuditLog {

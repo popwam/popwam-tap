@@ -58,6 +58,10 @@ export async function updateProfile(data: FormData) {
   if (theme !== "CLASSIC_DARK" && !effective.allowThemes) throw new Error("FEATURE_THEMES_REQUIRED");
   const parseCrop = (key: string) => { try { return JSON.parse(text(data, key)) as Prisma.InputJsonValue; } catch { return undefined; } };
   const nextAvatarKey = optional(data, "avatarStorageKey"); const nextCoverKey = optional(data, "coverStorageKey");
+  const visibility = Object.fromEntries([
+    "showAvatar", "showCover", "showDisplayName", "showTitle", "showBio", "showPhone", "showEmail", "showWebsite", "showLocation",
+    "showWhatsappBusiness", "showWhatsappPrivate", "showSocialLinks", "showCustomFields", "showUploadedFiles", "showSaveContact",
+  ].map(key => [key, data.get(key) === "on"]));
   await prisma.profile.update({ where: { id: profile.id }, data: {
     displayName, slug: slugResult?.code || null, title: optional(data, "title"), bio: optional(data, "bio"), theme,
     avatarUrl: optional(data, "avatarUrl"), avatarStorageKey: nextAvatarKey, avatarCrop: parseCrop("avatarCrop"),
@@ -66,12 +70,16 @@ export async function updateProfile(data: FormData) {
     whatsappPrivate: optional(data, "whatsappPrivate"), email: optional(data, "email"),
     website: optional(data, "website"), facebook: optional(data, "facebook"), linkedin: optional(data, "linkedin"),
     github: optional(data, "github"), tiktok: optional(data, "tiktok"), vcfUrl: optional(data, "vcfUrl"),
-    locationText: optional(data, "locationText"), isPublic: data.get("isPublic") === "on",
+    locationText: optional(data, "locationText"), isPublic: data.get("isPublic") === "on", ...visibility,
   }});
   for (const oldKey of [profile.avatarStorageKey !== nextAvatarKey ? profile.avatarStorageKey : null, profile.coverStorageKey !== nextCoverKey ? profile.coverStorageKey : null]) if (oldKey) await deleteObject(oldKey).catch(error => console.error("old image cleanup failed", { operation: "profile.image.cleanup", userId: user.id, error: error instanceof Error ? error.name : "unknown" }));
   revalidatePath("/dashboard/profile");
   if (previousSlug) revalidatePath(`/p/${previousSlug}`);
   publicRevalidate({ id: profile.id, slug: slugResult?.code });
+}
+
+export async function updateProfileTheme(data: FormData) {
+  const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),...(user.role==="ADMIN"?{}:{userId:user.id})}});const theme=text(data,"theme") as ProfileTheme;if(!profile||!Object.values(ProfileTheme).includes(theme))throw new Error("THEME_INVALID");const {effective}=await getUserEntitlements(profile.userId);if(theme!==profile.theme&&!effective.allowThemes)throw new Error("FEATURE_THEMES_REQUIRED");await prisma.profile.update({where:{id:profile.id},data:{theme}});revalidatePath("/dashboard/appearance");revalidatePath("/dashboard/profile");publicRevalidate(profile);
 }
 
 function destinationInput(data: FormData, profileId?: string) {
@@ -91,8 +99,9 @@ export async function createDestination(data: FormData) {
   const { effective } = await assertWithinLimit(user.id, "links");
   const profile = await prisma.profile.findFirst({ where: { userId: user.id, organizationId: null }, select: { id: true, slug: true } });
   if (!profile) throw new Error("PROFILE_MISSING");
-  const input = destinationInput(data, profile.id); if (input.customIconUrl && !effective.allowCustomTheme) throw new Error("FEATURE_CUSTOM_ICON_REQUIRED");
-  await prisma.destination.create({ data: { ...input, userId: user.id, profileId: profile.id } });
+  const input = destinationInput(data, profile.id); if (input.customIconUrl && !effective.allowCustomIcons) throw new Error("FEATURE_CUSTOM_ICON_REQUIRED");
+  const sortOrder = await prisma.destination.count({ where: { profileId: profile.id } });
+  await prisma.destination.create({ data: { ...input, userId: user.id, profileId: profile.id, isVisible: data.get("isVisible") !== "off", sortOrder } });
   revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); publicRevalidate(profile);
 }
 
@@ -100,8 +109,8 @@ export async function updateDestination(data: FormData) {
   const user = await requireUser(); const id = text(data, "id");
   if (!await canManageDestination(user, id)) throw new Error("DESTINATION_NOT_FOUND");
   const current = await prisma.destination.findUniqueOrThrow({ where: { id }, include: { profile: { select: { id: true, slug: true } } } });
-  const input = destinationInput(data, current.profileId || undefined); const { effective } = await getUserEntitlements(current.userId); if (input.customIconUrl && !effective.allowCustomTheme) throw new Error("FEATURE_CUSTOM_ICON_REQUIRED");
-  await prisma.destination.update({ where: { id }, data: input });
+  const input = destinationInput(data, current.profileId || undefined); const { effective } = await getUserEntitlements(current.userId); if (input.customIconUrl && !effective.allowCustomIcons) throw new Error("FEATURE_CUSTOM_ICON_REQUIRED");
+  await prisma.destination.update({ where: { id }, data: { ...input, isVisible: data.get("isVisible") === "on" } });
   revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); if (current.profile) publicRevalidate(current.profile);
 }
 
@@ -112,6 +121,19 @@ export async function deleteDestination(data: FormData) {
   if (current?.type === DestinationType.PROFILE) throw new Error("PROFILE_DESTINATION_REQUIRED");
   await prisma.destination.delete({ where: { id } });
   revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); if (current?.profile) publicRevalidate(current.profile);
+}
+
+export async function toggleDestinationVisibility(data: FormData) {
+  const user = await requireUser(); const id = text(data, "id"); if (!await canManageDestination(user, id)) throw new Error("DESTINATION_NOT_FOUND");
+  const item = await prisma.destination.findUniqueOrThrow({ where: { id }, include: { profile: { select: { id: true, slug: true } }, activeForTags: { select: { id: true, shortCode: true, token: true } } } });
+  await prisma.destination.update({ where: { id }, data: { isVisible: !item.isVisible } }); revalidatePath("/dashboard/cards"); revalidatePath("/admin/links"); if (item.profile) publicRevalidate(item.profile); for (const tag of item.activeForTags) { revalidatePath(`/${tag.shortCode}`); revalidatePath(`/t/${tag.token}`); }
+}
+
+export async function moveDestination(data: FormData) {
+  const user = await requireUser(); const id = text(data, "id"); if (!await canManageDestination(user, id)) throw new Error("DESTINATION_NOT_FOUND");
+  const item = await prisma.destination.findUniqueOrThrow({ where: { id }, include: { profile: { select: { id: true, slug: true } } } }); const direction = text(data, "direction") === "up" ? -1 : 1;
+  const neighbor = await prisma.destination.findFirst({ where: { profileId: item.profileId, sortOrder: direction < 0 ? { lt: item.sortOrder } : { gt: item.sortOrder } }, orderBy: { sortOrder: direction < 0 ? "desc" : "asc" } });
+  if (neighbor) await prisma.$transaction([prisma.destination.update({ where: { id }, data: { sortOrder: neighbor.sortOrder } }),prisma.destination.update({ where: { id: neighbor.id }, data: { sortOrder: item.sortOrder } })]); revalidatePath("/dashboard/cards"); if (item.profile) publicRevalidate(item.profile);
 }
 
 export async function createProfileField(data: FormData) {
@@ -148,6 +170,16 @@ export async function moveProfileField(data: FormData) {
   const neighbor = await prisma.profileField.findFirst({ where: { profileId: field.profileId, sortOrder: direction < 0 ? { lt: field.sortOrder } : { gt: field.sortOrder } }, orderBy: { sortOrder: direction < 0 ? "desc" : "asc" } });
   if (neighbor) await prisma.$transaction([prisma.profileField.update({ where: { id: field.id }, data: { sortOrder: neighbor.sortOrder } }), prisma.profileField.update({ where: { id: neighbor.id }, data: { sortOrder: field.sortOrder } })]);
   revalidatePath("/dashboard/profile"); publicRevalidate(field.profile);
+}
+
+export async function toggleUploadedFileVisibility(data: FormData) {
+  const user = await requireUser(); const file = await prisma.uploadedFile.findFirst({ where: { id: text(data, "id"), ...(user.role === "ADMIN" ? {} : { uploaderUserId: user.id }) }, include: { profile: { select: { id: true, slug: true } } } }); if (!file) throw new Error("FILE_NOT_FOUND");
+  await prisma.uploadedFile.update({ where: { id: file.id }, data: { isVisible: !file.isVisible } }); revalidatePath("/dashboard/uploads"); revalidatePath("/admin/uploads"); if (file.profile) publicRevalidate(file.profile);
+}
+
+export async function moveUploadedFile(data: FormData) {
+  const user = await requireUser(); const file = await prisma.uploadedFile.findFirst({ where: { id: text(data, "id"), ...(user.role === "ADMIN" ? {} : { uploaderUserId: user.id }) }, include: { profile: { select: { id: true, slug: true } } } }); if (!file) throw new Error("FILE_NOT_FOUND"); const direction = text(data, "direction") === "up" ? -1 : 1;
+  const neighbor = await prisma.uploadedFile.findFirst({ where: { profileId: file.profileId, sortOrder: direction < 0 ? { lt: file.sortOrder } : { gt: file.sortOrder } }, orderBy: { sortOrder: direction < 0 ? "desc" : "asc" } }); if (neighbor) await prisma.$transaction([prisma.uploadedFile.update({ where: { id: file.id }, data: { sortOrder: neighbor.sortOrder } }),prisma.uploadedFile.update({ where: { id: neighbor.id }, data: { sortOrder: file.sortOrder } })]); revalidatePath("/dashboard/uploads"); if (file.profile) publicRevalidate(file.profile);
 }
 
 export async function updateOwnedTag(data: FormData) {
@@ -237,13 +269,20 @@ export async function assignUserPlan(data: FormData) {
   await audit(admin.id, "admin.user.plan", userId, { planId }); revalidatePath(`/admin/users/${userId}`);
 }
 
+export type PlanActionState={ok:boolean;code?:string;id?:string};
+export async function saveAdminPlan(_previous:PlanActionState,data:FormData):Promise<PlanActionState>{const admin=await requireAdmin();const id=optional(data,"id");const slug=text(data,"slug").toLowerCase();const nameEn=text(data,"nameEn");const nameAr=text(data,"nameAr");if(!/^[a-z0-9-]{2,48}$/.test(slug)||!nameEn||!nameAr)return{ok:false,code:"PLAN_INVALID_TEXT"};const numericKeys=["maxProfiles","maxLinks","maxCustomFields","maxTags","maxUploads","maxStorageBytes","sortOrder"] as const;const values:Record<string,number|bigint>={};for(const key of numericKeys){const raw=text(data,key);if(!/^\d+$/.test(raw))return{ok:false,code:"PLAN_INVALID_LIMIT"};values[key]=key==="maxStorageBytes"?BigInt(raw):Number(raw);}const payload={name:nameEn,nameEn,nameAr,slug,description:optional(data,"descriptionEn"),descriptionEn:optional(data,"descriptionEn"),descriptionAr:optional(data,"descriptionAr"),isActive:data.get("isActive")==="on",sortOrder:Number(values.sortOrder),maxProfiles:Number(values.maxProfiles),maxLinks:Number(values.maxLinks),maxCustomFields:Number(values.maxCustomFields),maxTags:Number(values.maxTags),maxUploads:Number(values.maxUploads),maxStorageBytes:BigInt(values.maxStorageBytes),allowCustomSlug:data.get("allowCustomSlug")==="on",allowThemes:data.get("allowThemes")==="on",allowCustomTheme:data.get("allowCustomTheme")==="on",allowAnalytics:data.get("allowAnalytics")==="on",allowFileUploads:data.get("allowFileUploads")==="on",allowCustomIcons:data.get("allowCustomIcons")==="on"};try{const plan=id?await prisma.plan.update({where:{id},data:payload}):await prisma.plan.create({data:payload});await audit(admin.id,id?"admin.plan.update":"admin.plan.create",plan.id);revalidatePath("/admin/plans");revalidatePath(`/admin/plans/${plan.id}`);return{ok:true,id:plan.id};}catch(error){if(isUniqueConstraintError(error))return{ok:false,code:"PLAN_SLUG_IN_USE"};console.error("plan save failed",{operation:id?"plan.update":"plan.create",adminId:admin.id});return{ok:false,code:"PLAN_SAVE_FAILED"};}}
+
+export async function duplicateAdminPlan(data:FormData){const admin=await requireAdmin();const source=await prisma.plan.findUnique({where:{id:text(data,"id")}});if(!source)throw new Error("PLAN_NOT_FOUND");const {id,createdAt,updatedAt,...copy}=source;let suffix=1;let slug=`${source.slug}-copy`;while(await prisma.plan.findUnique({where:{slug}}))slug=`${source.slug}-copy-${++suffix}`;const plan=await prisma.plan.create({data:{...copy,name:`${source.name} Copy`,nameEn:`${source.nameEn||source.name} Copy`,nameAr:`نسخة ${source.nameAr||source.name}`,slug,isActive:false,sortOrder:source.sortOrder+1}});await audit(admin.id,"admin.plan.duplicate",plan.id,{sourceId:id});revalidatePath("/admin/plans");}
+
+export async function deleteAdminPlan(data:FormData){const admin=await requireAdmin();const id=text(data,"id");const assigned=await prisma.userPlan.count({where:{planId:id}});if(assigned>0)throw new Error("PLAN_ASSIGNED_USERS");await prisma.plan.delete({where:{id}});await audit(admin.id,"admin.plan.delete",id);revalidatePath("/admin/plans");}
+
 export async function updateUserLimits(data: FormData) {
   const admin = await requireAdmin(); const userId = text(data, "userId");
   await prisma.userLimitOverride.upsert({ where: { userId }, create: { userId }, update: {}, });
   await prisma.userLimitOverride.update({ where: { userId }, data: {
     maxProfiles: nullableNumber(data, "maxProfiles"), maxLinks: nullableNumber(data, "maxLinks"), maxCustomFields: nullableNumber(data, "maxCustomFields"), maxTags: nullableNumber(data, "maxTags"), maxUploads: nullableNumber(data, "maxUploads"),
     maxStorageBytes: text(data, "maxStorageBytes") ? BigInt(text(data, "maxStorageBytes")) : null,
-    allowCustomSlug: optionalBoolean(data, "allowCustomSlug"), allowThemes: optionalBoolean(data, "allowThemes"), allowCustomTheme: optionalBoolean(data, "allowCustomTheme"), allowAnalytics: optionalBoolean(data, "allowAnalytics"), allowFileUploads: optionalBoolean(data, "allowFileUploads"),
+    allowCustomSlug: optionalBoolean(data, "allowCustomSlug"), allowThemes: optionalBoolean(data, "allowThemes"), allowCustomTheme: optionalBoolean(data, "allowCustomTheme"), allowAnalytics: optionalBoolean(data, "allowAnalytics"), allowFileUploads: optionalBoolean(data, "allowFileUploads"), allowCustomIcons: optionalBoolean(data, "allowCustomIcons"),
   }});
   await audit(admin.id, "admin.user.limits", userId); revalidatePath(`/admin/users/${userId}`);
 }
