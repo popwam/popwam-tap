@@ -1,0 +1,18 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+.DS_Store
+.vercel/
+
+# Never commit local secrets (including the pre-existing typo file).
+.env
+.env.*
+!.env.example
+.evn
+
+packages/db/prisma/dev.db*

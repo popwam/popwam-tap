@@ -1,0 +1,19 @@
+import { prisma, TagStatus } from "@popwam/db";
+import { createAdminTag, updateAdminTag } from "@/app/actions";
+import { PageHeading } from "@/components/page-heading";
+import { Badge } from "@/components/badge";
+import { Plus } from "lucide-react";
+
+export const metadata = { title: "Admin tags" };
+
+export default async function AdminTagsPage() {
+  const [tags, users, profiles] = await Promise.all([
+    prisma.tag.findMany({ include: { owner: { select: { id: true, name: true, email: true } }, profile: { select: { displayName: true } } }, orderBy: { createdAt: "desc" } }),
+    prisma.user.findMany({ select: { id: true, name: true, email: true }, orderBy: { email: "asc" } }),
+    prisma.profile.findMany({ select: { id: true, userId: true, displayName: true }, orderBy: { displayName: "asc" } }),
+  ]);
+  return <><PageHeading eyebrow="Administration" title="All smart tags" description="Create tokens, assign ownership, control safety status, and record NFC programming or locking."/>
+    <details className="card mb-6 p-5"><summary className="flex cursor-pointer list-none items-center gap-2 font-bold"><Plus size={18} className="text-brand-400"/> Create tag</summary><form action={createAdminTag} className="mt-5 grid gap-4 sm:grid-cols-2"><label><span className="label">Tag name</span><input className="input" name="name" required/></label><label><span className="label">Token (optional)</span><input className="input" name="token" placeholder="Auto-generated when empty"/></label><label><span className="label">Owner</span><select className="input" name="ownerId" required>{users.map(user => <option value={user.id} key={user.id}>{user.name || user.email} · {user.email}</option>)}</select></label><label><span className="label">Profile (optional)</span><select className="input" name="profileId"><option value="">None</option>{profiles.map(profile => <option value={profile.id} key={profile.id}>{profile.displayName}</option>)}</select></label><button className="btn-primary sm:col-span-2 sm:justify-self-start">Create smart tag</button></form></details>
+    <div className="space-y-4">{tags.map(tag => <article className="card p-5" key={tag.id}><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="font-bold">{tag.name}</h2><p className="mt-1 font-mono text-xs text-slate-500">/t/{tag.token}</p></div><div className="flex gap-2"><Badge value={tag.status}/><Badge value={tag.mode}/></div></div><div className="mt-4 grid gap-2 text-xs text-slate-400 sm:grid-cols-3"><p>Owner: <span className="text-white">{tag.owner.email}</span></p><p>Profile: <span className="text-white">{tag.profile?.displayName || "None"}</span></p><p>Scans: <span className="text-white">{tag.scanCount}</span></p></div><form action={updateAdminTag} className="mt-5 grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-4"><input type="hidden" name="id" value={tag.id}/><label className="sm:col-span-2"><span className="label">Owner</span><select className="input" name="ownerId" defaultValue={tag.ownerId}>{users.map(user => <option value={user.id} key={user.id}>{user.name || user.email} · {user.email}</option>)}</select></label><label><span className="label">Status</span><select className="input" name="status" defaultValue={tag.status}>{Object.values(TagStatus).map(status => <option key={status}>{status}</option>)}</select></label><div className="flex items-end gap-4 pb-2"><label className="flex gap-2 text-sm"><input type="checkbox" name="programmed" defaultChecked={Boolean(tag.programmedAt)} className="accent-brand-400"/>Programmed</label><label className="flex gap-2 text-sm"><input type="checkbox" name="locked" defaultChecked={Boolean(tag.lockedAt)} className="accent-brand-400"/>Locked</label></div><button className="btn-primary sm:col-span-4 sm:justify-self-start">Apply admin changes</button></form></article>)}</div>
+  </>;
+}

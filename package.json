@@ -1,0 +1,19 @@
+{
+  "name": "popwam-tap",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.1.2",
+  "scripts": {
+    "dev": "turbo dev --filter=@popwam/web",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "start": "pnpm --filter @popwam/web start",
+    "db:generate": "pnpm --filter @popwam/db db:generate",
+    "db:migrate": "pnpm --filter @popwam/db db:migrate",
+    "db:deploy": "pnpm --filter @popwam/db db:deploy",
+    "seed": "pnpm --filter @popwam/db seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.6"
+  }
+}
