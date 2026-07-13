@@ -1,0 +1,4 @@
+import Link from "next/link";
+import { prisma } from "@popwam/db";
+import { PageHeading } from "@/components/page-heading";
+export default async function LimitsPage() { const overrides = await prisma.userLimitOverride.findMany({ include: { user: true }, orderBy: { updatedAt: "desc" } }); return <><PageHeading eyebrow="Commercial controls" title="Usage limits" description="Users with explicit overrides. Open a user to change inherited or custom values."/><div className="space-y-3">{overrides.map(item => <Link href={`/admin/users/${item.userId}`} className="card flex items-center justify-between p-4" key={item.id}><div><strong>{item.user.name || item.user.email}</strong><p className="text-xs text-slate-500">{item.user.email}</p></div><span className="text-sm text-brand-400">Edit overrides</span></Link>)}{!overrides.length && <div className="card p-8 text-center text-slate-500">No per-user overrides yet.</div>}</div></>; }

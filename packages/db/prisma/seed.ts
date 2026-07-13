@@ -83,10 +83,11 @@ async function main() {
     else await prisma.destination.create({ data });
   }
 
+  const selectedProfileDestination = await prisma.destination.findFirstOrThrow({ where: { userId: demo.id, profileId: profile.id, type: DestinationType.PROFILE } });
   await prisma.tag.upsert({
     where: { token: "mamdouh" },
-    update: { ownerId: demo.id, profileId: profile.id, name: "Mamdouh Main Smart Card" },
-    create: { token: "mamdouh", name: "Mamdouh Main Smart Card", mode: TagMode.PROFILE, status: TagStatus.ACTIVE, ownerId: demo.id, profileId: profile.id },
+    update: { shortCode: "mamdouh", ownerId: demo.id, profileId: profile.id, activeDestinationId: selectedProfileDestination.id, name: "Mamdouh Main Smart Card" },
+    create: { token: "mamdouh", shortCode: "mamdouh", name: "Mamdouh Main Smart Card", mode: TagMode.PROFILE, status: TagStatus.ACTIVE, ownerId: demo.id, profileId: profile.id, activeDestinationId: selectedProfileDestination.id, aliases: { create: { code: "mamdouh" } } },
   });
   console.info(`Seed complete: ${admin.email}, ${demo.email}; workspaces ${adminOrg.slug}, ${demoOrg.slug}`);
 }

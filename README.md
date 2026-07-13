@@ -1,12 +1,12 @@
 # POPWAM Tap
 
-POPWAM Tap is an online-first smart NFC/QR card platform. A sticker or printed QR contains only one permanent URL:
+POPWAM Tap is an online-first smart NFC/QR card platform. A sticker or printed QR contains one permanent short URL:
 
 ```text
-https://go.popwam.com/t/{token}
+https://go.popwam.com/{shortCode}
 ```
 
-The tag never stores a person's private contact data. The platform resolves the token at scan time, records the scan, and either displays a public profile, redirects to a validated destination, or shows a safe paused/lost/disabled page. The owner can change this behavior without rewriting the physical NFC tag.
+The legacy `https://go.popwam.com/t/{shortCode}` form remains supported. A tag opens only its selected active destination. A public profile is one explicit destination type and is never an implicit fallback.
 
 ## Monorepo
 
@@ -170,3 +170,25 @@ Reserved for Android: `/api/mobile` and the server-side API auth/permission modu
 Never use the example passwords in production.
 
 See [TESTING.md](./TESTING.md) for the full online acceptance checklist and [docs/architecture.md](./docs/architecture.md) for the request flow and future Android boundary.
+
+## Deploy to Railway with both production domains
+
+Use one Railway service built from the monorepo root. The production build command is `pnpm build`, the start command is `pnpm start`, and the pre-deploy migration command is `pnpm db:deploy`. Do not use `prisma db push` against production.
+
+Attach both custom domains to the same Railway service:
+
+- `app.popwam.com` — dashboard, admin, login, and Auth.js callbacks
+- `go.popwam.com` — public landing page, profiles, and NFC/short links
+
+Configure these exact application URLs:
+
+```env
+NEXTAUTH_URL="https://app.popwam.com"
+NEXT_PUBLIC_APP_URL="https://go.popwam.com"
+```
+
+Register `https://app.popwam.com/api/auth/callback/google` as the authorized Google OAuth redirect URI. The middleware matcher protects only `/dashboard/**` and `/admin/**`; it does not intercept the public root, short codes, legacy `/t/**`, profiles, manifest, service worker, or offline page. Point both DNS names to the targets Railway shows in the service Custom Domains panel.
+
+After deployment, run `pnpm db:repair` once. It safely repairs missing profiles, personal organizations, memberships, profile destinations, and FREE plans without duplicating existing records.
+
+Security note: replacing a credential in an example file does not remove it from Git history. Rotate any Neon, Google, R2, or Auth.js credentials that were previously committed.

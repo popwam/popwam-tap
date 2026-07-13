@@ -1,25 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Crop, Upload, X } from "lucide-react";
 
 export function ImageField({ type, initialUrl, initialKey, storageEnabled }: { type: "avatar" | "cover"; initialUrl?: string | null; initialKey?: string | null; storageEnabled: boolean }) {
-  const [url, setUrl] = useState(initialUrl || "");
-  const [key, setKey] = useState(initialKey || "");
-  const [status, setStatus] = useState("");
-  async function upload(file?: File) {
-    if (!file) return; setStatus("Uploading…");
-    const body = new FormData(); body.set("file", file);
-    const response = await fetch(`/api/upload/${type}`, { method: "POST", body });
-    const result = await response.json();
-    if (!response.ok) { setStatus(result.error || "Upload failed."); return; }
-    setUrl(result.url); setKey(result.key); setStatus("Uploaded. Save the profile to apply it.");
+  const [url,setUrl] = useState(initialUrl || ""); const [key,setKey] = useState(initialKey || ""); const [status,setStatus] = useState(""); const [source,setSource] = useState(""); const [filename,setFilename] = useState(""); const [zoom,setZoom] = useState(1); const [x,setX] = useState(0); const [y,setY] = useState(0);
+  useEffect(() => () => { if (source) URL.revokeObjectURL(source); }, [source]);
+  function choose(file?: File) { if (!file) return; if (source) URL.revokeObjectURL(source); setSource(URL.createObjectURL(file)); setFilename(file.name); setZoom(1); setX(0); setY(0); setStatus(""); }
+  async function cropAndUpload() {
+    if (!source) return; setStatus("Processing…"); const image = new Image(); image.src = source; await image.decode(); const [width,height] = type === "avatar" ? [512,512] : [1600,600]; const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height; const context = canvas.getContext("2d"); if (!context) return;
+    const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight) * zoom; const drawWidth = image.naturalWidth * scale; const drawHeight = image.naturalHeight * scale; const offsetX = (width - drawWidth) / 2 + (x / 100) * Math.max(0, (drawWidth - width) / 2); const offsetY = (height - drawHeight) / 2 + (y / 100) * Math.max(0, (drawHeight - height) / 2); context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/webp", .9)); if (!blob) { setStatus("Processing failed."); return; }
+    const body = new FormData(); body.set("file", new File([blob], filename.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" })); const response = await fetch(`/api/upload/${type}`, { method: "POST", body }); const result = await response.json(); if (!response.ok) { setStatus(result.error || "Upload failed."); return; }
+    setUrl(result.url); setKey(result.key); setStatus("Uploaded. Save the profile to apply it."); URL.revokeObjectURL(source); setSource("");
   }
-  return <div>
-    <label className="label">{type === "avatar" ? "Avatar" : "Cover image"} URL</label>
-    <input className="input" name={`${type}Url`} value={url} onChange={(event) => { setUrl(event.target.value); if (event.target.value !== initialUrl) setKey(""); }} placeholder="https://…"/>
-    <input type="hidden" name={`${type}StorageKey`} value={key}/>
-    {storageEnabled && <label className="btn-secondary mt-2 cursor-pointer"><Upload size={15}/> Upload {type}<input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => upload(event.target.files?.[0])}/></label>}
-    {status && <p className="mt-2 text-xs text-slate-400">{status}</p>}
+  const cropMetadata = JSON.stringify({ zoom, x, y, output: type === "avatar" ? [512,512] : [1600,600] });
+  return <div className={type === "cover" ? "sm:col-span-2" : ""}><label className="label">{type === "avatar" ? "Avatar (square)" : "Cover image (landscape 8:3)"}</label>{url && <div className={`mb-3 overflow-hidden bg-white/5 ${type === "avatar" ? "size-28 rounded-3xl" : "aspect-[8/3] w-full rounded-2xl"}`}><img src={url} alt="" className="size-full object-cover"/></div>}<input className="input" name={`${type}Url`} value={url} onChange={event => { setUrl(event.target.value); if (event.target.value !== initialUrl) setKey(""); }} placeholder="Advanced: manual https:// URL" dir="ltr"/><input type="hidden" name={`${type}StorageKey`} value={key}/><input type="hidden" name={`${type}Crop`} value={cropMetadata}/>{storageEnabled && <label className="btn-secondary mt-2 cursor-pointer"><Upload size={15}/> Upload and crop<input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => choose(event.target.files?.[0])}/></label>}{status && <p className="mt-2 text-xs text-slate-400">{status}</p>}
+    {source && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"><div className="card w-full max-w-3xl bg-panel p-5"><div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">Crop {type}</h2><p className="text-xs text-slate-400">Zoom and reposition before the optimized WebP upload.</p></div><button className="btn-secondary" onClick={() => { URL.revokeObjectURL(source); setSource(""); }} type="button"><X size={16}/></button></div><div className={`relative mx-auto mt-5 overflow-hidden bg-black ${type === "avatar" ? "aspect-square max-w-md rounded-3xl" : "aspect-[8/3] w-full rounded-2xl"}`}><img src={source} alt="Crop preview" className="size-full object-cover" style={{ transform: `scale(${zoom}) translate(${x / 3}%, ${y / 3}%)` }}/><div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/30"/></div><div className="mt-5 grid gap-4 sm:grid-cols-3"><label><span className="label">Zoom</span><input className="w-full accent-brand-400" type="range" min="1" max="3" step="0.05" value={zoom} onChange={event => setZoom(Number(event.target.value))}/></label><label><span className="label">Horizontal</span><input className="w-full accent-brand-400" type="range" min="-100" max="100" value={x} onChange={event => setX(Number(event.target.value))}/></label><label><span className="label">Vertical</span><input className="w-full accent-brand-400" type="range" min="-100" max="100" value={y} onChange={event => setY(Number(event.target.value))}/></label></div><div className="mt-5 flex justify-end gap-3"><button type="button" className="btn-secondary" onClick={() => setSource("")}>Cancel</button><button type="button" className="btn-primary" onClick={cropAndUpload}><Crop size={16}/> Crop and upload</button></div></div></div>}
   </div>;
 }

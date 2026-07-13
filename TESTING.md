@@ -1,5 +1,7 @@
 # POPWAM Tap online testing checklist
 
+Run `pnpm install`, `pnpm db:generate`, `pnpm test`, and `pnpm build` before deployment. Apply committed migrations with `pnpm db:deploy`; never use `prisma db push` in production. Existing installations should then run the idempotent `pnpm db:repair`.
+
 Before testing, deploy migrations, run `pnpm seed`, and confirm `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` match the active test deployment.
 
 ## Availability and authentication

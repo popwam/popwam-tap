@@ -1,0 +1,6 @@
+import { prisma } from "@popwam/db";
+import { requireUser } from "@/lib/session";
+import { getUserEntitlements, getUserUsage } from "@/lib/plans";
+import { PageHeading } from "@/components/page-heading";
+import { FileManager } from "@/components/file-manager";
+export default async function UploadsPage() { const user = await requireUser(); const [profile,files,{ effective },usage] = await Promise.all([prisma.profile.findFirst({ where: { userId: user.id, organizationId: null } }),prisma.uploadedFile.findMany({ where: { uploaderUserId: user.id }, orderBy: { createdAt: "desc" } }),getUserEntitlements(user.id),getUserUsage(user.id)]); if (!profile) return <p>Profile missing.</p>; return <><PageHeading eyebrow="Files" title="Uploads" description="Upload safe public documents to R2, publish them on your profile, or select their destination link for an NFC card."/><FileManager profileId={profile.id} allowed={effective.allowFileUploads} usageLabel={`${usage.uploads} / ${effective.maxUploads} files · ${Number(usage.storageBytes / 1024n / 1024n)} / ${Number(BigInt(effective.maxStorageBytes) / 1024n / 1024n)} MB`} initialFiles={files.map(file => ({ ...file, sizeBytes: file.sizeBytes.toString() }))}/></>; }

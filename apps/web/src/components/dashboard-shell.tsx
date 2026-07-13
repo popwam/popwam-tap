@@ -3,26 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { CreditCard, Gauge, LogOut, Nfc, Shield, UserRound } from "lucide-react";
+import { Building2, CreditCard, FileText, Gauge, Layers3, Link2, LogOut, Nfc, Palette, ScrollText, Settings, Shield, SlidersHorizontal, Upload, UserRound, Users } from "lucide-react";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
-const links = [
-  ["/dashboard", "Overview", Gauge],
-  ["/dashboard/profile", "Profile", UserRound],
-  ["/dashboard/cards", "Destinations", CreditCard],
-  ["/dashboard/tags", "Smart tags", Nfc],
-] as const;
-
-export function DashboardShell({ children, user }: { children: React.ReactNode; user: { name?: string | null; email?: string | null; role: string } }) {
-  const pathname = usePathname();
-  return <div className="mx-auto min-h-screen max-w-[1500px] lg:grid lg:grid-cols-[250px_1fr]">
-    <aside className="border-b border-white/10 bg-black/20 p-4 lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r lg:p-6">
-      <div className="flex items-center justify-between lg:block"><Link href="/" className="text-lg font-black"><span className="text-brand-400">POPWAM</span> Tap</Link><button onClick={() => signOut({ callbackUrl: "/login" })} className="text-slate-500 lg:hidden"><LogOut size={19}/></button></div>
-      <nav className="mt-5 flex gap-2 overflow-x-auto lg:mt-10 lg:block lg:space-y-1">
-        {links.map(([href, label, Icon]) => { const active = href === "/dashboard" ? pathname === href : pathname.startsWith(href); return <Link key={href} href={href} className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active ? "bg-brand-500/10 text-brand-400" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><Icon size={17}/>{label}</Link>; })}
-        {user.role === "ADMIN" && <Link href="/admin" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${pathname.startsWith("/admin") ? "bg-brand-500/10 text-brand-400" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><Shield size={17}/>Admin</Link>}
-      </nav>
-      <div className="mt-10 hidden border-t border-white/10 pt-5 lg:block"><p className="truncate text-sm font-semibold">{user.name || "POPWAM user"}</p><p className="mt-1 truncate text-xs text-slate-500">{user.email}</p><button onClick={() => signOut({ callbackUrl: "/login" })} className="mt-4 flex items-center gap-2 text-xs text-slate-500 hover:text-white"><LogOut size={14}/> Sign out</button></div>
-    </aside>
-    <main className="min-w-0 p-4 sm:p-7 lg:p-10">{children}</main>
-  </div>;
+type NavCopy = { overview: string; profile: string; destinations: string; tags: string; uploads: string; admin: string; signOut: string; users: string; organizations: string; plans: string; limits: string; profiles: string; links: string; themes: string; settings: string; audit: string };
+export function DashboardShell({ children, user, locale, labels, languageLabel }: { children: React.ReactNode; user: { name?: string | null; email?: string | null; role: string }; locale: "ar" | "en"; labels: NavCopy; languageLabel: string }) {
+  const pathname = usePathname(); const admin = pathname.startsWith("/admin");
+  const userLinks = [["/dashboard",labels.overview,Gauge],["/dashboard/profile",labels.profile,UserRound],["/dashboard/cards",labels.destinations,CreditCard],["/dashboard/tags",labels.tags,Nfc],["/dashboard/uploads",labels.uploads,Upload]] as const;
+  const adminLinks = [["/admin",labels.overview,Gauge],["/admin/users",labels.users,Users],["/admin/organizations",labels.organizations,Building2],["/admin/plans",labels.plans,Layers3],["/admin/limits",labels.limits,SlidersHorizontal],["/admin/profiles",labels.profiles,UserRound],["/admin/links",labels.links,Link2],["/admin/tags",labels.tags,Nfc],["/admin/uploads",labels.uploads,FileText],["/admin/themes",labels.themes,Palette],["/admin/settings",labels.settings,Settings],["/admin/audit",labels.audit,ScrollText]] as const;
+  const links = admin ? adminLinks : userLinks;
+  return <div className="mx-auto min-h-screen max-w-[1600px] lg:grid lg:grid-cols-[270px_1fr]"><aside className="border-b border-white/10 bg-black/20 p-4 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-e lg:p-6"><div className="flex items-center justify-between"><Link href="/" className="text-lg font-black"><span className="text-brand-400">POPWAM</span> Tap</Link><button onClick={() => signOut({ callbackUrl: "/login" })} className="text-slate-500 lg:hidden" aria-label={labels.signOut}><LogOut size={19}/></button></div><nav className="mt-5 flex gap-2 overflow-x-auto lg:mt-8 lg:block lg:space-y-1">{links.map(([href,label,Icon]) => { const active = href === (admin ? "/admin" : "/dashboard") ? pathname === href : pathname.startsWith(href); return <Link key={href} href={href} className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active ? "bg-brand-500/10 text-brand-400" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><Icon size={17}/>{label}</Link>; })}{!admin && user.role === "ADMIN" && <Link href="/admin" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white"><Shield size={17}/>{labels.admin}</Link>}{admin && <Link href="/dashboard" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white"><Gauge size={17}/>{labels.overview}</Link>}</nav><div className="mt-8 hidden border-t border-white/10 pt-5 lg:block"><p className="truncate text-sm font-semibold">{user.name || "POPWAM"}</p><p className="mt-1 truncate text-xs text-slate-500">{user.email}</p><div className="mt-4 flex flex-wrap gap-2"><LocaleSwitcher locale={locale} label={languageLabel}/><button onClick={() => signOut({ callbackUrl: "/login" })} className="btn-secondary"><LogOut size={14}/>{labels.signOut}</button></div></div></aside><main className="min-w-0 p-4 sm:p-7 lg:p-10">{children}</main></div>;
 }

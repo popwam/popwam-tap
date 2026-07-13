@@ -1,0 +1,13 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FileText, Trash2, Upload } from "lucide-react";
+
+type Item = { id: string; title: string | null; originalFilename: string; publicUrl: string; sizeBytes: string };
+export function FileManager({ profileId, initialFiles, allowed, usageLabel }: { profileId: string; initialFiles: Item[]; allowed: boolean; usageLabel: string }) {
+  const [status,setStatus] = useState(""); const [pending,setPending] = useState(false); const form = useRef<HTMLFormElement>(null); const router = useRouter();
+  async function upload(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); if (!form.current) return; setPending(true); setStatus(""); const response = await fetch("/api/upload/file", { method: "POST", body: new FormData(form.current) }); const result = await response.json(); setPending(false); if (!response.ok) setStatus(result.error || "UPLOAD_FAILED"); else { form.current.reset(); setStatus("Uploaded"); router.refresh(); } }
+  async function remove(id: string) { if (!window.confirm("Delete this uploaded file?")) return; const response = await fetch(`/api/upload/file?id=${encodeURIComponent(id)}`, { method: "DELETE" }); if (response.ok) router.refresh(); else setStatus("DELETE_FAILED"); }
+  return <><div className="mb-5 flex items-center justify-between"><p className="text-sm text-slate-400">{usageLabel}</p></div>{allowed ? <form ref={form} onSubmit={upload} className="card mb-5 grid gap-4 p-5 sm:grid-cols-[1fr_1fr_auto]"><input type="hidden" name="profileId" value={profileId}/><label><span className="label">Public title</span><input className="input" name="title"/></label><label><span className="label">File</span><input className="input" type="file" name="file" required accept=".pdf,.vcf,.txt,.jpg,.jpeg,.png,.webp"/></label><button className="btn-primary self-end" disabled={pending}><Upload size={15}/> Upload</button>{status && <p className="text-sm text-amber-300 sm:col-span-3">{status}</p>}</form> : <div className="card mb-5 p-5 text-amber-200">File uploads are not enabled by your current plan.</div>}<div className="grid gap-3">{initialFiles.map(file => <article className="card flex items-center gap-4 p-4" key={file.id}><FileText className="text-brand-400"/><div className="min-w-0 flex-1"><a href={file.publicUrl} target="_blank" className="font-semibold">{file.title || file.originalFilename}</a><p className="text-xs text-slate-500">{Math.ceil(Number(file.sizeBytes) / 1024)} KB</p></div><button className="btn-danger" onClick={() => remove(file.id)}><Trash2 size={14}/></button></article>)}</div></>;
+}

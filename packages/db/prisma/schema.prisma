@@ -13,6 +13,18 @@ enum SystemRole {
   USER
 }
 
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  EXPIRED
+  CANCELED
+}
+
 enum OrgRole {
   OWNER
   ORG_ADMIN
@@ -31,7 +43,34 @@ enum DestinationType {
   LINKEDIN
   GITHUB
   TIKTOK
+  INSTAGRAM
+  X
+  YOUTUBE
+  TELEGRAM
+  LOCATION
+  FILE
+  SOCIAL
+  CUSTOM_FIELD
   CUSTOM_URL
+}
+
+enum ProfileFieldType {
+  TEXT
+  PHONE
+  EMAIL
+  URL
+  WHATSAPP
+  LOCATION
+  FILE
+  SOCIAL
+  CUSTOM
+}
+
+enum ProfileTheme {
+  CLASSIC_DARK
+  CLASSIC_LIGHT
+  ELEGANT_DARK
+  ELEGANT_LIGHT
 }
 
 enum TagMode {
@@ -63,6 +102,9 @@ model User {
   image              String?
   passwordHash       String?
   role               SystemRole     @default(USER)
+  status             AccountStatus  @default(ACTIVE)
+  locale             String?
+  lastLoginAt        DateTime?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   accounts           Account[]
@@ -72,6 +114,67 @@ model User {
   ownedTags           Tag[]          @relation("TagOwner")
   organizationsOwned Organization[] @relation("OrganizationOwner")
   memberships        Membership[]
+  subscriptions      UserPlan[]
+  limitOverride      UserLimitOverride?
+  profileFields      ProfileField[]
+  uploads            UploadedFile[] @relation("UploadedBy")
+  auditLogs          AuditLog[]      @relation("AuditActor")
+}
+
+model Plan {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  description      String?
+  isActive         Boolean  @default(true)
+  maxProfiles      Int      @default(1)
+  maxLinks         Int      @default(5)
+  maxCustomFields  Int      @default(3)
+  maxTags          Int      @default(1)
+  maxUploads       Int      @default(0)
+  maxStorageBytes  BigInt   @default(0)
+  allowCustomSlug  Boolean  @default(false)
+  allowThemes      Boolean  @default(false)
+  allowCustomTheme Boolean  @default(false)
+  allowAnalytics   Boolean  @default(false)
+  allowFileUploads Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  subscriptions    UserPlan[]
+}
+
+model UserPlan {
+  id        String             @id @default(cuid())
+  userId    String
+  planId    String
+  status    SubscriptionStatus @default(ACTIVE)
+  startsAt  DateTime           @default(now())
+  endsAt    DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  @@index([userId, status])
+  @@index([planId])
+}
+
+model UserLimitOverride {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  maxProfiles      Int?
+  maxLinks         Int?
+  maxCustomFields  Int?
+  maxTags          Int?
+  maxUploads       Int?
+  maxStorageBytes  BigInt?
+  allowCustomSlug  Boolean?
+  allowThemes      Boolean?
+  allowCustomTheme Boolean?
+  allowAnalytics   Boolean?
+  allowFileUploads Boolean?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {
@@ -157,15 +260,59 @@ model Profile {
   vcfUrl             String?
   locationText       String?
   isPublic           Boolean       @default(true)
+  theme              ProfileTheme  @default(CLASSIC_DARK)
+  avatarCrop         Json?
+  coverCrop          Json?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   destinations       Destination[]
   tags               Tag[]
+  fields             ProfileField[]
+  uploads            UploadedFile[]
   @@index([userId])
   @@index([organizationId])
   @@index([slug])
+}
+
+model ProfileField {
+  id            String           @id @default(cuid())
+  profileId     String
+  userId        String
+  label         String
+  value         String
+  type          ProfileFieldType @default(TEXT)
+  iconKey       String?
+  customIconUrl String?
+  actionUrl     String?
+  isVisible     Boolean          @default(true)
+  sortOrder     Int              @default(0)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  profile       Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([profileId, isVisible, sortOrder])
+  @@index([userId])
+}
+
+model UploadedFile {
+  id               String   @id @default(cuid())
+  profileId        String?
+  uploaderUserId   String
+  storageKey       String   @unique
+  publicUrl        String
+  originalFilename String
+  mimeType         String
+  sizeBytes        BigInt
+  title            String?
+  isVisible        Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  profile          Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  uploader         User     @relation("UploadedBy", fields: [uploaderUserId], references: [id], onDelete: Cascade)
+  @@index([uploaderUserId, createdAt])
+  @@index([profileId, isVisible])
 }
 
 model Destination {
@@ -177,6 +324,9 @@ model Destination {
   type             DestinationType
   url              String
   icon             String?
+  iconKey          String?
+  customIconUrl    String?
+  isActive         Boolean         @default(true)
   isOfflineCapable Boolean         @default(false)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -192,6 +342,7 @@ model Destination {
 model Tag {
   id                  String       @id @default(cuid())
   token               String       @unique
+  shortCode           String       @unique
   ownerId             String
   organizationId      String?
   profileId           String?
@@ -210,10 +361,20 @@ model Tag {
   profile              Profile?     @relation(fields: [profileId], references: [id], onDelete: SetNull)
   activeDestination    Destination? @relation("ActiveDestination", fields: [activeDestinationId], references: [id], onDelete: SetNull)
   events               TagEvent[]
+  aliases              TagAlias[]
   @@index([token])
+  @@index([shortCode])
   @@index([ownerId])
   @@index([status])
   @@index([organizationId])
+}
+
+model TagAlias {
+  code      String   @id
+  tagId     String
+  createdAt DateTime @default(now())
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@index([tagId])
 }
 
 model TagEvent {
@@ -227,4 +388,23 @@ model TagEvent {
   createdAt DateTime     @default(now())
   tag       Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
   @@index([tagId, createdAt])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  operation String
+  route     String?
+  targetId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  @@index([createdAt])
+  @@index([actorId])
 }

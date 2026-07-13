@@ -1,0 +1,4 @@
+"use client";
+import { useEffect } from "react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
+export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset(): void }) { useEffect(() => { console.error("route boundary", { operation: "route.render", digest: error.digest, name: error.name }); }, [error]); return <main className="flex min-h-screen items-center justify-center p-5"><div className="card max-w-md p-8 text-center"><AlertTriangle className="mx-auto text-amber-300" size={40}/><h1 className="mt-5 text-2xl font-black">تعذر إكمال الطلب · Something went wrong</h1><p className="mt-3 text-slate-400">يرجى المحاولة مرة أخرى. Please try again.</p><button className="btn-primary mt-6" onClick={reset}><RotateCcw size={16}/> إعادة المحاولة · Retry</button></div></main>; }

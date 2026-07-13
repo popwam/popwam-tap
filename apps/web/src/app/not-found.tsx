@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function NotFound() { return <main className="flex min-h-screen items-center justify-center p-5"><div className="card max-w-md p-8 text-center"><h1 className="text-4xl font-black text-brand-400">404</h1><p className="mt-4 text-slate-300">الصفحة غير موجودة · Page not found</p><Link href="/" className="btn-secondary mt-6">POPWAM Tap</Link></div></main>; }

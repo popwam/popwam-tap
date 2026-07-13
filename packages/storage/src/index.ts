@@ -1,6 +1,7 @@
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const DEFAULT_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const DEFAULT_FILE_TYPES = ["application/pdf", "text/vcard", "text/x-vcard", "text/plain", "image/jpeg", "image/png", "image/webp"];
 let client: S3Client | undefined;
 
 function env(name: string) {
@@ -44,6 +45,15 @@ export function validateImageUpload(metadata: ImageMetadata) {
   return { valid: true as const };
 }
 
+export function validateFileUpload(metadata: ImageMetadata) {
+  const maxMb = Number(env("MAX_FILE_UPLOAD_MB") || "10");
+  const allowed = (env("ALLOWED_FILE_TYPES") || DEFAULT_FILE_TYPES.join(",")).split(",").map(type => type.trim().toLowerCase()).filter(Boolean);
+  const dangerous = /\.(exe|dll|com|bat|cmd|ps1|sh|js|mjs|html?|php|jar|msi|scr)$/i.test(metadata.filename);
+  if (dangerous || !allowed.includes(metadata.contentType.toLowerCase())) return { valid: false as const, error: "This file type is not allowed." };
+  if (!Number.isFinite(metadata.size) || metadata.size <= 0 || metadata.size > maxMb * 1024 * 1024) return { valid: false as const, error: `File must be smaller than ${maxMb} MB.` };
+  return { valid: true as const };
+}
+
 function safePart(value: string) {
   return value.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100) || "image";
 }
@@ -74,6 +84,8 @@ export async function uploadPublicImage(
   }));
   return { key: options.key, url: getPublicUrl(options.key) };
 }
+
+export const uploadPublicFile = uploadPublicImage;
 
 export async function deleteObject(key: string) {
   const bucket = env("R2_BUCKET_NAME");

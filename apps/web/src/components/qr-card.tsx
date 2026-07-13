@@ -15,6 +15,6 @@ export function QrCard({ value, name, compact = false }: { value: string; name: 
   }
   return <div className={compact ? "flex items-center gap-3" : "space-y-4 text-center"}>
     <div ref={wrapper} className="inline-flex rounded-2xl bg-white p-3"><QRCodeCanvas value={value} size={compact ? 92 : 220} level="H" marginSize={1}/></div>
-    {!compact && <button type="button" onClick={download} className="btn-secondary w-full"><Download size={15}/> Download PNG</button>}
+    <button type="button" onClick={download} className={compact ? "btn-secondary p-2" : "btn-secondary w-full"} title="Download QR PNG"><Download size={15}/>{!compact && " Download PNG"}</button>
   </div>;
 }

@@ -3,14 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { DestinationType, prisma, SystemRole, TagEventType, TagMode, TagStatus } from "@popwam/db";
+import {
+  AccountStatus, DestinationType, Prisma, ProfileFieldType, ProfileTheme, prisma, SubscriptionStatus,
+  SystemRole, TagEventType, TagMode, TagStatus,
+} from "@popwam/db";
+import { defaultIconKeys, validateShortCode } from "@popwam/shared";
 import { requireAdmin, requireUser } from "@/lib/session";
 import { canManageDestination, canManageTag } from "@/lib/permissions";
 import { isSafeDestinationUrl, normalizeAndValidate } from "@/lib/url";
-import { ensureUserDefaults } from "@/lib/ensure-user";
+import { ensureUserDefaults, ensureUserDefaultsInTransaction } from "@/lib/ensure-user";
+import { assertWithinLimit, getUserEntitlements } from "@/lib/plans";
+import { deleteObject } from "@popwam/storage";
+import { isUniqueConstraintError, normalizeEmail, runAtomicUserCreation } from "@/lib/user-validation";
 
 const text = (data: FormData, key: string) => String(data.get(key) || "").trim();
 const optional = (data: FormData, key: string) => text(data, key) || null;
+const nullableNumber = (data: FormData, key: string) => text(data, key) === "" ? null : Math.max(0, Number(text(data, key)));
+
+function publicRevalidate(profile?: { id: string; slug?: string | null }) {
+  revalidatePath("/dashboard");
+  if (profile) {
+    revalidatePath(`/p/id/${profile.id}`);
+    if (profile.slug) revalidatePath(`/p/${profile.slug}`);
+  }
+}
+
+async function audit(actorId: string, operation: string, targetId?: string, metadata?: Prisma.InputJsonValue) {
+  await prisma.auditLog.create({ data: { actorId, operation, targetId, metadata } });
+}
 
 export async function updateProfile(data: FormData) {
   const user = await requireUser();
@@ -19,125 +39,228 @@ export async function updateProfile(data: FormData) {
     ? await prisma.profile.findFirst({ where: { id: profileId, ...(user.role === "ADMIN" ? {} : { userId: user.id }) } })
     : await prisma.profile.findFirst({ where: { userId: user.id, organizationId: null } });
   const displayName = text(data, "displayName");
-  if (!profile || !displayName) throw new Error("Profile not found or display name missing.");
-  const slug = optional(data, "slug")?.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || null;
+  if (!profile || !displayName) throw new Error("PROFILE_INVALID");
+  const previousSlug = profile.slug;
+  const requestedSlug = optional(data, "slug");
+  const slugResult = requestedSlug ? validateShortCode(requestedSlug) : null;
+  if (slugResult && !slugResult.valid) throw new Error(`SHORT_CODE_${slugResult.reason.toUpperCase()}`);
+  if (slugResult?.code !== previousSlug) {
+    const { effective } = await getUserEntitlements(profile.userId);
+    if (slugResult?.code && !effective.allowCustomSlug) throw new Error("FEATURE_CUSTOM_SLUG_REQUIRED");
+  }
   const urlFields = ["avatarUrl", "coverUrl", "website", "facebook", "linkedin", "github", "tiktok", "vcfUrl"] as const;
   for (const field of urlFields) {
     const value = optional(data, field);
-    if (value && !isSafeDestinationUrl(value)) throw new Error(`Invalid URL in ${field}.`);
+    if (value && !isSafeDestinationUrl(value)) throw new Error("INVALID_URL");
   }
+  const theme = Object.values(ProfileTheme).includes(text(data, "theme") as ProfileTheme) ? text(data, "theme") as ProfileTheme : profile.theme;
+  const { effective } = await getUserEntitlements(profile.userId);
+  if (theme !== "CLASSIC_DARK" && !effective.allowThemes) throw new Error("FEATURE_THEMES_REQUIRED");
+  const parseCrop = (key: string) => { try { return JSON.parse(text(data, key)) as Prisma.InputJsonValue; } catch { return undefined; } };
+  const nextAvatarKey = optional(data, "avatarStorageKey"); const nextCoverKey = optional(data, "coverStorageKey");
   await prisma.profile.update({ where: { id: profile.id }, data: {
-    displayName, slug, title: optional(data, "title"), bio: optional(data, "bio"),
-    avatarUrl: optional(data, "avatarUrl"), avatarStorageKey: optional(data, "avatarStorageKey"),
-    coverUrl: optional(data, "coverUrl"), coverStorageKey: optional(data, "coverStorageKey"),
+    displayName, slug: slugResult?.code || null, title: optional(data, "title"), bio: optional(data, "bio"), theme,
+    avatarUrl: optional(data, "avatarUrl"), avatarStorageKey: nextAvatarKey, avatarCrop: parseCrop("avatarCrop"),
+    coverUrl: optional(data, "coverUrl"), coverStorageKey: nextCoverKey, coverCrop: parseCrop("coverCrop"),
     phone: optional(data, "phone"), whatsappBusiness: optional(data, "whatsappBusiness"),
     whatsappPrivate: optional(data, "whatsappPrivate"), email: optional(data, "email"),
     website: optional(data, "website"), facebook: optional(data, "facebook"), linkedin: optional(data, "linkedin"),
     github: optional(data, "github"), tiktok: optional(data, "tiktok"), vcfUrl: optional(data, "vcfUrl"),
     locationText: optional(data, "locationText"), isPublic: data.get("isPublic") === "on",
   }});
+  for (const oldKey of [profile.avatarStorageKey !== nextAvatarKey ? profile.avatarStorageKey : null, profile.coverStorageKey !== nextCoverKey ? profile.coverStorageKey : null]) if (oldKey) await deleteObject(oldKey).catch(error => console.error("old image cleanup failed", { operation: "profile.image.cleanup", userId: user.id, error: error instanceof Error ? error.name : "unknown" }));
   revalidatePath("/dashboard/profile");
-  revalidatePath(`/p/${slug || ""}`);
+  if (previousSlug) revalidatePath(`/p/${previousSlug}`);
+  publicRevalidate({ id: profile.id, slug: slugResult?.code });
 }
 
-function destinationInput(data: FormData) {
+function destinationInput(data: FormData, profileId?: string) {
   const title = text(data, "title");
   const type = text(data, "type") as DestinationType;
-  if (!title || !Object.values(DestinationType).includes(type)) throw new Error("Destination title and type are required.");
+  if (!title || !Object.values(DestinationType).includes(type)) throw new Error("DESTINATION_INVALID");
+  if (type === DestinationType.PROFILE) return { title, type, url: `/p/id/${profileId}`, iconKey: "profile", customIconUrl: null, isActive: true, isOfflineCapable: false };
   const normalized = normalizeAndValidate(type, text(data, "url"));
-  if (!normalized.valid) throw new Error("Destination URL is not safe or supported.");
-  return { title, type, url: normalized.url, icon: optional(data, "icon"), isOfflineCapable: data.get("isOfflineCapable") === "on" };
+  if (!normalized.valid) throw new Error("INVALID_URL");
+  const customIconUrl = optional(data, "customIconUrl");
+  if (customIconUrl && !isSafeDestinationUrl(customIconUrl)) throw new Error("INVALID_URL");
+  return { title, type, url: normalized.url, iconKey: optional(data, "iconKey") || defaultIconKeys[type], customIconUrl, isActive: data.get("isActive") === "on", isOfflineCapable: data.get("isOfflineCapable") === "on" };
 }
 
 export async function createDestination(data: FormData) {
   const user = await requireUser();
-  const profile = await prisma.profile.findFirst({ where: { userId: user.id, organizationId: null }, select: { id: true } });
-  await prisma.destination.create({ data: { ...destinationInput(data), userId: user.id, profileId: profile?.id } });
-  revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags");
+  const { effective } = await assertWithinLimit(user.id, "links");
+  const profile = await prisma.profile.findFirst({ where: { userId: user.id, organizationId: null }, select: { id: true, slug: true } });
+  if (!profile) throw new Error("PROFILE_MISSING");
+  const input = destinationInput(data, profile.id); if (input.customIconUrl && !effective.allowCustomTheme) throw new Error("FEATURE_CUSTOM_ICON_REQUIRED");
+  await prisma.destination.create({ data: { ...input, userId: user.id, profileId: profile.id } });
+  revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); publicRevalidate(profile);
 }
 
 export async function updateDestination(data: FormData) {
-  const user = await requireUser();
-  const id = text(data, "id");
-  if (!await canManageDestination(user, id)) throw new Error("Destination not found.");
-  await prisma.destination.update({ where: { id }, data: destinationInput(data) });
-  revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags");
+  const user = await requireUser(); const id = text(data, "id");
+  if (!await canManageDestination(user, id)) throw new Error("DESTINATION_NOT_FOUND");
+  const current = await prisma.destination.findUniqueOrThrow({ where: { id }, include: { profile: { select: { id: true, slug: true } } } });
+  const input = destinationInput(data, current.profileId || undefined); const { effective } = await getUserEntitlements(current.userId); if (input.customIconUrl && !effective.allowCustomTheme) throw new Error("FEATURE_CUSTOM_ICON_REQUIRED");
+  await prisma.destination.update({ where: { id }, data: input });
+  revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); if (current.profile) publicRevalidate(current.profile);
 }
 
 export async function deleteDestination(data: FormData) {
-  const user = await requireUser();
-  const id = text(data, "id");
-  if (!await canManageDestination(user, id)) throw new Error("Destination not found.");
+  const user = await requireUser(); const id = text(data, "id");
+  if (!await canManageDestination(user, id)) throw new Error("DESTINATION_NOT_FOUND");
+  const current = await prisma.destination.findUnique({ where: { id }, include: { profile: { select: { id: true, slug: true } } } });
+  if (current?.type === DestinationType.PROFILE) throw new Error("PROFILE_DESTINATION_REQUIRED");
   await prisma.destination.delete({ where: { id } });
-  revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags");
+  revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); if (current?.profile) publicRevalidate(current.profile);
+}
+
+export async function createProfileField(data: FormData) {
+  const user = await requireUser(); await assertWithinLimit(user.id, "customFields");
+  const profile = await prisma.profile.findFirst({ where: { id: text(data, "profileId"), userId: user.id } });
+  const label = text(data, "label"); const value = text(data, "value"); const type = text(data, "type") as ProfileFieldType;
+  if (!profile || !label || !value || !Object.values(ProfileFieldType).includes(type)) throw new Error("FIELD_INVALID");
+  const actionUrl = optional(data, "actionUrl"); if (actionUrl && !isSafeDestinationUrl(normalizeAndValidate(type, actionUrl).url)) throw new Error("INVALID_URL");
+  const count = await prisma.profileField.count({ where: { profileId: profile.id } });
+  await prisma.profileField.create({ data: { profileId: profile.id, userId: user.id, label, value, type, actionUrl, iconKey: optional(data, "iconKey"), isVisible: data.get("isVisible") !== "off", sortOrder: count } });
+  revalidatePath("/dashboard/profile"); publicRevalidate(profile);
+}
+
+export async function updateProfileField(data: FormData) {
+  const user = await requireUser(); const id = text(data, "id");
+  const field = await prisma.profileField.findFirst({ where: { id, userId: user.id }, include: { profile: true } });
+  const type = text(data, "type") as ProfileFieldType; const label = text(data, "label"); const value = text(data, "value");
+  if (!field || !label || !value || !Object.values(ProfileFieldType).includes(type)) throw new Error("FIELD_INVALID");
+  const actionUrl = optional(data, "actionUrl"); if (actionUrl && !isSafeDestinationUrl(normalizeAndValidate(type, actionUrl).url)) throw new Error("INVALID_URL");
+  await prisma.profileField.update({ where: { id }, data: { label, value, type, actionUrl, iconKey: optional(data, "iconKey"), isVisible: data.get("isVisible") === "on" } });
+  revalidatePath("/dashboard/profile"); publicRevalidate(field.profile);
+}
+
+export async function deleteProfileField(data: FormData) {
+  const user = await requireUser(); const field = await prisma.profileField.findFirst({ where: { id: text(data, "id"), userId: user.id }, include: { profile: true } });
+  if (!field) throw new Error("FIELD_NOT_FOUND");
+  await prisma.profileField.delete({ where: { id: field.id } }); revalidatePath("/dashboard/profile"); publicRevalidate(field.profile);
+}
+
+export async function moveProfileField(data: FormData) {
+  const user = await requireUser(); const field = await prisma.profileField.findFirst({ where: { id: text(data, "id"), userId: user.id }, include: { profile: true } });
+  if (!field) throw new Error("FIELD_NOT_FOUND");
+  const direction = text(data, "direction") === "up" ? -1 : 1;
+  const neighbor = await prisma.profileField.findFirst({ where: { profileId: field.profileId, sortOrder: direction < 0 ? { lt: field.sortOrder } : { gt: field.sortOrder } }, orderBy: { sortOrder: direction < 0 ? "desc" : "asc" } });
+  if (neighbor) await prisma.$transaction([prisma.profileField.update({ where: { id: field.id }, data: { sortOrder: neighbor.sortOrder } }), prisma.profileField.update({ where: { id: neighbor.id }, data: { sortOrder: field.sortOrder } })]);
+  revalidatePath("/dashboard/profile"); publicRevalidate(field.profile);
 }
 
 export async function updateOwnedTag(data: FormData) {
-  const user = await requireUser();
-  const id = text(data, "id");
-  const existing = await canManageTag(user, id);
-  if (!existing) throw new Error("Tag not found.");
+  const user = await requireUser(); const id = text(data, "id");
+  if (!await canManageTag(user, id)) throw new Error("TAG_NOT_FOUND");
   const tag = await prisma.tag.findUniqueOrThrow({ where: { id } });
-  const requestedMode = text(data, "mode");
   const requestedStatus = text(data, "status");
-  const mode = Object.values(TagMode).includes(requestedMode as TagMode) ? requestedMode as TagMode : tag.mode;
   const allowedStatuses = user.role === "ADMIN" ? Object.values(TagStatus) : [TagStatus.ACTIVE, TagStatus.PAUSED, TagStatus.LOST];
   const status = allowedStatuses.includes(requestedStatus as TagStatus) ? requestedStatus as TagStatus : tag.status;
-  let activeDestinationId = optional(data, "activeDestinationId");
+  const activeDestinationId = optional(data, "activeDestinationId");
+  let destination: { id: string; type: DestinationType } | null = null;
   if (activeDestinationId) {
-    const destination = await prisma.destination.findFirst({ where: { id: activeDestinationId, ...(user.role === "ADMIN" ? {} : { userId: user.id }) } });
-    if (!destination) throw new Error("Destination not found.");
+    destination = await prisma.destination.findFirst({ where: { id: activeDestinationId, userId: tag.ownerId, isActive: true }, select: { id: true, type: true } });
+    if (!destination) throw new Error("DESTINATION_NOT_FOUND");
   }
   await prisma.$transaction([
-    prisma.tag.update({ where: { id }, data: { mode, status, activeDestinationId } }),
-    prisma.tagEvent.create({ data: { tagId: id, type: status !== tag.status ? TagEventType.STATUS_CHANGE : TagEventType.UPDATED, metadata: { fromMode: tag.mode, toMode: mode, fromStatus: tag.status, toStatus: status } } }),
+    prisma.tag.update({ where: { id }, data: { status, activeDestinationId, mode: destination?.type === DestinationType.PROFILE ? TagMode.PROFILE : TagMode.REDIRECT } }),
+    prisma.tagEvent.create({ data: { tagId: id, type: status !== tag.status ? TagEventType.STATUS_CHANGE : TagEventType.UPDATED, metadata: { activeDestinationId, destinationType: destination?.type || null } } }),
   ]);
-  revalidatePath("/dashboard"); revalidatePath("/dashboard/tags"); revalidatePath(`/dashboard/tags/${id}`);
+  revalidatePath("/dashboard"); revalidatePath("/dashboard/tags"); revalidatePath(`/dashboard/tags/${id}`); revalidatePath(`/${tag.shortCode}`); revalidatePath(`/t/${tag.token}`);
 }
 
-export async function createAdminUser(data: FormData) {
-  await requireAdmin();
-  const email = text(data, "email").toLowerCase();
-  const password = text(data, "password");
+export async function updateTagDetails(data: FormData) {
+  const user = await requireUser(); const id = text(data, "id"); const existing = await prisma.tag.findFirst({ where: { id, ownerId: user.id } });
+  if (!existing) throw new Error("TAG_NOT_FOUND"); const name = text(data, "name"); const result = validateShortCode(text(data, "shortCode")); if (!name || !result.valid) throw new Error(result.valid ? "TAG_INVALID" : `SHORT_CODE_${result.reason.toUpperCase()}`);
+  if (result.code !== existing.shortCode) { const { effective } = await getUserEntitlements(user.id); if (!effective.allowCustomSlug) throw new Error("FEATURE_CUSTOM_SLUG_REQUIRED"); }
+  try { await prisma.$transaction(async tx => { const [collision,alias] = await Promise.all([tx.tag.findUnique({ where: { shortCode: result.code } }),tx.tagAlias.findUnique({ where: { code: result.code } })]); if ((collision && collision.id !== existing.id) || (alias && alias.tagId !== existing.id)) throw new Error("SHORT_CODE_IN_USE"); if (!alias) await tx.tagAlias.create({ data: { code: result.code, tagId: existing.id } }); await tx.tag.update({ where: { id }, data: { name, shortCode: result.code } }); await tx.tagEvent.create({ data: { tagId: id, type: TagEventType.UPDATED, metadata: { previousName: existing.name, previousShortCode: existing.shortCode, shortCode: result.code } } }); }); }
+  catch (error) { if (isUniqueConstraintError(error)) throw new Error("SHORT_CODE_IN_USE"); throw error; }
+  revalidatePath("/dashboard/tags"); revalidatePath(`/dashboard/tags/${id}`); revalidatePath(`/${existing.shortCode}`); revalidatePath(`/${result.code}`);
+}
+
+export type CreateUserState = { ok: boolean; code?: string; temporaryPassword?: string };
+export async function createAdminUser(_previous: CreateUserState, data: FormData): Promise<CreateUserState> {
+  const admin = await requireAdmin(); const email = normalizeEmail(text(data, "email")); const password = text(data, "password");
   const role = text(data, "role") === "ADMIN" ? SystemRole.ADMIN : SystemRole.USER;
-  if (!email || password.length < 8) throw new Error("Valid email and an 8+ character password are required.");
-  const rounds = Math.max(10, Number(process.env.BCRYPT_SALT_ROUNDS || 12));
-  const user = await prisma.user.create({ data: { email, name: optional(data, "name"), role, passwordHash: await bcrypt.hash(password, rounds) } });
-  await ensureUserDefaults(user.id);
-  revalidatePath("/admin/users");
+  if (!/^\S+@\S+\.\S+$/.test(email)) return { ok: false, code: "INVALID_EMAIL" };
+  if (password.length < 8) return { ok: false, code: "PASSWORD_TOO_SHORT" };
+  if (await prisma.user.findUnique({ where: { email }, select: { id: true } })) return { ok: false, code: "EMAIL_IN_USE" };
+  try {
+    const rounds = Math.max(10, Number(process.env.BCRYPT_SALT_ROUNDS || 12)); const passwordHash = await bcrypt.hash(password, rounds);
+    const user = await runAtomicUserCreation(prisma, tx => tx.user.create({ data: { email, name: optional(data, "name"), role, passwordHash } }), async (tx, created) => { await ensureUserDefaultsInTransaction(tx, created.id); });
+    await audit(admin.id, "admin.user.create", user.id); revalidatePath("/admin/users"); return { ok: true };
+  } catch (error) {
+    if (isUniqueConstraintError(error)) return { ok: false, code: "EMAIL_IN_USE" };
+    console.error("admin.user.create failed", { operation: "admin.user.create", route: "/admin/users", adminId: admin.id, prismaCode: error instanceof Prisma.PrismaClientKnownRequestError ? error.code : undefined });
+    return { ok: false, code: "CREATE_USER_FAILED" };
+  }
 }
 
 export async function createAdminTag(data: FormData) {
-  await requireAdmin();
-  const ownerId = text(data, "ownerId");
-  const owner = await prisma.user.findUnique({ where: { id: ownerId } });
-  if (!owner) throw new Error("Owner not found.");
-  const rawToken = text(data, "token") || randomBytes(12).toString("base64url");
-  const token = rawToken.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
-  const name = text(data, "name");
-  if (!name || token.length < 4) throw new Error("Name and a token of at least 4 characters are required.");
-  const profileId = optional(data, "profileId");
-  if (profileId && !await prisma.profile.findFirst({ where: { id: profileId, userId: ownerId } })) throw new Error("Profile does not belong to owner.");
-  await prisma.tag.create({ data: { token, name, ownerId, profileId, events: { create: { type: TagEventType.CREATED } } } });
-  revalidatePath("/admin/tags");
+  const admin = await requireAdmin(); const ownerId = text(data, "ownerId");
+  if (!await prisma.user.findUnique({ where: { id: ownerId } })) throw new Error("OWNER_NOT_FOUND");
+  await assertWithinLimit(ownerId, "tags");
+  const result = validateShortCode(text(data, "shortCode") || randomBytes(4).toString("hex")); const name = text(data, "name");
+  if (!name || !result.valid) throw new Error(result.valid ? "TAG_INVALID" : `SHORT_CODE_${result.reason.toUpperCase()}`);
+  if (await prisma.tag.findUnique({ where: { shortCode: result.code } }) || await prisma.tagAlias.findUnique({ where: { code: result.code } })) throw new Error("SHORT_CODE_IN_USE");
+  const tag = await prisma.tag.create({ data: { token: randomBytes(18).toString("base64url"), shortCode: result.code, name, ownerId, mode: TagMode.REDIRECT, aliases: { create: { code: result.code } }, events: { create: { type: TagEventType.CREATED } } } });
+  await audit(admin.id, "admin.tag.create", tag.id, { ownerId }); revalidatePath("/admin/tags");
 }
 
 export async function updateAdminTag(data: FormData) {
-  await requireAdmin();
-  const id = text(data, "id");
-  const ownerId = text(data, "ownerId");
-  const status = text(data, "status") as TagStatus;
+  const admin = await requireAdmin(); const id = text(data, "id"); const ownerId = text(data, "ownerId"); const status = text(data, "status") as TagStatus;
   const existing = await prisma.tag.findUnique({ where: { id } });
-  if (!existing || !Object.values(TagStatus).includes(status) || !await prisma.user.findUnique({ where: { id: ownerId } })) throw new Error("Invalid tag update.");
+  if (!existing || !Object.values(TagStatus).includes(status) || !await prisma.user.findUnique({ where: { id: ownerId } })) throw new Error("TAG_INVALID");
   const ownerChanged = ownerId !== existing.ownerId;
+  if (ownerChanged) await assertWithinLimit(ownerId, "tags");
   await prisma.$transaction([
-    prisma.tag.update({ where: { id }, data: {
-      ownerId, status,
-      ...(ownerChanged ? { profileId: null, activeDestinationId: null, organizationId: null } : {}),
-      ...(data.get("programmed") === "on" && !existing.programmedAt ? { programmedAt: new Date() } : {}),
-      ...(data.get("locked") === "on" && !existing.lockedAt ? { lockedAt: new Date() } : {}),
-    }}),
+    prisma.tag.update({ where: { id }, data: { ownerId, status, ...(ownerChanged ? { profileId: null, activeDestinationId: null, organizationId: null, mode: TagMode.REDIRECT } : {}), ...(data.get("programmed") === "on" && !existing.programmedAt ? { programmedAt: new Date() } : {}), ...(data.get("locked") === "on" && !existing.lockedAt ? { lockedAt: new Date() } : {}) } }),
     prisma.tagEvent.create({ data: { tagId: id, type: existing.status !== status ? TagEventType.STATUS_CHANGE : TagEventType.UPDATED, metadata: { admin: true, previousOwnerId: existing.ownerId, ownerId } } }),
   ]);
-  revalidatePath("/admin/tags"); revalidatePath("/dashboard/tags");
+  await audit(admin.id, "admin.tag.update", id, { ownerId, status }); revalidatePath("/admin/tags"); revalidatePath("/dashboard/tags");
+}
+
+export async function updateAdminUser(data: FormData) {
+  const admin = await requireAdmin(); const id = text(data, "id"); const email = text(data, "email").toLowerCase();
+  const status = text(data, "status") as AccountStatus; const role = text(data, "role") as SystemRole;
+  if (!Object.values(AccountStatus).includes(status) || !Object.values(SystemRole).includes(role)) throw new Error("USER_INVALID");
+  try { await prisma.user.update({ where: { id }, data: { email, name: optional(data, "name"), status, role } }); }
+  catch (error) { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new Error("EMAIL_IN_USE"); throw error; }
+  await audit(admin.id, "admin.user.update", id); revalidatePath(`/admin/users/${id}`); revalidatePath("/admin/users");
+}
+
+export async function assignUserPlan(data: FormData) {
+  const admin = await requireAdmin(); const userId = text(data, "userId"); const planId = text(data, "planId");
+  if (!await prisma.plan.findFirst({ where: { id: planId, isActive: true } })) throw new Error("PLAN_INVALID");
+  await prisma.$transaction([prisma.userPlan.updateMany({ where: { userId, status: SubscriptionStatus.ACTIVE }, data: { status: SubscriptionStatus.CANCELED, endsAt: new Date() } }), prisma.userPlan.create({ data: { userId, planId } })]);
+  await audit(admin.id, "admin.user.plan", userId, { planId }); revalidatePath(`/admin/users/${userId}`);
+}
+
+export async function updateUserLimits(data: FormData) {
+  const admin = await requireAdmin(); const userId = text(data, "userId");
+  await prisma.userLimitOverride.upsert({ where: { userId }, create: { userId }, update: {}, });
+  await prisma.userLimitOverride.update({ where: { userId }, data: {
+    maxProfiles: nullableNumber(data, "maxProfiles"), maxLinks: nullableNumber(data, "maxLinks"), maxCustomFields: nullableNumber(data, "maxCustomFields"), maxTags: nullableNumber(data, "maxTags"), maxUploads: nullableNumber(data, "maxUploads"),
+    maxStorageBytes: text(data, "maxStorageBytes") ? BigInt(text(data, "maxStorageBytes")) : null,
+    allowCustomSlug: optionalBoolean(data, "allowCustomSlug"), allowThemes: optionalBoolean(data, "allowThemes"), allowCustomTheme: optionalBoolean(data, "allowCustomTheme"), allowAnalytics: optionalBoolean(data, "allowAnalytics"), allowFileUploads: optionalBoolean(data, "allowFileUploads"),
+  }});
+  await audit(admin.id, "admin.user.limits", userId); revalidatePath(`/admin/users/${userId}`);
+}
+
+function optionalBoolean(data: FormData, key: string) { const value = text(data, key); return value === "" ? null : value === "true"; }
+
+export async function resetUserPassword(data: FormData) {
+  const admin = await requireAdmin(); const userId = text(data, "userId"); const temporaryPassword = text(data, "password") || randomBytes(9).toString("base64url");
+  const rounds = Math.max(10, Number(process.env.BCRYPT_SALT_ROUNDS || 12)); await prisma.user.update({ where: { id: userId }, data: { passwordHash: await bcrypt.hash(temporaryPassword, rounds) } });
+  await audit(admin.id, "admin.user.password_reset", userId); revalidatePath(`/admin/users/${userId}`);
+}
+
+export async function repairUserAccount(data: FormData) {
+  const admin = await requireAdmin(); const userId = text(data, "userId"); await ensureUserDefaults(userId); await audit(admin.id, "admin.user.repair", userId); revalidatePath(`/admin/users/${userId}`);
+}
+
+export async function deleteAdminUser(data: FormData) {
+  const admin = await requireAdmin(); const userId = text(data, "userId"); if (userId === admin.id) throw new Error("CANNOT_DELETE_SELF");
+  await audit(admin.id, "admin.user.delete", userId); await prisma.user.delete({ where: { id: userId } }); revalidatePath("/admin/users");
 }

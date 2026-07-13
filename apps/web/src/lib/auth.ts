@@ -14,7 +14,8 @@ const providers: NextAuthOptions["providers"] = [
       const email = credentials?.email?.trim().toLowerCase();
       if (!email || !credentials?.password) return null;
       const user = await prisma.user.findUnique({ where: { email } });
-      if (!user?.passwordHash || !(await bcrypt.compare(credentials.password, user.passwordHash))) return null;
+      if (!user?.passwordHash || user.status !== "ACTIVE" || !(await bcrypt.compare(credentials.password, user.passwordHash))) return null;
+      await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
       await ensureUserDefaults(user.id);
       return { id: user.id, email: user.email, name: user.name, image: user.image, role: user.role };
     },
@@ -40,7 +41,13 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) { if (user.id) await ensureUserDefaults(user.id); },
   },
   callbacks: {
-    async signIn() { return true; },
+    async signIn({ user }) {
+      if (!user.id) return false;
+      const account = await prisma.user.findUnique({ where: { id: user.id }, select: { status: true } });
+      if (account?.status !== "ACTIVE") return false;
+      await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+      return true;
+    },
     async jwt({ token, user }) {
       if (user?.id) {
         const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, role: true, name: true, email: true } });
