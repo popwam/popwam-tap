@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
+import { PrismaPlugin } from "@prisma/nextjs-monorepo-workaround-plugin";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@popwam/auth", "@popwam/db", "@popwam/shared", "@popwam/storage"],
+  webpack(config, { isServer }) {
+    if (isServer) config.plugins.push(new PrismaPlugin());
+    return config;
+  },
   async headers() {
     const securityHeaders = [
       { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },

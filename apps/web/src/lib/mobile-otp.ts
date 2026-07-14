@@ -1,11 +1,46 @@
 import "server-only";
-import {OtpPurpose,Prisma,prisma} from "@popwam/db";
-import {normalizePhone,maskPhone} from "@/lib/phone";
-import {createOtpCode,hashOtp,hashPhone,otpMatches} from "@/lib/otp-crypto";
-import {getSmsProvider} from "@/lib/sms";
-import {ensureUserDefaultsInTransaction} from "@/lib/ensure-user";
-import {issueMobileSession} from "@/lib/mobile-auth";
+import { OtpPurpose, Prisma, prisma } from "@popwam/db";
+import { normalizePhone, maskPhone } from "@/lib/phone";
+import { createOtpCode, hashOtp, hashPhone, otpMatches } from "@/lib/otp-crypto";
+import { getSmsProvider, type SmsDelivery } from "@/lib/sms";
+import { isOtpUsable, otpPolicyFromEnv } from "@/lib/otp-policy";
+import { ensureUserDefaultsInTransaction } from "@/lib/ensure-user";
+import { issueMobileSession } from "@/lib/mobile-auth";
 
-export async function sendMobileOtp(rawPhone:string,locale:"ar"|"en"){const normalized=normalizePhone(rawPhone);if(!normalized.valid)return{ok:false as const,status:400,error:"PHONE_INVALID"};const now=new Date();const cooldown=Math.max(30,Number(process.env.OTP_SEND_COOLDOWN_SECONDS||60));const latest=await prisma.otpChallenge.findFirst({where:{phone:normalized.e164,purpose:OtpPurpose.LOGIN},orderBy:{createdAt:"desc"},select:{createdAt:true}});if(latest&&latest.createdAt>new Date(now.getTime()-cooldown*1000))return{ok:false as const,status:429,error:"OTP_COOLDOWN"};const phoneHash=hashPhone(normalized.e164);const dayStart=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));const dailyLimit=Math.max(1,Number(process.env.OTP_DAILY_SEND_LIMIT||10));if(await prisma.otpSendLog.count({where:{phoneHash,createdAt:{gte:dayStart}}})>=dailyLimit)return{ok:false as const,status:429,error:"OTP_LIMIT_REACHED"};const code=createOtpCode();const expiryMinutes=Math.min(5,Math.max(3,Number(process.env.OTP_EXPIRY_MINUTES||5)));const provider=getSmsProvider();const challenge=await prisma.otpChallenge.create({data:{phone:normalized.e164,purpose:OtpPurpose.LOGIN,otpHash:hashOtp(normalized.e164,code),expiresAt:new Date(now.getTime()+expiryMinutes*60_000),maxAttempts:Math.min(10,Math.max(3,Number(process.env.OTP_MAX_ATTEMPTS||5))),provider:provider.name}});let delivery:{status:"SENT"|"FAILED";provider:string;messageId?:string};try{delivery=await provider.sendOtp({to:normalized.e164,code,expiresMinutes:expiryMinutes,locale})}catch{delivery={status:"FAILED",provider:provider.name}}await prisma.$transaction([prisma.otpChallenge.update({where:{id:challenge.id},data:{deliveryStatus:delivery.status,providerMessageId:delivery.messageId}}),prisma.otpSendLog.create({data:{phoneHash,purpose:OtpPurpose.LOGIN,status:delivery.status,provider:provider.name}})]);if(delivery.status!=="SENT")return{ok:false as const,status:503,error:"OTP_SEND_FAILED"};return{ok:true as const,challengeId:challenge.id,maskedPhone:maskPhone(normalized.e164),expiresIn:expiryMinutes*60,...(process.env.NODE_ENV!=="production"&&provider.name==="development"?{developmentCode:code}:{})}}
+export async function sendMobileOtp(rawPhone: string, locale: "ar" | "en") {
+  const normalized = normalizePhone(rawPhone);
+  if (!normalized.valid) return { ok: false as const, status: 400, error: "PHONE_INVALID" };
+  const now = new Date(); const policy = otpPolicyFromEnv();
+  const latest = await prisma.otpChallenge.findFirst({ where: { phone: normalized.e164 }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+  if (latest && latest.createdAt > new Date(now.getTime() - policy.resendSeconds * 1000)) return { ok: false as const, status: 429, error: "OTP_COOLDOWN" };
+  const phoneHash = hashPhone(normalized.e164);
+  if (await prisma.otpSendLog.count({ where: { phoneHash, createdAt: { gte: new Date(now.getTime() - 60 * 60_000) } } }) >= policy.hourlySendLimit) return { ok: false as const, status: 429, error: "OTP_LIMIT_REACHED" };
+  const code = createOtpCode(); const provider = getSmsProvider();
+  const challenge = await prisma.otpChallenge.create({ data: { phone: normalized.e164, purpose: OtpPurpose.LOGIN, otpHash: hashOtp(normalized.e164, code), expiresAt: new Date(now.getTime() + policy.expiryMinutes * 60_000), maxAttempts: policy.maxAttempts, provider: provider.name } });
+  let delivery: SmsDelivery;
+  try { delivery = await provider.sendOtp({ to: normalized.e164, code, expiresMinutes: policy.expiryMinutes, locale }); }
+  catch { delivery = { status: "FAILED", provider: provider.name, error: "NETWORK" }; }
+  await prisma.$transaction([
+    prisma.otpChallenge.update({ where: { id: challenge.id }, data: { deliveryStatus: delivery.status, providerMessageId: delivery.messageId } }),
+    prisma.otpSendLog.create({ data: { phoneHash, purpose: OtpPurpose.LOGIN, status: delivery.status, provider: provider.name, responseCode: delivery.responseCode, messageId: delivery.messageId, cost: delivery.cost } }),
+  ]);
+  if (delivery.status !== "SENT") return { ok: false as const, status: 503, error: "OTP_SEND_FAILED" };
+  return { ok: true as const, challengeId: challenge.id, maskedPhone: maskPhone(normalized.e164), expiresIn: policy.expiryMinutes * 60, resendAfter: policy.resendSeconds, ...(process.env.NODE_ENV !== "production" && provider.name === "development" ? { developmentCode: code } : {}) };
+}
 
-export async function verifyMobileOtp(challengeId:string,code:string,deviceName?:string){if(!challengeId||!/^[0-9]{6}$/.test(code))return null;try{return await prisma.$transaction(async tx=>{const challenge=await tx.otpChallenge.findUnique({where:{id:challengeId}});if(!challenge||challenge.purpose!=="LOGIN"||challenge.deliveryStatus!=="SENT"||challenge.consumedAt||challenge.expiresAt<=new Date()||challenge.attempts>=challenge.maxAttempts)return null;if(!otpMatches(challenge.phone,code,challenge.otpHash)){await tx.otpChallenge.update({where:{id:challenge.id},data:{attempts:{increment:1}}});return null}let user=await tx.user.findUnique({where:{phone:challenge.phone}});if(user&&user.status!=="ACTIVE")return null;if(!user){const suffix=hashPhone(challenge.phone).slice(0,24);user=await tx.user.create({data:{email:`phone-${suffix}@otp.popwam.invalid`,phone:challenge.phone,phoneVerifiedAt:new Date(),name:challenge.phone}})}await ensureUserDefaultsInTransaction(tx,user.id);await tx.otpChallenge.update({where:{id:challenge.id},data:{consumedAt:new Date(),deliveryStatus:"VERIFIED"}});await tx.user.update({where:{id:user.id},data:{lastLoginAt:new Date(),phoneVerifiedAt:user.phoneVerifiedAt||new Date()}});const session=await issueMobileSession(tx,user,deviceName);return{session,user:{id:user.id,name:user.name,phone:user.phone,email:user.email,role:user.role,locale:user.locale}}},{isolationLevel:Prisma.TransactionIsolationLevel.Serializable})}catch{return null}}
+export async function verifyMobileOtp(challengeId: string, code: string, deviceName?: string) {
+  if (!challengeId || !/^[0-9]{6}$/.test(code)) return null;
+  try { return await prisma.$transaction(async tx => {
+    const challenge = await tx.otpChallenge.findUnique({ where: { id: challengeId } });
+    if (!challenge || challenge.purpose !== "LOGIN" || challenge.deliveryStatus !== "SENT" || isOtpUsable(challenge) !== "VALID") return null;
+    if (!otpMatches(challenge.phone, code, challenge.otpHash)) { await tx.otpChallenge.update({ where: { id: challenge.id }, data: { attempts: { increment: 1 } } }); return null; }
+    let user = await tx.user.findUnique({ where: { phone: challenge.phone } });
+    if (user && user.status !== "ACTIVE") return null;
+    if (!user) { const suffix = hashPhone(challenge.phone).slice(0, 24); user = await tx.user.create({ data: { email: `phone-${suffix}@otp.popwam.invalid`, phone: challenge.phone, phoneVerifiedAt: new Date(), name: challenge.phone } }); }
+    await ensureUserDefaultsInTransaction(tx, user.id);
+    await tx.otpChallenge.update({ where: { id: challenge.id }, data: { consumedAt: new Date(), deliveryStatus: "VERIFIED" } });
+    await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), phoneVerifiedAt: user.phoneVerifiedAt || new Date() } });
+    const session = await issueMobileSession(tx, user, deviceName);
+    return { session, user: { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role, locale: user.locale } };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }); } catch { return null; }
+}

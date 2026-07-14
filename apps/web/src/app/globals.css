@@ -40,6 +40,14 @@ html[lang="ar"] .public-theme { --profile-font:var(--font-arabic); }
 .organization-profile .profile-card { border-top:4px solid var(--profile-accent); }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
+.landing-shell { background: radial-gradient(circle at 80% 8%,rgba(38,201,154,.11),transparent 27rem),radial-gradient(circle at 8% 45%,rgba(120,70,110,.09),transparent 24rem),#07090f; }
+.smart-card-mock { background: radial-gradient(circle at 80% 10%,rgba(83,224,179,.3),transparent 35%),linear-gradient(145deg,#1a1e26,#0b0d12 60%); }
+.hero-visual { min-height:400px; animation:hero-in .7s ease-out both; }
+@keyframes hero-in { from { opacity:0;transform:translateY(16px) } to { opacity:1;transform:translateY(0) } }
+@media (prefers-reduced-motion:reduce) { .hero-visual { animation:none } }
+.scan-beam { animation:scan-beam 2s ease-in-out infinite; }
+@keyframes scan-beam { 0%,100% { transform:translateY(-110px);opacity:.2 } 50% { transform:translateY(110px);opacity:1 } }
+@media (prefers-reduced-motion:reduce) { .scan-beam { animation:none } }
 
 @layer components {
   .card { @apply rounded-2xl border border-white/10 bg-white/[.045] shadow-glow backdrop-blur-sm; }

@@ -748,11 +748,13 @@ model OtpChallenge {
   deliveryStatus    OtpDeliveryStatus       @default(PENDING)
   provider          String
   providerMessageId String?
+  requestIpHash     String?
   lastSentAt        DateTime                @default(now())
   createdAt         DateTime                @default(now())
   claimSession      ActivationClaimSession? @relation(fields: [claimSessionId], references: [id], onDelete: Cascade)
 
   @@index([phone, createdAt])
+  @@index([requestIpHash, createdAt])
   @@index([claimSessionId])
   @@index([expiresAt])
 }
@@ -763,6 +765,9 @@ model OtpSendLog {
   purpose   OtpPurpose
   status    OtpDeliveryStatus
   provider  String
+  responseCode String?
+  messageId String?
+  cost      String?
   createdAt DateTime          @default(now())
 
   @@index([phoneHash, createdAt])

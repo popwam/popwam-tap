@@ -1,5 +1,66 @@
 # تقرير الجاهزية النهائية للإنتاج — POPWAM Tap
 
+## ملحق التنفيذ: SMS Misr وتجربة المستخدم — 14 يوليو 2026
+
+هذا الملحق يوثق التغييرات المنفذة بعد إضافة متغيرات SMS Misr إلى Railway، ويحل محل أجزاء SMS/OTP والمسارات العامة الأقدم في التقرير أدناه. لم تُقرأ أو تُطبع قيم Railway، ولم تُرسل رسالة حقيقية أثناء الاختبارات الآلية، ولم تُعدل بيانات الإنتاج.
+
+### القرار الحالي
+
+**الكود جاهز لنشر Release Candidate واختبار مستخدم حقيقي على staging، لكنه ليس مثبتًا Live بعد.** يلزم قبل الاختبار الحي تطبيق الهجرة الجديدة عبر مسار Railway المعتاد، والتأكد من متغيرات Railway، ثم إرسال رسالة واحدة من `/admin/sms`. بيئة `.env` المحلية ليست نسخة من Railway وفشل مدققها بسبب متغيرات محلية ناقصة موضحة أدناه.
+
+### حالة SMS Misr وOTP
+
+- أضيف مزود `smsmisr` الفعلي عبر `POST` و`application/x-www-form-urlencoded` إلى `https://smsmisr.com/api/OTP/`.
+- تُرسل الحقول: `environment`, `username`, `password`, `sender`, `mobile`, `template`, `otp` من الخادم فقط.
+- يحوّل الرقم المصري من `+201xxxxxxxxx` المخزن في قاعدة البيانات إلى `201xxxxxxxxx` عند الإرسال، ويقبل صيغ `010...` و`2010...` و`+2010...`.
+- النجاح محصور في كود `4901`. تغطي الاختبارات `4903`, `4904`, `4905`, `4906`, `4907`, `4908`, `4909`, `4912` والمهلة والاستجابة غير المفهومة.
+- يولد الخادم OTP من 6 أرقام باستخدام `crypto.randomInt`، ويخزن HMAC-SHA256 باستخدام `OTP_PEPPER` فقط. الصلاحية 5 دقائق، إعادة الإرسال بعد 60 ثانية، 5 رسائل للهاتف خلال ساعة، 10 محاولات كحد أقصى، واستخدام واحد.
+- لا يُطبع OTP أو اسم المستخدم أو كلمة المرور أو sender/template token. سجلات التشغيل الجديدة تحفظ فقط status وresponse code وSMSID وCost.
+- يخزن IP الطلب كـHMAC عند توفره ولا يخزن IP الخام.
+- `/admin/sms` يعرض حالة الإعداد والبيئة والإحصاءات دون أسرار، ويتيح Test SMS للمشرف فقط دون عرض OTP.
+
+### الواجهات والمسارات
+
+- `/` أصبحت Landing Page عامة عربية/إنجليزية، RTL/LTR، Mobile First، بخط Cairo للعربية وألوان POPWAM الداكنة. تحتوي Header وHero ونموذج كارت/هاتف/QR وخطوات العمل والمميزات وقسم Android وFooter.
+- `/download` صفحة مستقلة. لا تعرض رابطًا وهميًا؛ تظهر Coming Soon عند غياب رابط APK صالح على نطاق POPWAM. عند توفيره تعرض QR والإصدار والحجم والتاريخ ومتطلبات Android وSHA-256 إن توفر.
+- `/login` يجعل Phone OTP المسار الأساسي، وGoogle اختياري، وأزيل إدخال كلمة المرور من واجهة المستخدم.
+- `/activate/scan` ماسح مخصص فيه Camera Preview وإطار وحركة خفيفة وفلاش وتبديل كاميرا ورفع صورة وإدخال يدوي وحالات خطأ مترجمة.
+- فتح كارت غير مفعّل يعرض حالة الكارت ورقمه masked وزر بدء التفعيل، ولا يحول إلى Login.
+- التدفق: QR مطابق للكارت ← Phone OTP ← Session ← تأكيد نهائي ← Claim داخل Transaction Serializable. المسح وحده لا يربط الكارت.
+- Claim يستخدم `updateMany` مشروطًا على owner/status/token داخل Transaction؛ أول طلب مكتمل فقط ينجح، ويُرفض أي طلب لاحق ككارت مستخدم.
+- Dashboard تعرض عدد الكروت والمفعلة والموقوفة والفتحات وآخر كارت وقائمة الوجهات، مع Empty State وإجراءات التفعيل والملف والرفع.
+
+### الملفات المعدلة أو المضافة في هذا الملحق
+
+- البيئة والبناء: `.env.example`, `scripts/validate-production-env.mjs`, `apps/web/next.config.ts`, `apps/web/package.json`, `pnpm-lock.yaml`.
+- قاعدة البيانات: `packages/db/prisma/schema.prisma`, `packages/db/prisma/migrations/20260714120000_smsmisr_otp_observability/migration.sql`.
+- SMS/OTP: `apps/web/src/lib/sms/index.ts`, `apps/web/src/lib/sms/smsmisr.ts`, `apps/web/src/lib/otp-policy.ts`, `apps/web/src/lib/otp-crypto.ts`, `apps/web/src/lib/phone.ts`, `apps/web/src/lib/mobile-otp.ts`, ومسارات `/api/otp/*` و`/api/admin/sms/test`.
+- التفعيل والدخول: `apps/web/src/app/api/activation/start/route.ts`, صفحات `activate`, `login`, ومكونات `activation-scanner.tsx`, `otp-form.tsx`, `login-form.tsx`.
+- الواجهات: الصفحة الرئيسية، `download`, `dashboard`, `privacy`, `terms`, `admin/sms`, `globals.css`, `layout.tsx`, و`dashboard-shell.tsx`.
+- الاختبارات: `smsmisr.test.ts`, `otp-policy.test.ts`, وتحديث `platform.test.ts`.
+- تشغيل Prisma في Next monorepo: `apps/web/src/types/prisma-next-plugin.d.ts` مع Prisma webpack plugin لضمان نسخ Query Engine إلى حزمة الخادم.
+
+### نتائج التحقق
+
+| التحقق | النتيجة |
+|---|---|
+| `pnpm db:generate` | PASS |
+| `pnpm lint` | PASS — 5/5 packages |
+| `pnpm test` | PASS — 41/41 tests، 3 ملفات اختبار |
+| `pnpm build` | PASS — 77 مسارًا، ثم أعيد Web build بعد إصلاح Prisma ونجح |
+| Smoke Test للـBuild | PASS — HTTP 200 للجذر وdownload وactivate/scan وlogin وlogin/phone وprivacy وterms؛ الجذر لم يتحول إلى Login |
+| Prisma Query Engine | PASS — نُسخ إلى `.next/server/chunks` وتمكن مسار المصادقة من العمل |
+| فحص أسرار Client Bundle | PASS — لم توجد أي قيمة سرية محلية مهيأة في static chunks |
+| SMS حقيقي | NOT RUN — متعمد؛ الاختبارات الآلية لا ترسل رسائل |
+
+### المتغيرات والحواجز المتبقية
+
+عند `SMS_PROVIDER=smsmisr` يتطلب المدقق: `SMSMISR_ENVIRONMENT`, `SMSMISR_USERNAME`, `SMSMISR_PASSWORD`, `SMSMISR_SENDER_TOKEN`, `SMSMISR_TEMPLATE_TOKEN`, `SMSMISR_BASE_URL`. القيمة `SMSMISR_ENVIRONMENT=2` مسموحة للاختبار وتظهر Warning بأنها ليست Live.
+
+فشل التحقق المحمل من `.env` المحلية بسبب: `MOBILE_TOKEN_SECRET`, `OTP_PEPPER`, `APP_HOST`, `PUBLIC_HOST`, و`SMS_PROVIDER`. هذا لا يثبت نقص Railway؛ القيم لم تُقرأ من Railway. كذلك لا يوجد APK منشور صالح في المستودع، لذلك صفحة التنزيل تعرض Coming Soon بأمان.
+
+قبل اختبار المستخدم الحقيقي: خذ backup/restore point، انشر المصدر والهجرة الجديدة، راجع `/admin/sms`، أرسل Test SMS واحدًا، ثم اختبر OTP الصحيح والخاطئ والمنتهي وإعادة الإرسال وClaim متزامن من حسابين. لا تشغّل seed ولا تعدل Production Data يدويًا.
+
 تاريخ التدقيق: 14 يوليو 2026  
 النطاق: المستودع الأحادي الحالي، تطبيق الويب وواجهات API وPrisma/Neon وRailway/Cloudflare R2 وتطبيق Android.  
 القرار العام: **NO-GO**

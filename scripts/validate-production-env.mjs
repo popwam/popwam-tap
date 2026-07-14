@@ -27,8 +27,17 @@ httpsUrl("NEXT_PUBLIC_APP_URL", "go.popwam.com");
 if (value("APP_HOST") !== "app.popwam.com") errors.push("APP_HOST must be app.popwam.com");
 if (value("PUBLIC_HOST") !== "go.popwam.com") errors.push("PUBLIC_HOST must be go.popwam.com");
 
-if (value("SMS_PROVIDER").toLowerCase() !== "webhook") errors.push("SMS_PROVIDER must be webhook in production");
-httpsUrl("SMS_API_URL"); required("SMS_API_TOKEN"); required("SMS_SENDER_ID");
+const smsProvider = value("SMS_PROVIDER").toLowerCase();
+if (!['smsmisr', 'webhook'].includes(smsProvider)) errors.push("SMS_PROVIDER must be smsmisr or webhook in production");
+if (smsProvider === "smsmisr") {
+  for (const name of ["SMSMISR_ENVIRONMENT", "SMSMISR_USERNAME", "SMSMISR_PASSWORD", "SMSMISR_SENDER_TOKEN", "SMSMISR_TEMPLATE_TOKEN"]) required(name);
+  httpsUrl("SMSMISR_BASE_URL", "smsmisr.com");
+  if (!["1", "2"].includes(value("SMSMISR_ENVIRONMENT"))) errors.push("SMSMISR_ENVIRONMENT must be 1 (Live) or 2 (Test)");
+  if (value("SMSMISR_ENVIRONMENT") === "2") console.warn("WARNING: SMSMISR_ENVIRONMENT=2 is Test mode, not Live delivery.");
+}
+if (smsProvider === "webhook") {
+  httpsUrl("SMS_API_URL"); required("SMS_API_TOKEN"); required("SMS_SENDER_ID");
+}
 
 for (const name of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) required(name);
 httpsUrl("R2_ENDPOINT");
