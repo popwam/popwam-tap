@@ -1,4 +1,4 @@
-import { prisma } from "@popwam/db";
+import { Prisma, prisma } from "@popwam/db";
 
 export const LIMIT_KEYS = ["maxProfiles", "maxLinks", "maxCustomFields", "maxTags", "maxCards", "maxUploads", "maxFiles", "maxStorageBytes"] as const;
 export const FEATURE_KEYS = ["allowCustomSlug", "customSlugAllowed", "allowThemes", "allowCustomTheme", "allowAnalytics", "analyticsAllowed", "allowFileUploads", "allowCustomIcons"] as const;
@@ -37,4 +37,31 @@ export async function assertWithinLimit(userId: string, resource: "profiles" | "
   const key = ({ profiles: "maxProfiles", links: "maxLinks", customFields: "maxCustomFields", tags: "maxTags", cards: "maxCards", uploads: "maxUploads", files: "maxFiles" } as const)[resource];
   if (usage[resource] + increment > Number(effective[key])) throw new Error(`LIMIT_REACHED:${resource}`);
   return { effective, usage };
+}
+
+export type LimitedResource = "profiles" | "links" | "customFields" | "tags" | "cards" | "uploads" | "files";
+
+/**
+ * Enforce a limit while holding the owning User row lock. Creation must happen
+ * in the same transaction so concurrent direct API calls cannot exceed a plan.
+ */
+export async function assertWithinLimitLocked(tx: Prisma.TransactionClient, userId: string, resource: LimitedResource, increment = 1) {
+  await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`);
+  const now = new Date();
+  const [subscription, override] = await Promise.all([
+    tx.userPlan.findFirst({ where: { userId, status: "ACTIVE", OR: [{ endsAt: null }, { endsAt: { gt: now } }] }, orderBy: { startsAt: "desc" }, include: { plan: true } }),
+    tx.userLimitOverride.findUnique({ where: { userId } }),
+  ]);
+  const plan = subscription?.plan || await tx.plan.findUnique({ where: { slug: "free" } });
+  if (!plan) throw new Error("PLAN_NOT_CONFIGURED");
+  const effective = mergeEntitlements(plan, override);
+  const used = resource === "profiles" ? await tx.profile.count({ where: { userId } })
+    : resource === "links" ? await tx.destination.count({ where: { userId } })
+    : resource === "customFields" ? await tx.profileField.count({ where: { userId } })
+    : resource === "tags" ? await tx.tag.count({ where: { ownerId: userId } })
+    : resource === "cards" ? await tx.card.count({ where: { ownerId: userId } })
+    : await tx.uploadedFile.count({ where: { uploaderUserId: userId } });
+  const key = ({ profiles: "maxProfiles", links: "maxLinks", customFields: "maxCustomFields", tags: "maxTags", cards: "maxCards", uploads: "maxUploads", files: "maxFiles" } as const)[resource];
+  if (used + increment > Number(effective[key])) throw new Error(`LIMIT_REACHED:${resource}`);
+  return { effective, used };
 }

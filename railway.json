@@ -5,7 +5,7 @@
     "buildCommand": "pnpm build"
   },
   "deploy": {
-    "preDeployCommand": "pnpm db:deploy",
+    "preDeployCommand": "pnpm validate:production-env && pnpm db:deploy",
     "startCommand": "pnpm start",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300,

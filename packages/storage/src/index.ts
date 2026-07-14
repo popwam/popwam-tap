@@ -32,12 +32,30 @@ export function getR2Client() {
 
 export type ImageMetadata = { filename: string; contentType: string; size: number };
 
+const MIME_BY_EXTENSION: Record<string, readonly string[]> = {
+  ".jpg": ["image/jpeg"],
+  ".jpeg": ["image/jpeg"],
+  ".png": ["image/png"],
+  ".webp": ["image/webp"],
+  ".pdf": ["application/pdf"],
+  ".vcf": ["text/vcard", "text/x-vcard"],
+  ".txt": ["text/plain"],
+};
+
+function extensionMatchesMime(filename: string, contentType: string) {
+  const match = filename.toLowerCase().match(/\.[a-z0-9]+$/);
+  return Boolean(match && MIME_BY_EXTENSION[match[0]]?.includes(contentType.toLowerCase()));
+}
+
 export function validateImageUpload(metadata: ImageMetadata) {
   const maxMb = Number(env("MAX_IMAGE_UPLOAD_MB") || "5");
   const allowed = (env("ALLOWED_IMAGE_TYPES") || DEFAULT_TYPES.join(","))
     .split(",").map((type) => type.trim().toLowerCase()).filter(Boolean);
   if (!allowed.includes(metadata.contentType.toLowerCase())) {
     return { valid: false as const, error: "Only JPEG, PNG, and WebP images are allowed." };
+  }
+  if (!extensionMatchesMime(metadata.filename, metadata.contentType)) {
+    return { valid: false as const, error: "The image extension does not match its MIME type." };
   }
   if (!Number.isFinite(metadata.size) || metadata.size <= 0 || metadata.size > maxMb * 1024 * 1024) {
     return { valid: false as const, error: `Image must be smaller than ${maxMb} MB.` };
@@ -49,7 +67,7 @@ export function validateFileUpload(metadata: ImageMetadata) {
   const maxMb = Number(env("MAX_FILE_UPLOAD_MB") || "10");
   const allowed = (env("ALLOWED_FILE_TYPES") || DEFAULT_FILE_TYPES.join(",")).split(",").map(type => type.trim().toLowerCase()).filter(Boolean);
   const dangerous = /\.(exe|dll|com|bat|cmd|ps1|sh|js|mjs|html?|php|jar|msi|scr)$/i.test(metadata.filename);
-  if (dangerous || !allowed.includes(metadata.contentType.toLowerCase())) return { valid: false as const, error: "This file type is not allowed." };
+  if (dangerous || !allowed.includes(metadata.contentType.toLowerCase()) || !extensionMatchesMime(metadata.filename, metadata.contentType)) return { valid: false as const, error: "This file type is not allowed or its extension does not match its MIME type." };
   if (!Number.isFinite(metadata.size) || metadata.size <= 0 || metadata.size > maxMb * 1024 * 1024) return { valid: false as const, error: `File must be smaller than ${maxMb} MB.` };
   return { valid: true as const };
 }

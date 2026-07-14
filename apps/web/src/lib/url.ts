@@ -3,6 +3,9 @@ import type { DestinationType } from "@popwam/db";
 export function isSafeDestinationUrl(value: string) {
   const input = value.trim();
   if (!input || /[\u0000-\u001F\u007F]/.test(input)) return false;
+  // Internal application routes (for example the dynamic vCard endpoint) are
+  // safe, while protocol-relative external URLs beginning with // are not.
+  if (/^\/(?!\/)/.test(input) && !input.includes("\\") && !/%(?:2f|5c)/i.test(input)) return true;
   try {
     const url = new URL(input);
     if (["tel:", "mailto:", "sms:"].includes(url.protocol)) return Boolean(url.pathname);

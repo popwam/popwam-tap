@@ -10,6 +10,7 @@ datasource db {
 
 enum SystemRole {
   ADMIN
+  STAFF
   USER
 }
 
@@ -205,41 +206,42 @@ enum PaymentStatus {
 }
 
 model User {
-  id                 String                   @id @default(cuid())
-  name               String?
-  email              String                   @unique
-  emailVerified      DateTime?
-  image              String?
-  passwordHash       String?
-  phone              String?                  @unique
-  phoneVerifiedAt    DateTime?
-  role               SystemRole               @default(USER)
-  status             AccountStatus            @default(ACTIVE)
-  locale             String?
-  lastLoginAt        DateTime?
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  accounts           Account[]
-  sessions           Session[]
-  profiles           Profile[]
-  destinations       Destination[]
-  ownedTags          Tag[]                    @relation("TagOwner")
-  organizationsOwned Organization[]           @relation("OrganizationOwner")
-  memberships        Membership[]
-  subscriptions      UserPlan[]
-  limitOverride      UserLimitOverride?
-  profileFields      ProfileField[]
-  uploads            UploadedFile[]           @relation("UploadedBy")
-  auditLogs          AuditLog[]               @relation("AuditActor")
-  ownedCards         Card[]                   @relation("CardOwner")
-  createdCardBatches CardBatch[]              @relation("CardBatchCreator")
-  inventoryMovements InventoryMovement[]      @relation("InventoryMovementCreator")
-  createdPurchases   Purchase[]               @relation("PurchaseCreator")
-  createdExpenses    Expense[]                @relation("ExpenseCreator")
-  createdOrders      Order[]                  @relation("OrderCreator")
-  customer           Customer?
-  activationClaims   ActivationClaimSession[]
-  authTickets        AuthTicket[]
+  id                  String                   @id @default(cuid())
+  name                String?
+  email               String                   @unique
+  emailVerified       DateTime?
+  image               String?
+  passwordHash        String?
+  phone               String?                  @unique
+  phoneVerifiedAt     DateTime?
+  role                SystemRole               @default(USER)
+  status              AccountStatus            @default(ACTIVE)
+  locale              String?
+  lastLoginAt         DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  accounts            Account[]
+  sessions            Session[]
+  profiles            Profile[]
+  destinations        Destination[]
+  ownedTags           Tag[]                    @relation("TagOwner")
+  organizationsOwned  Organization[]           @relation("OrganizationOwner")
+  memberships         Membership[]
+  subscriptions       UserPlan[]
+  limitOverride       UserLimitOverride?
+  profileFields       ProfileField[]
+  uploads             UploadedFile[]           @relation("UploadedBy")
+  auditLogs           AuditLog[]               @relation("AuditActor")
+  ownedCards          Card[]                   @relation("CardOwner")
+  createdCardBatches  CardBatch[]              @relation("CardBatchCreator")
+  inventoryMovements  InventoryMovement[]      @relation("InventoryMovementCreator")
+  createdPurchases    Purchase[]               @relation("PurchaseCreator")
+  createdExpenses     Expense[]                @relation("ExpenseCreator")
+  createdOrders       Order[]                  @relation("OrderCreator")
+  customer            Customer?
+  activationClaims    ActivationClaimSession[]
+  authTickets         AuthTicket[]
+  mobileRefreshTokens MobileRefreshToken[]
 }
 
 model Plan {
@@ -628,7 +630,7 @@ model Card {
   serialNumber              String                   @unique
   publicSlug                String                   @unique
   publicToken               String                   @unique
-  activationTokenHash       String
+  activationTokenHash       String                   @unique
   activationTokenConsumedAt DateTime?
   cardType                  CardType
   batchId                   String?
@@ -640,6 +642,7 @@ model Card {
   cardStatus                CardStatus               @default(CREATED)
   inventoryStatus           CardInventoryStatus      @default(AVAILABLE)
   programmedAt              DateTime?
+  lockedAt                  DateTime?
   assignedAt                DateTime?
   activatedAt               DateTime?
   lastOpenedAt              DateTime?
@@ -660,6 +663,7 @@ model Card {
   @@index([ownerId])
   @@index([organizationId])
   @@index([assignmentStatus, cardStatus])
+  @@index([cardStatus])
   @@index([inventoryStatus])
 }
 
@@ -774,6 +778,23 @@ model AuthTicket {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
+}
+
+model MobileRefreshToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  familyId   String
+  userId     String
+  deviceName String?
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@index([expiresAt])
 }
 
 model CardOpenDaily {

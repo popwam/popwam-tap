@@ -5,10 +5,12 @@ import { redirect } from "next/navigation";
 import { CardStatus, InventoryItemType, InventoryMovementType, OrderStatus, PaymentStatus, prisma, PurchaseStatus } from "@popwam/db";
 import { requireAdmin, requireUser } from "@/lib/session";
 import { assertWithinLimit } from "@/lib/plans";
+import { parseMoney } from "@/lib/money";
 
 const text = (data: FormData, key: string) => String(data.get(key) || "").trim();
 const optional = (data: FormData, key: string) => text(data, key) || null;
 const number = (data: FormData, key: string) => Number(text(data, key) || 0);
+const money = (data: FormData, key: string) => parseMoney(text(data, key), key);
 const date = (data: FormData, key: string) => new Date(`${text(data, key)}T12:00:00.000Z`);
 
 export async function createSupplier(data: FormData) {
@@ -20,8 +22,12 @@ export async function createSupplier(data: FormData) {
 export async function createInventoryItem(data: FormData) {
   const admin = await requireAdmin(); const type = text(data, "type") as InventoryItemType;
   if (!text(data, "sku") || !text(data, "nameAr") || !text(data, "nameEn") || !Object.values(InventoryItemType).includes(type)) throw new Error("INVENTORY_ITEM_INVALID");
-  await prisma.inventoryItem.create({ data: { sku: text(data, "sku").toUpperCase(), nameAr: text(data, "nameAr"), nameEn: text(data, "nameEn"), type, supplierId: optional(data, "supplierId"), quantityOnHand: Math.max(0, Math.trunc(number(data, "quantityOnHand"))), reorderLevel: Math.max(0, Math.trunc(number(data, "reorderLevel"))), unitCost: Math.max(0, number(data, "unitCost")), sellingPrice: Math.max(0, number(data, "sellingPrice")) } });
-  await prisma.auditLog.create({ data: { actorId: admin.id, operation: "admin.inventory_item.create" } }); revalidatePath("/admin/inventory"); revalidatePath("/admin/inventory/items");
+  const quantityOnHand = Math.max(0, Math.trunc(number(data, "quantityOnHand"))); const unitCost = money(data, "unitCost");
+  await prisma.$transaction(async tx => {
+    const item = await tx.inventoryItem.create({ data: { sku: text(data, "sku").toUpperCase(), nameAr: text(data, "nameAr"), nameEn: text(data, "nameEn"), type, supplierId: optional(data, "supplierId"), quantityOnHand, reorderLevel: Math.max(0, Math.trunc(number(data, "reorderLevel"))), unitCost, sellingPrice: money(data, "sellingPrice") } });
+    if (quantityOnHand > 0) await tx.inventoryMovement.create({ data: { inventoryItemId: item.id, type: "ADJUSTMENT_IN", quantity: quantityOnHand, unitCost, referenceType: "OPENING_BALANCE", referenceId: item.id, notes: "Opening inventory balance", createdBy: admin.id } });
+    await tx.auditLog.create({ data: { actorId: admin.id, operation: "admin.inventory_item.create", targetId: item.id, metadata: { openingQuantity: quantityOnHand } } });
+  }); revalidatePath("/admin/inventory"); revalidatePath("/admin/inventory/items");
 }
 
 export async function adjustInventory(data: FormData) {
@@ -32,15 +38,19 @@ export async function adjustInventory(data: FormData) {
     const item = await tx.inventoryItem.findUnique({ where: { id: inventoryItemId } }); if (!item) throw new Error("INVENTORY_ITEM_NOT_FOUND");
     if (item.quantityOnHand + delta < item.quantityReserved) throw new Error("STOCK_CANNOT_BE_NEGATIVE");
     await tx.inventoryItem.update({ where: { id: item.id }, data: { quantityOnHand: { increment: delta } } });
-    await tx.inventoryMovement.create({ data: { inventoryItemId, type, quantity: delta, unitCost: number(data, "unitCost") || null, notes: optional(data, "notes"), createdBy: admin.id } });
+    const unitCost = text(data, "unitCost") ? money(data, "unitCost") : null;
+    await tx.inventoryMovement.create({ data: { inventoryItemId, type, quantity: delta, unitCost, notes: optional(data, "notes"), createdBy: admin.id } });
     await tx.auditLog.create({ data: { actorId: admin.id, operation: "admin.inventory.adjust", targetId: item.id, metadata: { type, delta } } });
   }, { isolationLevel: "Serializable" }); revalidatePath("/admin/inventory"); revalidatePath("/admin/inventory/movements");
 }
 
 export async function createPurchase(data: FormData) {
-  const admin = await requireAdmin(); const quantity = Math.trunc(number(data, "quantity")); const unitCost = number(data, "unitCost"); const subtotal = quantity * unitCost; const shippingCost = number(data, "shippingCost"); const customsCost = number(data, "customsCost"); const otherCost = number(data, "otherCost");
-  if (!text(data, "supplierId") || !text(data, "inventoryItemId") || quantity <= 0 || unitCost < 0) throw new Error("PURCHASE_INVALID");
-  const purchase = await prisma.purchase.create({ data: { supplierId: text(data, "supplierId"), invoiceNumber: optional(data, "invoiceNumber"), status: PurchaseStatus.ORDERED, subtotal, shippingCost, customsCost, otherCost, totalCost: subtotal + shippingCost + customsCost + otherCost, paidAmount: Math.max(0, number(data, "paidAmount")), purchaseDate: date(data, "purchaseDate"), notes: optional(data, "notes"), createdBy: admin.id, items: { create: { inventoryItemId: text(data, "inventoryItemId"), quantity, unitCost, totalCost: subtotal } } } });
+  const admin = await requireAdmin(); const quantity = Math.trunc(number(data, "quantity"));
+  const unitCost = money(data, "unitCost"); const subtotal = unitCost.mul(quantity);
+  const shippingCost = money(data, "shippingCost"); const customsCost = money(data, "customsCost"); const otherCost = money(data, "otherCost");
+  const totalCost = subtotal.plus(shippingCost).plus(customsCost).plus(otherCost); const paidAmount = money(data, "paidAmount");
+  if (!text(data, "supplierId") || !text(data, "inventoryItemId") || quantity <= 0 || paidAmount.greaterThan(totalCost)) throw new Error("PURCHASE_INVALID");
+  const purchase = await prisma.purchase.create({ data: { supplierId: text(data, "supplierId"), invoiceNumber: optional(data, "invoiceNumber"), status: PurchaseStatus.ORDERED, subtotal, shippingCost, customsCost, otherCost, totalCost, paidAmount, purchaseDate: date(data, "purchaseDate"), notes: optional(data, "notes"), createdBy: admin.id, items: { create: { inventoryItemId: text(data, "inventoryItemId"), quantity, unitCost, totalCost: subtotal } } } });
   await prisma.auditLog.create({ data: { actorId: admin.id, operation: "admin.purchase.create", targetId: purchase.id } }); revalidatePath("/admin/purchases"); redirect(`/admin/purchases/${purchase.id}`);
 }
 
@@ -54,10 +64,10 @@ export async function receivePurchase(data: FormData) {
 }
 
 export async function createExpenseCategory(data: FormData) { const admin=await requireAdmin();if(!text(data,"nameAr")||!text(data,"nameEn"))throw new Error("CATEGORY_INVALID");const category=await prisma.expenseCategory.create({data:{nameAr:text(data,"nameAr"),nameEn:text(data,"nameEn")}});await prisma.auditLog.create({data:{actorId:admin.id,operation:"admin.expense_category.create",targetId:category.id}});revalidatePath("/admin/expense-categories"); }
-export async function createExpense(data: FormData) { const admin=await requireAdmin();if(!text(data,"categoryId")||!text(data,"title")||number(data,"amount")<=0)throw new Error("EXPENSE_INVALID");const expense=await prisma.expense.create({data:{categoryId:text(data,"categoryId"),title:text(data,"title"),description:optional(data,"description"),amount:number(data,"amount"),expenseDate:date(data,"expenseDate"),paymentMethod:optional(data,"paymentMethod"),referenceNumber:optional(data,"referenceNumber"),attachmentFileId:optional(data,"attachmentFileId"),createdBy:admin.id}});await prisma.auditLog.create({data:{actorId:admin.id,operation:"admin.expense.create",targetId:expense.id}});revalidatePath("/admin/expenses");redirect("/admin/expenses"); }
+export async function createExpense(data: FormData) { const admin=await requireAdmin();const amount=money(data,"amount");if(!text(data,"categoryId")||!text(data,"title")||!amount.greaterThan(0))throw new Error("EXPENSE_INVALID");const expense=await prisma.expense.create({data:{categoryId:text(data,"categoryId"),title:text(data,"title"),description:optional(data,"description"),amount,expenseDate:date(data,"expenseDate"),paymentMethod:optional(data,"paymentMethod"),referenceNumber:optional(data,"referenceNumber"),attachmentFileId:optional(data,"attachmentFileId"),createdBy:admin.id}});await prisma.auditLog.create({data:{actorId:admin.id,operation:"admin.expense.create",targetId:expense.id}});revalidatePath("/admin/expenses");redirect("/admin/expenses"); }
 
 export async function createCustomer(data: FormData) { const admin=await requireAdmin();if(!text(data,"name")||!text(data,"phone"))throw new Error("CUSTOMER_INVALID");const customer=await prisma.customer.create({data:{userId:optional(data,"userId"),name:text(data,"name"),phone:text(data,"phone"),email:optional(data,"email"),organizationName:optional(data,"organizationName"),notes:optional(data,"notes")}});await prisma.auditLog.create({data:{actorId:admin.id,operation:"admin.customer.create",targetId:customer.id}});revalidatePath("/admin/customers"); }
-export async function createOrder(data: FormData) { const admin=await requireAdmin();const quantity=Math.trunc(number(data,"quantity"));const unitPrice=number(data,"unitPrice");const subtotal=quantity*unitPrice;const discount=Math.max(0,number(data,"discount"));const shippingCost=Math.max(0,number(data,"shippingCost"));if(!text(data,"customerId")||!text(data,"description")||quantity<=0||unitPrice<0)throw new Error("ORDER_INVALID");const order=await prisma.order.create({data:{customerId:text(data,"customerId"),status:OrderStatus.DRAFT,subtotal,discount,shippingCost,total:Math.max(0,subtotal-discount+shippingCost),paidAmount:0,paymentStatus:PaymentStatus.UNPAID,notes:optional(data,"notes"),createdBy:admin.id,items:{create:{cardId:optional(data,"cardId"),inventoryItemId:optional(data,"inventoryItemId"),description:text(data,"description"),quantity,unitPrice,total:subtotal}}}});await prisma.auditLog.create({data:{actorId:admin.id,operation:"admin.order.create",targetId:order.id}});revalidatePath("/admin/orders");redirect(`/admin/orders/${order.id}`); }
+export async function createOrder(data: FormData) { const admin=await requireAdmin();const quantity=Math.trunc(number(data,"quantity"));const unitPrice=money(data,"unitPrice");const subtotal=unitPrice.mul(quantity);const discount=money(data,"discount");const shippingCost=money(data,"shippingCost");if(!text(data,"customerId")||!text(data,"description")||quantity<=0||discount.greaterThan(subtotal))throw new Error("ORDER_INVALID");const total=subtotal.minus(discount).plus(shippingCost);const order=await prisma.order.create({data:{customerId:text(data,"customerId"),status:OrderStatus.DRAFT,subtotal,discount,shippingCost,total,paidAmount:"0",paymentStatus:PaymentStatus.UNPAID,notes:optional(data,"notes"),createdBy:admin.id,items:{create:{cardId:optional(data,"cardId"),inventoryItemId:optional(data,"inventoryItemId"),description:text(data,"description"),quantity,unitPrice,total:subtotal}}}});await prisma.auditLog.create({data:{actorId:admin.id,operation:"admin.order.create",targetId:order.id}});revalidatePath("/admin/orders");redirect(`/admin/orders/${order.id}`); }
 
 export async function updateCardState(data: FormData) {
   const admin=await requireAdmin();const id=text(data,"cardId");const action=text(data,"cardAction");const card=await prisma.card.findUnique({where:{id}});if(!card)throw new Error("CARD_NOT_FOUND");

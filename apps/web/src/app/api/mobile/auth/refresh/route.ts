@@ -1,0 +1,2 @@
+import {rotateMobileSession} from "@/lib/mobile-auth";
+export async function POST(request:Request){const body=await request.json().catch(()=>({}));const session=await rotateMobileSession(String(body.refreshToken||""),String(body.deviceName||""));if(!session)return Response.json({ok:false,error:"REFRESH_INVALID"},{status:401,headers:{"cache-control":"no-store"}});return Response.json({ok:true,...session},{headers:{"cache-control":"no-store"}})}

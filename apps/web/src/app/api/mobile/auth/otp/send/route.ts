@@ -1,0 +1,2 @@
+import {sendMobileOtp} from "@/lib/mobile-otp";
+export async function POST(request:Request){const body=await request.json().catch(()=>({}));const result=await sendMobileOtp(String(body.phone||""),body.locale==="en"?"en":"ar");if(!result.ok)return Response.json({ok:false,error:result.error},{status:result.status,headers:{"cache-control":"no-store"}});return Response.json(result,{headers:{"cache-control":"no-store"}})}

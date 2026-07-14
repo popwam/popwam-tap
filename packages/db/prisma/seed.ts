@@ -8,6 +8,19 @@ config({ path: resolve(process.cwd(), "../../.env"), quiet: true });
 const prisma = new PrismaClient();
 
 const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+const isProduction = process.env.NODE_ENV === "production";
+
+function requireSeedPassword(name: "ADMIN_PASSWORD" | "DEMO_USER_PASSWORD", developmentFallback: string) {
+  const configured = process.env[name];
+  if (!isProduction) return configured || developmentFallback;
+  if (process.env.ALLOW_PRODUCTION_SEED !== "true") {
+    throw new Error("Production seed is disabled. Set ALLOW_PRODUCTION_SEED=true only for an intentional one-time operation.");
+  }
+  if (!configured || configured.length < 16 || /change|example|password/i.test(configured)) {
+    throw new Error(`${name} must be a non-placeholder secret of at least 16 characters for a production seed.`);
+  }
+  return configured;
+}
 
 async function upsertUser(email: string, password: string, role: SystemRole, name: string) {
   const rounds = Math.max(10, Number(process.env.BCRYPT_SALT_ROUNDS || 12));
@@ -37,8 +50,10 @@ async function ensurePersonalWorkspace(user: { id: string; name: string | null; 
 async function main() {
   const adminEmail = (process.env.ADMIN_EMAIL || "admin@popwam.com").toLowerCase();
   const demoEmail = (process.env.DEMO_USER_EMAIL || "mmdoh@popwam.com").toLowerCase();
-  const admin = await upsertUser(adminEmail, process.env.ADMIN_PASSWORD || "ChangeMe123!", SystemRole.ADMIN, "POPWAM Admin");
-  const demo = await upsertUser(demoEmail, process.env.DEMO_USER_PASSWORD || "ChangeMe123!", SystemRole.USER, "mamdouh mmdouh saad");
+  const adminPassword = requireSeedPassword("ADMIN_PASSWORD", "ChangeMe123!");
+  const demoPassword = requireSeedPassword("DEMO_USER_PASSWORD", "ChangeMe123!");
+  const admin = await upsertUser(adminEmail, adminPassword, SystemRole.ADMIN, "POPWAM Admin");
+  const demo = await upsertUser(demoEmail, demoPassword, SystemRole.USER, "mamdouh mmdouh saad");
   const adminOrg = await ensurePersonalWorkspace(admin);
   const demoOrg = await ensurePersonalWorkspace(demo);
 

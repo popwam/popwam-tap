@@ -14,7 +14,8 @@ export function LoginForm({ googleEnabled, locale, copy }: { googleEnabled: bool
   const [pending, setPending] = useState(false);
   const router = useRouter();
   const search = useSearchParams();
-  const callbackUrl = search.get("callbackUrl") || "/dashboard";
+  const requestedCallback = search.get("callbackUrl") || "/dashboard";
+  const callbackUrl = requestedCallback.startsWith("/") && !requestedCallback.startsWith("//") ? requestedCallback : "/dashboard";
   const oauthError = search.get("error");
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {

@@ -1,15 +1,19 @@
-import { getServerSession } from "next-auth";
-import { CardType, prisma } from "@popwam/db";
-import { authOptions } from "@/lib/auth";
+import { CardType, Prisma, prisma } from "@popwam/db";
+import { csrfRejected, getApiUser, isSameOriginMutation } from "@/lib/api-auth";
 import { createOpaqueToken, csvCell, hashActivationToken, MAX_BATCH_QUANTITY, normalizeBatchPrefix } from "@/lib/card-tokens";
 import { getActivationQrValue, getPermanentCardUrl } from "@popwam/shared";
 
 const value = (form: FormData, key: string) => String(form.get(key) || "").trim();
-const money = (form: FormData, key: string) => Math.max(0, Number(value(form, key) || 0));
+const money = (form: FormData, key: string) => {
+  const raw = value(form, key) || "0";
+  if (!/^\d{1,12}(?:\.\d{1,2})?$/.test(raw)) throw new Error("INVALID_MONEY");
+  return new Prisma.Decimal(raw);
+};
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "ADMIN") return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  if (!isSameOriginMutation(request)) return csrfRejected();
+  const admin = await getApiUser();
+  if (!admin || admin.role !== "ADMIN") return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   const form = await request.formData();
   const name = value(form, "name");
   const quantity = Number(value(form, "quantity"));
@@ -41,11 +45,11 @@ export async function POST(request: Request) {
         name, supplierId, inventoryItemId, cardType, quantity, serialPrefix, startingSerialNumber, publicSlugPrefix,
         unitPurchaseCost: money(form, "unitPurchaseCost"), unitProgrammingCost: money(form, "unitProgrammingCost"),
         unitPackagingCost: money(form, "unitPackagingCost"), expectedSellingPrice: money(form, "expectedSellingPrice"),
-        notes: value(form, "notes") || null, createdBy: session.user.id,
+        notes: value(form, "notes") || null, createdBy: admin.id,
         cards: { create: rows.map(({ activationToken: _plain, ...card }) => ({ ...card, cardType })) },
       }});
-      if (inventoryItemId) await tx.inventoryMovement.create({ data: { inventoryItemId, type: "CARD_BATCH_CREATED", quantity: -quantity, referenceType: "CARD_BATCH", referenceId: created.id, notes: `Generated ${name}`, createdBy: session.user.id } });
-      await tx.auditLog.create({ data: { actorId: session.user.id, operation: "admin.card_batch.create", targetId: created.id, metadata: { quantity, cardType } } });
+      if (inventoryItemId) await tx.inventoryMovement.create({ data: { inventoryItemId, type: "CARD_BATCH_CREATED", quantity: -quantity, referenceType: "CARD_BATCH", referenceId: created.id, notes: `Generated ${name}`, createdBy: admin.id } });
+      await tx.auditLog.create({ data: { actorId: admin.id, operation: "admin.card_batch.create", targetId: created.id, metadata: { quantity, cardType } } });
       return created;
     }, { isolationLevel: "Serializable" });
     const header = ["serialNumber","publicSlug","permanentUrl","activationToken","activationQrValue","cardType","batchName","status"];
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
     return new Response(csv, { status: 201, headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${publicSlugPrefix}-${batch.id}-activation.csv"`, "cache-control": "no-store, private" } });
   } catch (error) {
     const code = error instanceof Error && error.message === "INSUFFICIENT_STOCK" ? "INSUFFICIENT_STOCK" : "BATCH_CREATE_FAILED";
-    console.error("card batch creation failed", { operation: "card_batch.create", adminId: session.user.id, code, error: error instanceof Error ? error.name : "unknown" });
+    console.error("card batch creation failed", { operation: "card_batch.create", adminId: admin.id, code, error: error instanceof Error ? error.name : "unknown" });
     return Response.json({ error: code }, { status: code === "INSUFFICIENT_STOCK" ? 409 : 400 });
   }
 }

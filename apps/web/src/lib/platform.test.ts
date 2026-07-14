@@ -8,6 +8,8 @@ import { resolveProfileFieldUrl, visibleProfileFields } from "./profile-fields";
 import { activationTokenMatches, createOpaqueToken, hashActivationToken, MAX_BATCH_QUANTITY, normalizeBatchPrefix } from "./card-tokens";
 import { normalizePhone } from "./phone";
 import { createVCard, escapeVCard, safeVCardFilename } from "./vcard";
+import { isSafeDestinationUrl } from "./url";
+import { parseMoney } from "./money";
 import ar from "../../locales/ar.json";
 import en from "../../locales/en.json";
 
@@ -29,11 +31,22 @@ describe("plans and limits", () => {
   it("inherits null overrides", () => expect(mergeEntitlements(plan,{ maxLinks:null })).toMatchObject({ maxLinks:5 }));
 });
 
+describe("financial integrity", () => {
+  it("calculates authoritative money without JavaScript floating point", () => {
+    expect(parseMoney("0.10").plus(parseMoney("0.20")).toFixed(2)).toBe("0.30");
+    expect(parseMoney("19.99").mul(3).toFixed(2)).toBe("59.97");
+  });
+  it("rejects negative, over-precision and oversized money", () => {
+    for (const value of ["-1", "1.001", "1000000000000.00", "NaN"]) expect(() => parseMoney(value)).toThrow("INVALID_MONEY");
+  });
+});
+
 describe("short links and single destination NFC", () => {
   it("normalizes codes and rejects reserved paths", () => { expect(normalizeShortCode(" My Card ")).toBe("my-card"); expect(validateShortCode("admin")).toMatchObject({ valid:false,reason:"reserved" }); expect(validateShortCode("m1")).toMatchObject({ valid:true,code:"m1" }); });
   it("does not silently fall back to a profile", () => expect(decideTagResolution({ status:"ACTIVE",activeDestination:null })).toEqual({ kind:"unconfigured" }));
   it("opens profile only when selected", () => expect(decideTagResolution({ status:"ACTIVE",activeDestination:{ isActive:true,type:"PROFILE",url:"/p/id/1",profileId:"p1" } })).toEqual({ kind:"profile",profileId:"p1" }));
   it("redirects only to the selected destination", () => expect(decideTagResolution({ status:"ACTIVE",activeDestination:{ isActive:true,type:"WHATSAPP_PRIVATE",url:"https://wa.me/1" } })).toEqual({ kind:"redirect",url:"https://wa.me/1" }));
+  it("accepts trusted internal vCard paths but rejects protocol-relative and backslash redirects", () => { expect(isSafeDestinationUrl("/api/profiles/p1/contact.vcf")).toBe(true); expect(isSafeDestinationUrl("//evil.example/path")).toBe(false); expect(isSafeDestinationUrl("/\\evil.example/path")).toBe(false); expect(isSafeDestinationUrl("/%5cevil.example/path")).toBe(false); });
   it("keeps multiple tag decisions independent", () => { const work = decideTagResolution({ status:"ACTIVE",activeDestination:{ isActive:true,type:"WEBSITE",url:"https://work.example" } }); const events = decideTagResolution({ status:"ACTIVE",activeDestination:{ isActive:true,type:"CUSTOM_URL",url:"https://events.example" } }); expect(work).toMatchObject({ url:"https://work.example" }); expect(events).toMatchObject({ url:"https://events.example" }); });
   it("accepts distinct globally-valid short codes for one owner", () => { for (const code of ["mamdouh","mamdouh-work","mamdouh-events"]) expect(validateShortCode(code).valid).toBe(true); expect(new Set(["mamdouh","mamdouh-work","mamdouh-events"]).size).toBe(3); });
   it("handles missing destination/status", () => expect(decideTagResolution({ status:"PAUSED",activeDestination:null })).toEqual({ kind:"status",status:"paused" }));
@@ -43,6 +56,7 @@ describe("custom fields, uploads and icons", () => {
   it("renders only visible fields in order", () => expect(visibleProfileFields([{ id:"hidden",isVisible:false,sortOrder:0 },{ id:"second",isVisible:true,sortOrder:2 },{ id:"first",isVisible:true,sortOrder:1 }]).map(x => x.id)).toEqual(["first","second"]));
   it("makes actionable fields clickable", () => { expect(resolveProfileFieldUrl({ type:"PHONE",value:"+37360000000",actionUrl:null })).toBe("tel:+37360000000"); expect(resolveProfileFieldUrl({ type:"TEXT",value:"hello",actionUrl:null })).toBeNull(); });
   it("rejects executable and oversized uploads", () => { expect(validateFileUpload({ filename:"bad.exe",contentType:"application/pdf",size:100 }).valid).toBe(false); expect(validateImageUpload({ filename:"large.jpg",contentType:"image/jpeg",size:99*1024*1024 }).valid).toBe(false); });
+  it("rejects extension and MIME mismatches", () => { expect(validateFileUpload({ filename:"document.jpg",contentType:"application/pdf",size:100 }).valid).toBe(false); expect(validateImageUpload({ filename:"avatar.pdf",contentType:"image/jpeg",size:100 }).valid).toBe(false); });
   it("has a default icon for every known type", () => { for (const value of Object.values(defaultIconKeys)) expect(value).toMatch(/^[a-z]+$/); expect(defaultIconKeys.FILE).toBe("file"); });
 });
 

@@ -1,7 +1,8 @@
 import { createStorageKey, isStorageEnabled, uploadPublicImage, validateImageUpload } from "@popwam/storage";
-import { getApiUser, unauthorized } from "@/lib/api-auth";
+import { csrfRejected, getApiUser, isSameOriginMutation, unauthorized } from "@/lib/api-auth";
 
 export async function POST(request: Request) {
+  if (!isSameOriginMutation(request)) return csrfRejected();
   const user = await getApiUser();
   if (!user) return unauthorized();
   if (!isStorageEnabled()) return Response.json({ error: "Storage is not configured." }, { status: 503 });

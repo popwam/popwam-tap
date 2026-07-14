@@ -12,7 +12,7 @@ import { requireAdmin, requireUser } from "@/lib/session";
 import { canManageDestination, canManageTag } from "@/lib/permissions";
 import { isSafeDestinationUrl, normalizeAndValidate } from "@/lib/url";
 import { ensureUserDefaults, ensureUserDefaultsInTransaction } from "@/lib/ensure-user";
-import { assertWithinLimit, getUserEntitlements } from "@/lib/plans";
+import { assertWithinLimit, assertWithinLimitLocked, getUserEntitlements } from "@/lib/plans";
 import { deleteObject } from "@popwam/storage";
 import { isUniqueConstraintError, normalizeEmail, runAtomicUserCreation } from "@/lib/user-validation";
 
@@ -86,7 +86,7 @@ export async function updateProfileTheme(data: FormData) {
   const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),...(user.role==="ADMIN"?{}:{userId:user.id})}});const theme=text(data,"theme") as ProfileTheme;if(!profile||!Object.values(ProfileTheme).includes(theme))throw new Error("THEME_INVALID");const {effective}=await getUserEntitlements(profile.userId);if(theme!==profile.theme&&!effective.allowThemes)throw new Error("FEATURE_THEMES_REQUIRED");if(Array.isArray(effective.availableThemes)&&!effective.availableThemes.map(String).includes(theme))throw new Error("THEME_NOT_AVAILABLE");await prisma.profile.update({where:{id:profile.id},data:{theme}});revalidatePath("/dashboard/appearance");revalidatePath("/dashboard/profile");publicRevalidate(profile);
 }
 
-export async function createProfile(data:FormData){const user=await requireUser();const {effective}=await assertWithinLimit(user.id,"profiles");const type=text(data,"type") as ProfileType;if(!Object.values(ProfileType).includes(type))throw new Error("PROFILE_TYPE_INVALID");const available=Array.isArray(effective.availableProfileTypes)?effective.availableProfileTypes.map(String):["PERSONAL","ORGANIZATION"];if(!available.includes(type))throw new Error("PROFILE_TYPE_NOT_ALLOWED");const displayName=text(data,"displayName");if(!displayName)throw new Error("PROFILE_NAME_REQUIRED");const profile=await prisma.profile.create({data:{userId:user.id,type,displayName,displayNameAr:optional(data,"displayNameAr"),displayNameEn:optional(data,"displayNameEn"),organizationNameAr:type==="ORGANIZATION"?optional(data,"displayNameAr"):null,organizationNameEn:type==="ORGANIZATION"?optional(data,"displayNameEn"):null,primaryLanguage:text(data,"primaryLanguage")==="en"?"en":"ar",email:user.email}});await prisma.destination.createMany({data:[{userId:user.id,profileId:profile.id,type:"PROFILE",title:"Public profile",titleAr:"الملف العام",titleEn:"Public profile",url:`/p/id/${profile.id}`,iconKey:"profile"},{userId:user.id,profileId:profile.id,type:"VCF",title:"Save contact",titleAr:"حفظ جهة الاتصال",titleEn:"Save Contact",url:`/api/profiles/${profile.id}/contact.vcf`,iconKey:"contact"}]});revalidatePath("/dashboard/profiles");}
+export async function createProfile(data:FormData){const user=await requireUser();const type=text(data,"type") as ProfileType;if(!Object.values(ProfileType).includes(type))throw new Error("PROFILE_TYPE_INVALID");const displayName=text(data,"displayName");if(!displayName)throw new Error("PROFILE_NAME_REQUIRED");await prisma.$transaction(async tx=>{const {effective}=await assertWithinLimitLocked(tx,user.id,"profiles");await assertWithinLimitLocked(tx,user.id,"links",2);const available=Array.isArray(effective.availableProfileTypes)?effective.availableProfileTypes.map(String):["PERSONAL","ORGANIZATION"];if(!available.includes(type))throw new Error("PROFILE_TYPE_NOT_ALLOWED");const profile=await tx.profile.create({data:{userId:user.id,type,displayName,displayNameAr:optional(data,"displayNameAr"),displayNameEn:optional(data,"displayNameEn"),organizationNameAr:type==="ORGANIZATION"?optional(data,"displayNameAr"):null,organizationNameEn:type==="ORGANIZATION"?optional(data,"displayNameEn"):null,primaryLanguage:text(data,"primaryLanguage")==="en"?"en":"ar",email:user.email}});await tx.destination.createMany({data:[{userId:user.id,profileId:profile.id,type:"PROFILE",title:"Public profile",titleAr:"الملف العام",titleEn:"Public profile",url:`/p/id/${profile.id}`,iconKey:"profile"},{userId:user.id,profileId:profile.id,type:"VCF",title:"Save contact",titleAr:"حفظ جهة الاتصال",titleEn:"Save Contact",url:`/api/profiles/${profile.id}/contact.vcf`,iconKey:"contact"}]});},{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});revalidatePath("/dashboard/profiles");}
 
 export async function updateProfileContent(data:FormData){const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),userId:user.id}});if(!profile)throw new Error("PROFILE_NOT_FOUND");const type=text(data,"type") as ProfileType;if(!Object.values(ProfileType).includes(type))throw new Error("PROFILE_TYPE_INVALID");const website=optional(data,"website");if(website&&!isSafeDestinationUrl(website))throw new Error("INVALID_URL");const displayName=optional(data,"displayNameAr")||optional(data,"displayNameEn")||profile.displayName;await prisma.profile.update({where:{id:profile.id},data:{type,primaryLanguage:text(data,"primaryLanguage")==="en"?"en":"ar",displayName,firstName:optional(data,"firstName"),lastName:optional(data,"lastName"),displayNameAr:optional(data,"displayNameAr"),displayNameEn:optional(data,"displayNameEn"),jobTitleAr:optional(data,"jobTitleAr"),jobTitleEn:optional(data,"jobTitleEn"),company:optional(data,"company"),bioAr:optional(data,"bioAr"),bioEn:optional(data,"bioEn"),organizationNameAr:type==="ORGANIZATION"?optional(data,"displayNameAr"):null,organizationNameEn:type==="ORGANIZATION"?optional(data,"displayNameEn"):null,industryAr:optional(data,"industryAr"),industryEn:optional(data,"industryEn"),descriptionAr:optional(data,"descriptionAr"),descriptionEn:optional(data,"descriptionEn"),phone:optional(data,"phone"),alternatePhone:optional(data,"alternatePhone"),whatsappBusiness:optional(data,"whatsapp"),email:optional(data,"email"),website,addressAr:optional(data,"addressAr"),addressEn:optional(data,"addressEn"),contactNotesAr:optional(data,"contactNotesAr"),contactNotesEn:optional(data,"contactNotesEn")}});revalidatePath("/dashboard/profiles");publicRevalidate(profile);}
 
@@ -108,12 +108,10 @@ function destinationInput(data: FormData, profileId?: string) {
 
 export async function createDestination(data: FormData) {
   const user = await requireUser();
-  const { effective } = await assertWithinLimit(user.id, "links");
   const profile = await prisma.profile.findFirst({ where: { userId: user.id, organizationId: null }, select: { id: true, slug: true } });
   if (!profile) throw new Error("PROFILE_MISSING");
-  const input = destinationInput(data, profile.id); if (input.customIconUrl && !effective.allowCustomIcons) throw new Error("FEATURE_CUSTOM_ICON_REQUIRED");
-  const sortOrder = await prisma.destination.count({ where: { profileId: profile.id } });
-  await prisma.destination.create({ data: { ...input, userId: user.id, profileId: profile.id, isVisible: data.get("isVisible") !== "off", sortOrder } });
+  const input = destinationInput(data, profile.id);
+  await prisma.$transaction(async tx=>{const {effective}=await assertWithinLimitLocked(tx,user.id,"links");if(input.customIconUrl&&!effective.allowCustomIcons)throw new Error("FEATURE_CUSTOM_ICON_REQUIRED");const sortOrder=await tx.destination.count({where:{profileId:profile.id}});await tx.destination.create({data:{...input,userId:user.id,profileId:profile.id,isVisible:data.get("isVisible")!=="off",sortOrder}});},{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
   revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); publicRevalidate(profile);
 }
 
@@ -149,13 +147,12 @@ export async function moveDestination(data: FormData) {
 }
 
 export async function createProfileField(data: FormData) {
-  const user = await requireUser(); await assertWithinLimit(user.id, "customFields");
+  const user = await requireUser();
   const profile = await prisma.profile.findFirst({ where: { id: text(data, "profileId"), userId: user.id } });
   const label = text(data, "label"); const value = text(data, "value"); const type = text(data, "type") as ProfileFieldType;
   if (!profile || !label || !value || !Object.values(ProfileFieldType).includes(type)) throw new Error("FIELD_INVALID");
   const actionUrl = optional(data, "actionUrl"); if (actionUrl && !isSafeDestinationUrl(normalizeAndValidate(type, actionUrl).url)) throw new Error("INVALID_URL");
-  const count = await prisma.profileField.count({ where: { profileId: profile.id } });
-  await prisma.profileField.create({ data: { profileId: profile.id, userId: user.id, label, value, type, actionUrl, iconKey: optional(data, "iconKey"), isVisible: data.get("isVisible") !== "off", sortOrder: count } });
+  await prisma.$transaction(async tx=>{await assertWithinLimitLocked(tx,user.id,"customFields");const count=await tx.profileField.count({where:{profileId:profile.id}});await tx.profileField.create({data:{profileId:profile.id,userId:user.id,label,value,type,actionUrl,iconKey:optional(data,"iconKey"),isVisible:data.get("isVisible")!=="off",sortOrder:count}});},{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
   revalidatePath("/dashboard/profile"); publicRevalidate(profile);
 }
 
@@ -244,11 +241,9 @@ export async function createAdminUser(_previous: CreateUserState, data: FormData
 export async function createAdminTag(data: FormData) {
   const admin = await requireAdmin(); const ownerId = text(data, "ownerId");
   if (!await prisma.user.findUnique({ where: { id: ownerId } })) throw new Error("OWNER_NOT_FOUND");
-  await assertWithinLimit(ownerId, "tags");
   const result = validateShortCode(text(data, "shortCode") || randomBytes(4).toString("hex")); const name = text(data, "name");
   if (!name || !result.valid) throw new Error(result.valid ? "TAG_INVALID" : `SHORT_CODE_${result.reason.toUpperCase()}`);
-  if (await prisma.tag.findUnique({ where: { shortCode: result.code } }) || await prisma.tagAlias.findUnique({ where: { code: result.code } })) throw new Error("SHORT_CODE_IN_USE");
-  const tag = await prisma.tag.create({ data: { token: randomBytes(18).toString("base64url"), shortCode: result.code, name, ownerId, mode: TagMode.REDIRECT, aliases: { create: { code: result.code } }, events: { create: { type: TagEventType.CREATED } } } });
+  const tag=await prisma.$transaction(async tx=>{await assertWithinLimitLocked(tx,ownerId,"tags");if(await tx.tag.findUnique({where:{shortCode:result.code}})||await tx.tagAlias.findUnique({where:{code:result.code}}))throw new Error("SHORT_CODE_IN_USE");return tx.tag.create({data:{token:randomBytes(18).toString("base64url"),shortCode:result.code,name,ownerId,mode:TagMode.REDIRECT,aliases:{create:{code:result.code}},events:{create:{type:TagEventType.CREATED}}}});},{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
   await audit(admin.id, "admin.tag.create", tag.id, { ownerId }); revalidatePath("/admin/tags");
 }
 

@@ -1,3 +1,1 @@
-export function GET() {
-  return Response.json({ ok: true, message: "Mobile API namespace reserved for the future POPWAM Tap Android client.", auth: "not-implemented" });
-}
+export function GET(){return Response.json({ok:true,api:"POPWAM Tap Mobile",version:1,authentication:"Bearer access token",privacy:{analytics:["totalOpens","lastOpenedAt","dailyCount"],excluded:["ip","device","browser","location"]}},{headers:{"cache-control":"no-store"}})}

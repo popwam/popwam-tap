@@ -1,0 +1,2 @@
+import {verifyMobileOtp} from "@/lib/mobile-otp";
+export async function POST(request:Request){const body=await request.json().catch(()=>({}));const result=await verifyMobileOtp(String(body.challengeId||""),String(body.code||"").replace(/\D/g,""),String(body.deviceName||""));if(!result)return Response.json({ok:false,error:"OTP_INVALID"},{status:400,headers:{"cache-control":"no-store"}});return Response.json({ok:true,...result.session,user:result.user},{headers:{"cache-control":"no-store"}})}
