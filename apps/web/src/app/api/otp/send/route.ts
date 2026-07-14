@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 import { normalizePhone, maskPhone } from "@/lib/phone";
 import { createOtpCode, hashOtp, hashPhone, hashRequestIp } from "@/lib/otp-crypto";
 import { getSmsProvider, type SmsDelivery } from "@/lib/sms";
-import { otpPolicyFromEnv } from "@/lib/otp-policy";
+import { otpHourlyLimitReached, otpPolicyFromEnv, otpRetryAfter } from "@/lib/otp-policy";
+import { getOtpTestDelivery } from "@/lib/otp-test-mode";
+import { deliverOtpCode } from "@/lib/otp-delivery";
 import { ACTIVATION_COOKIE, OTP_COOKIE, secureCookie } from "@/lib/activation-session";
 import { hashActivationToken } from "@/lib/card-tokens";
 
@@ -29,32 +31,33 @@ export async function POST(request: Request) {
   const now = new Date();
   const policy = otpPolicyFromEnv();
   const latest = await prisma.otpChallenge.findFirst({ where: { phone: normalized.e164 }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
-  if (latest && latest.createdAt > new Date(now.getTime() - policy.resendSeconds * 1000)) {
-    const retryAfter = Math.ceil((latest.createdAt.getTime() + policy.resendSeconds * 1000 - now.getTime()) / 1000);
+  const retryAfter = otpRetryAfter(latest?.createdAt || null, now, policy.resendSeconds);
+  if (retryAfter > 0) {
     return NextResponse.json({ ok: false, error: "OTP_COOLDOWN", retryAfter }, { status: 429, headers: { "retry-after": String(retryAfter) } });
   }
   const phoneHash = hashPhone(normalized.e164);
   const hourStart = new Date(now.getTime() - 60 * 60_000);
-  if (await prisma.otpSendLog.count({ where: { phoneHash, createdAt: { gte: hourStart } } }) >= policy.hourlySendLimit) {
+  const recentSendCount = await prisma.otpSendLog.count({ where: { phoneHash, createdAt: { gte: hourStart } } });
+  if (otpHourlyLimitReached(recentSendCount, policy.hourlySendLimit)) {
     return NextResponse.json({ ok: false, error: "OTP_LIMIT_REACHED" }, { status: 429 });
   }
 
-  const code = createOtpCode();
-  const provider = getSmsProvider();
+  const testDelivery = getOtpTestDelivery(normalized.e164);
+  const code = testDelivery.code || createOtpCode();
+  const provider = testDelivery.testDelivery ? null : getSmsProvider();
+  const providerName = testDelivery.testDelivery ? "test-allowlist" : provider!.name;
   const challenge = await prisma.otpChallenge.create({ data: {
     phone: normalized.e164, purpose, claimSessionId, otpHash: hashOtp(normalized.e164, code),
     expiresAt: new Date(now.getTime() + policy.expiryMinutes * 60_000), maxAttempts: policy.maxAttempts,
-    provider: provider.name, requestIpHash: hashRequestIp(requestIp(request)),
+    provider: providerName, requestIpHash: hashRequestIp(requestIp(request)),
   } });
-  let delivery: SmsDelivery;
-  try { delivery = await provider.sendOtp({ to: normalized.e164, code, expiresMinutes: policy.expiryMinutes, locale: body.locale === "en" ? "en" : "ar" }); }
-  catch { delivery = { status: "FAILED", provider: provider.name, error: "NETWORK" }; }
+  const delivery: SmsDelivery = await deliverOtpCode({ testDelivery: testDelivery.testDelivery, provider, otp: { to: normalized.e164, code, expiresMinutes: policy.expiryMinutes, locale: body.locale === "en" ? "en" : "ar" } });
   await prisma.$transaction([
     prisma.otpChallenge.update({ where: { id: challenge.id }, data: { deliveryStatus: delivery.status, providerMessageId: delivery.messageId } }),
-    prisma.otpSendLog.create({ data: { phoneHash, purpose, status: delivery.status, provider: provider.name, responseCode: delivery.responseCode, messageId: delivery.messageId, cost: delivery.cost } }),
+    prisma.otpSendLog.create({ data: { phoneHash, purpose, status: delivery.status, provider: providerName, responseCode: delivery.responseCode, messageId: delivery.messageId, cost: delivery.cost } }),
   ]);
   if (delivery.status !== "SENT") return NextResponse.json({ ok: false, error: "OTP_SEND_FAILED" }, { status: 503 });
-  const response = NextResponse.json({ ok: true, maskedPhone: maskPhone(normalized.e164), expiresIn: policy.expiryMinutes * 60, resendAfter: policy.resendSeconds, ...(process.env.NODE_ENV !== "production" && provider.name === "development" ? { developmentCode: code } : {}) });
+  const response = NextResponse.json({ ok: true, maskedPhone: maskPhone(normalized.e164), expiresIn: policy.expiryMinutes * 60, resendAfter: policy.resendSeconds, ...(testDelivery.expose ? { testOtp: code, testingOnly: true } : {}) });
   response.cookies.set(OTP_COOKIE, challenge.id, { ...secureCookie, maxAge: policy.expiryMinutes * 60 });
   return response;
 }

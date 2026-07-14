@@ -28,6 +28,11 @@ if (value("APP_HOST") !== "app.popwam.com") errors.push("APP_HOST must be app.po
 if (value("PUBLIC_HOST") !== "go.popwam.com") errors.push("PUBLIC_HOST must be go.popwam.com");
 
 const smsProvider = value("SMS_PROVIDER").toLowerCase();
+const booleanValue = name => ["true", "false"].includes(value(name).toLowerCase());
+for (const name of ["STAGING", "OTP_TEST_MODE", "OTP_EXPOSE_IN_RESPONSE"]) if (value(name) && !booleanValue(name)) errors.push(`${name} must be true or false`);
+const staging = value("STAGING").toLowerCase() === "true";
+const otpTestMode = value("OTP_TEST_MODE").toLowerCase() === "true";
+const otpExpose = value("OTP_EXPOSE_IN_RESPONSE").toLowerCase() === "true";
 if (!['smsmisr', 'webhook'].includes(smsProvider)) errors.push("SMS_PROVIDER must be smsmisr or webhook in production");
 if (smsProvider === "smsmisr") {
   for (const name of ["SMSMISR_ENVIRONMENT", "SMSMISR_USERNAME", "SMSMISR_PASSWORD", "SMSMISR_SENDER_TOKEN", "SMSMISR_TEMPLATE_TOKEN"]) required(name);
@@ -38,6 +43,16 @@ if (smsProvider === "smsmisr") {
 if (smsProvider === "webhook") {
   httpsUrl("SMS_API_URL"); required("SMS_API_TOKEN"); required("SMS_SENDER_ID");
 }
+
+if (otpTestMode) {
+  if (!staging) errors.push("OTP_TEST_MODE=true is forbidden on live production; set it only on an explicitly marked STAGING deployment");
+  if (value("SMSMISR_ENVIRONMENT") !== "2") errors.push("OTP_TEST_MODE=true requires SMSMISR_ENVIRONMENT=2");
+  const phones = value("OTP_TEST_PHONES").split(",").map(phone => phone.trim()).filter(Boolean);
+  if (!phones.length || phones.some(phone => !/^\+[1-9]\d{7,14}$/.test(phone))) errors.push("OTP_TEST_PHONES must be a non-empty comma-separated list of normalized E.164 phone numbers");
+  if (value("OTP_TEST_CODE") && !/^\d{6}$/.test(value("OTP_TEST_CODE"))) errors.push("OTP_TEST_CODE must be exactly 6 digits when provided");
+}
+if (otpExpose && !otpTestMode) errors.push("OTP_EXPOSE_IN_RESPONSE=true requires OTP_TEST_MODE=true");
+if (otpExpose && !staging) errors.push("OTP_EXPOSE_IN_RESPONSE=true is forbidden on live production");
 
 for (const name of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) required(name);
 httpsUrl("R2_ENDPOINT");

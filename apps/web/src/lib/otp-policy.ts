@@ -18,3 +18,12 @@ export function isOtpUsable(challenge: { consumedAt: Date | null; expiresAt: Dat
   if (challenge.attempts >= challenge.maxAttempts) return "RATE_LIMITED" as const;
   return "VALID" as const;
 }
+
+export function otpRetryAfter(latestCreatedAt: Date | null, now: Date, resendSeconds: number) {
+  if (!latestCreatedAt) return 0;
+  return Math.max(0, Math.ceil((latestCreatedAt.getTime() + resendSeconds * 1000 - now.getTime()) / 1000));
+}
+
+export function otpHourlyLimitReached(sendCount: number, hourlyLimit: number) {
+  return sendCount >= hourlyLimit;
+}
