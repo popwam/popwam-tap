@@ -61,6 +61,12 @@ httpsUrl("R2_PUBLIC_BASE_URL", "media.popwam.com");
 const googleId = value("GOOGLE_CLIENT_ID"); const googleSecret = value("GOOGLE_CLIENT_SECRET");
 if (Boolean(googleId) !== Boolean(googleSecret)) errors.push("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must either both be set or both be empty");
 
+const googleWalletKeys = ["GOOGLE_WALLET_ISSUER_ID", "GOOGLE_WALLET_CLASS_SUFFIX", "GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WALLET_PRIVATE_KEY"];
+if (googleWalletKeys.some(name => value(name))) for (const name of googleWalletKeys) required(name);
+const appleWalletKeys = ["APPLE_WALLET_PASS_TYPE_ID", "APPLE_WALLET_TEAM_ID", "APPLE_WALLET_SIGNER_CERT_BASE64", "APPLE_WALLET_SIGNER_KEY_BASE64", "APPLE_WALLET_WWDR_CERT_BASE64", "APPLE_WALLET_ICON_BASE64"];
+if (appleWalletKeys.some(name => value(name))) for (const name of appleWalletKeys) required(name);
+if (value("APPLE_WALLET_WEB_SERVICE_URL")) { httpsUrl("APPLE_WALLET_WEB_SERVICE_URL"); strongSecret("APPLE_WALLET_AUTH_SECRET"); }
+
 if (errors.length) {
   console.error("Production environment validation failed:");
   for (const error of errors) console.error(`- ${error}`);

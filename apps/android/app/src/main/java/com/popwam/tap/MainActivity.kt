@@ -13,6 +13,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.popwam.tap.hce.HceConfig
 import com.popwam.tap.hce.PopwamHostApduService
 import com.popwam.tap.nfc.NfcCoordinator
+import com.popwam.tap.nfc.NfcDeepLinkPolicy
 import com.popwam.tap.ui.AuthFactory
 import com.popwam.tap.ui.AuthViewModel
 import com.popwam.tap.ui.MainFactory
@@ -39,7 +40,7 @@ class MainActivity : ComponentActivity() {
                 factory = MainFactory(app.container.repository, app.container.sessions.role),
             )
             PopwamTheme {
-                PopwamApp(auth, main)
+                PopwamApp(auth, main, NfcDeepLinkPolicy.route(intent?.dataString))
             }
         }
     }

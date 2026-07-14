@@ -28,6 +28,7 @@ async function claimCardOnce(input: {
       select: { id: true, cardId: true, activationTokenHash: true },
     });
     if (!currentClaim) return "expired" as const;
+    const producedTag = await tx.producedTag.findUnique({ where: { cardId: currentClaim.cardId }, select: { id: true, batch: { select: { batchCode: true } } } });
 
     const [override, subscription, freePlan, ownedCards] = await Promise.all([
       tx.userLimitOverride.findUnique({ where: { userId: input.userId }, select: { maxCards: true } }),
@@ -64,6 +65,10 @@ async function claimCardOnce(input: {
       },
     });
     if (updated.count !== 1) return "used" as const;
+    if (producedTag) {
+      await tx.producedTag.update({ where: { id: producedTag.id }, data: { status: "ACTIVATED", assignedUserId: input.userId, activatedAt: now } });
+      await tx.inventoryBatch.updateMany({ where: { batchCode: producedTag.batch.batchCode, availableQuantity: { gt: 0 } }, data: { availableQuantity: { decrement: 1 }, assignedQuantity: { increment: 1 } } });
+    }
     const consumed = await tx.activationClaimSession.updateMany({
       where: { id: currentClaim.id, status: "VERIFIED", consumedAt: null },
       data: { status: "CONSUMED", consumedAt: now },

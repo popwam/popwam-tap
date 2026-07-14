@@ -7,7 +7,7 @@ import { decideTagResolution } from "@/lib/tag-resolution";
 import { PublicProfile } from "@/components/public-profile";
 import { PublicStatus } from "@/components/public-status";
 
-const profileInclude={user:{select:{email:true}},fields:{orderBy:{sortOrder:"asc" as const}},uploads:{orderBy:{sortOrder:"asc" as const}},destinations:{orderBy:{sortOrder:"asc" as const}},services:{orderBy:{sortOrder:"asc" as const}},branches:{orderBy:{sortOrder:"asc" as const}}} satisfies Prisma.ProfileInclude;
+const profileInclude={user:{select:{email:true}},fields:{orderBy:{sortOrder:"asc" as const}},uploads:{orderBy:{sortOrder:"asc" as const}},destinations:{orderBy:{sortOrder:"asc" as const}},services:{orderBy:{sortOrder:"asc" as const}},branches:{orderBy:{sortOrder:"asc" as const}},virtualCard:{include:{template:true}}} satisfies Prisma.ProfileInclude;
 const tagInclude={activeDestination:{include:{profile:{include:profileInclude}}}} satisfies Prisma.TagInclude;
 const cardSelect={id:true,serialNumber:true,publicSlug:true,cardType:true,assignmentStatus:true,cardStatus:true,ownerId:true,activeDestination:{select:{id:true,isActive:true,type:true,url:true,profileId:true}}} satisfies Prisma.CardSelect;
 

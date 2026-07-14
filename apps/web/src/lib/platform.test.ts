@@ -5,7 +5,7 @@ import { decideTagResolution } from "./tag-resolution";
 import { mergeEntitlements } from "./plans";
 import { normalizeEmail, isUniqueConstraintError, runAtomicUserCreation } from "./user-validation";
 import { resolveProfileFieldUrl, visibleProfileFields } from "./profile-fields";
-import { activationTokenMatches, createOpaqueToken, hashActivationToken, MAX_BATCH_QUANTITY, normalizeBatchPrefix } from "./card-tokens";
+import { activationTokenMatches, createActivationCode, createOpaqueToken, hashActivationToken, isActivationToken, MAX_BATCH_QUANTITY, normalizeBatchPrefix, openActivationCode, sealActivationCode } from "./card-tokens";
 import { normalizePhone } from "./phone";
 import { createVCard, escapeVCard, safeVCardFilename } from "./vcard";
 import { isSafeDestinationUrl } from "./url";
@@ -62,6 +62,8 @@ describe("custom fields, uploads and icons", () => {
 
 describe("physical card activation architecture", () => {
   it("stores only a deterministic SHA-256 hash", () => { const token=createOpaqueToken();const hash=hashActivationToken(token);expect(token).not.toBe(hash);expect(hash).toMatch(/^[a-f0-9]{64}$/);expect(activationTokenMatches(token,hash)).toBe(true);expect(activationTokenMatches(`${token}x`,hash)).toBe(false); });
+  it("creates printable activation codes without confusing characters", () => { const code=createActivationCode();expect(code).toMatch(/^[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$/);expect(isActivationToken(code)).toBe(true);expect(hashActivationToken(code.toLowerCase())).toBe(hashActivationToken(code)); });
+  it("encrypts printable activation codes at rest while retaining HMAC lookup", () => { const code="A7K9-M2Q4",pepper="test-only-pepper";const sealed=sealActivationCode(code,pepper);expect(sealed).not.toContain(code);expect(openActivationCode(sealed,pepper)).toBe(code);expect(hashActivationToken(code,pepper)).toHaveLength(64); });
   it("uses a safe batch maximum and normalized permanent slug prefix", () => { expect(MAX_BATCH_QUANTITY).toBe(1000);expect(normalizeBatchPrefix(" PW Cards ","pw")).toBe("pw-cards"); });
 });
 

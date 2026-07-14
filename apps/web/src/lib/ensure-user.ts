@@ -12,7 +12,7 @@ type DbClient = Prisma.TransactionClient | typeof prisma;
 export async function ensurePlans(db: DbClient = prisma) {
   for (const plan of DEFAULT_PLANS) {
     const allThemes=["CLASSIC_DARK","CLASSIC_LIGHT","ELEGANT_DARK","ELEGANT_LIGHT","BUSINESS_DARK","BUSINESS_LIGHT"];
-    const normalized={...plan,maxCards:plan.maxTags,maxFiles:plan.maxUploads,customSlugAllowed:plan.allowCustomSlug,analyticsAllowed:plan.allowAnalytics,availableProfileTypes:plan.slug==="free"||plan.slug==="personal"?["PERSONAL"]:["PERSONAL","ORGANIZATION"],availableThemes:plan.slug==="free"?["CLASSIC_DARK"]:plan.slug==="personal"?allThemes.slice(0,4):allThemes};
+    const normalized={...plan,maxVirtualCards:plan.slug==="free"?1:plan.slug==="personal"?2:plan.slug==="pro"?3:25,allowBusinessCards:plan.slug==="business",allowWalletPasses:plan.slug!=="free",allowCustomLinks:plan.slug==="pro"||plan.slug==="business",maxCards:plan.maxTags,maxFiles:plan.maxUploads,customSlugAllowed:plan.allowCustomSlug,analyticsAllowed:plan.allowAnalytics,availableProfileTypes:plan.slug==="free"||plan.slug==="personal"?["PERSONAL"]:plan.slug==="pro"?["PERSONAL","PROFESSIONAL","CREATOR"]:["PERSONAL","PROFESSIONAL","CREATOR","BUSINESS"],availableThemes:plan.slug==="free"?["CLASSIC_DARK"]:plan.slug==="personal"?allThemes.slice(0,4):allThemes};
     await db.plan.upsert({ where: { slug: plan.slug }, update: normalized, create: normalized });
   }
 }
@@ -38,6 +38,11 @@ export async function ensureUserDefaultsInTransaction(db: Prisma.TransactionClie
 
   let profile = await db.profile.findFirst({ where: { userId: user.id, organizationId: null } });
   if (!profile) profile = await db.profile.create({ data: { userId: user.id, displayName: user.name || slugBase, displayNameAr: user.name || slugBase, type: "PERSONAL", primaryLanguage: "ar", email: user.email } });
+  await db.virtualCard.upsert({
+    where: { profileId: profile.id },
+    update: { name: profile.displayName },
+    create: { userId: user.id, name: profile.displayName, type: "PERSONAL", profileId: profile.id, isDefault: true },
+  });
   const profileDestination = await db.destination.findFirst({ where: { userId: user.id, profileId: profile.id, type: DestinationType.PROFILE } });
   if (!profileDestination) {
     await db.destination.create({ data: { userId: user.id, profileId: profile.id, type: DestinationType.PROFILE, title: "Public profile", titleAr: "الملف العام", titleEn: "Public profile", url: `/p/id/${profile.id}`, icon: "profile", iconKey: "profile" } });

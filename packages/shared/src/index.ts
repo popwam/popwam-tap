@@ -51,6 +51,10 @@ export function getPublicAppUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
 }
 
+export function getWebAppUrl() {
+  return (process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXTAUTH_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
+}
+
 export function getTagUrl(token: string) {
   return `${getPublicAppUrl()}/${encodeURIComponent(token)}`;
 }
@@ -60,7 +64,7 @@ export function getPermanentCardUrl(publicSlug: string) {
 }
 
 export function getActivationQrValue(activationToken: string) {
-  return `${getPublicAppUrl()}/activate/${encodeURIComponent(activationToken)}`;
+  return `${getWebAppUrl()}/activate/${encodeURIComponent(activationToken)}`;
 }
 
 export function getLegacyTagUrl(token: string) {

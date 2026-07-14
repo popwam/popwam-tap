@@ -56,10 +56,10 @@ import kotlinx.coroutines.delay
 
 private enum class EntryScreen { SPLASH, WELCOME, SCAN, LOGIN }
 
-@Composable fun PopwamApp(auth:AuthViewModel,main:MainViewModel){
+@Composable fun PopwamApp(auth:AuthViewModel,main:MainViewModel,initialRoute:String="home"){
     val authState by auth.state.collectAsStateWithLifecycle()
     var entry by rememberSaveable { mutableStateOf(EntryScreen.SPLASH.name) }
-    var pendingRoute by rememberSaveable { mutableStateOf("home") }
+    var pendingRoute by rememberSaveable { mutableStateOf(initialRoute) }
     var pendingActivation by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { delay(650); if(entry==EntryScreen.SPLASH.name) entry=EntryScreen.WELCOME.name }
     if(!authState.authenticated){

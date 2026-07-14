@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@popwam/db";
 
-export const LIMIT_KEYS = ["maxProfiles", "maxLinks", "maxCustomFields", "maxTags", "maxCards", "maxUploads", "maxFiles", "maxStorageBytes"] as const;
-export const FEATURE_KEYS = ["allowCustomSlug", "customSlugAllowed", "allowThemes", "allowCustomTheme", "allowAnalytics", "analyticsAllowed", "allowFileUploads", "allowCustomIcons"] as const;
+export const LIMIT_KEYS = ["maxProfiles", "maxVirtualCards", "maxLinks", "maxCustomFields", "maxTags", "maxCards", "maxUploads", "maxFiles", "maxStorageBytes"] as const;
+export const FEATURE_KEYS = ["allowCustomSlug", "customSlugAllowed", "allowThemes", "allowCustomTheme", "allowAnalytics", "analyticsAllowed", "allowFileUploads", "allowCustomIcons", "allowBusinessCards", "allowWalletPasses", "allowCustomLinks"] as const;
 export const CATALOG_KEYS = ["availableProfileTypes", "availableThemes"] as const;
 export type LimitKey = (typeof LIMIT_KEYS)[number];
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
@@ -23,23 +23,25 @@ export async function getUserEntitlements(userId: string) {
 }
 
 export async function getUserUsage(userId: string) {
-  const [profiles, links, customFields, tags, cards, uploads, storage] = await Promise.all([
-    prisma.profile.count({ where: { userId } }), prisma.destination.count({ where: { userId } }),
+  const [profiles, virtualCards, links, customFields, tags, cards, uploads, storage] = await Promise.all([
+    prisma.profile.count({ where: { userId } }),
+    prisma.virtualCard.count({ where: { userId, status: { not: "ARCHIVED" } } }),
+    prisma.destination.count({ where: { userId } }),
     prisma.profileField.count({ where: { userId } }), prisma.tag.count({ where: { ownerId: userId } }), prisma.card.count({ where: { ownerId: userId } }),
     prisma.uploadedFile.count({ where: { uploaderUserId: userId } }),
     prisma.uploadedFile.aggregate({ where: { uploaderUserId: userId }, _sum: { sizeBytes: true } }),
   ]);
-  return { profiles, links, customFields, tags, cards, uploads, files: uploads, storageBytes: storage._sum.sizeBytes || 0n };
+  return { profiles, virtualCards, links, customFields, tags, cards, uploads, files: uploads, storageBytes: storage._sum.sizeBytes || 0n };
 }
 
-export async function assertWithinLimit(userId: string, resource: "profiles" | "links" | "customFields" | "tags" | "cards" | "uploads" | "files", increment = 1) {
+export async function assertWithinLimit(userId: string, resource: LimitedResource, increment = 1) {
   const [{ effective }, usage] = await Promise.all([getUserEntitlements(userId), getUserUsage(userId)]);
-  const key = ({ profiles: "maxProfiles", links: "maxLinks", customFields: "maxCustomFields", tags: "maxTags", cards: "maxCards", uploads: "maxUploads", files: "maxFiles" } as const)[resource];
+  const key = ({ profiles: "maxProfiles", virtualCards: "maxVirtualCards", links: "maxLinks", customFields: "maxCustomFields", tags: "maxTags", cards: "maxCards", uploads: "maxUploads", files: "maxFiles" } as const)[resource];
   if (usage[resource] + increment > Number(effective[key])) throw new Error(`LIMIT_REACHED:${resource}`);
   return { effective, usage };
 }
 
-export type LimitedResource = "profiles" | "links" | "customFields" | "tags" | "cards" | "uploads" | "files";
+export type LimitedResource = "profiles" | "virtualCards" | "links" | "customFields" | "tags" | "cards" | "uploads" | "files";
 
 /**
  * Enforce a limit while holding the owning User row lock. Creation must happen
@@ -56,12 +58,13 @@ export async function assertWithinLimitLocked(tx: Prisma.TransactionClient, user
   if (!plan) throw new Error("PLAN_NOT_CONFIGURED");
   const effective = mergeEntitlements(plan, override);
   const used = resource === "profiles" ? await tx.profile.count({ where: { userId } })
+    : resource === "virtualCards" ? await tx.virtualCard.count({ where: { userId, status: { not: "ARCHIVED" } } })
     : resource === "links" ? await tx.destination.count({ where: { userId } })
     : resource === "customFields" ? await tx.profileField.count({ where: { userId } })
     : resource === "tags" ? await tx.tag.count({ where: { ownerId: userId } })
     : resource === "cards" ? await tx.card.count({ where: { ownerId: userId } })
     : await tx.uploadedFile.count({ where: { uploaderUserId: userId } });
-  const key = ({ profiles: "maxProfiles", links: "maxLinks", customFields: "maxCustomFields", tags: "maxTags", cards: "maxCards", uploads: "maxUploads", files: "maxFiles" } as const)[resource];
+  const key = ({ profiles: "maxProfiles", virtualCards: "maxVirtualCards", links: "maxLinks", customFields: "maxCustomFields", tags: "maxTags", cards: "maxCards", uploads: "maxUploads", files: "maxFiles" } as const)[resource];
   if (used + increment > Number(effective[key])) throw new Error(`LIMIT_REACHED:${resource}`);
   return { effective, used };
 }

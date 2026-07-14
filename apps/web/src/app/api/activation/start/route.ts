@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@popwam/db";
-import { activationTokenMatches, createOpaqueToken, hashActivationToken } from "@/lib/card-tokens";
+import { activationTokenMatches, createOpaqueToken, hashActivationToken, isActivationToken, normalizeActivationToken } from "@/lib/card-tokens";
 import { ACTIVATION_COOKIE, secureCookie } from "@/lib/activation-session";
 
 function extractToken(value: string) { const trimmed = value.trim(); try { const url = new URL(trimmed); return url.pathname.split("/").filter(Boolean).at(-1) || ""; } catch { return trimmed; } }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({})); const publicSlug = String(body.publicSlug || "").trim().toLowerCase(); const token = extractToken(String(body.activationValue || ""));
-  if (token.length < 32) return NextResponse.json({ ok: false, error: "ACTIVATION_INVALID" }, { status: 400 });
+  const body = await request.json().catch(() => ({})); const publicSlug = String(body.publicSlug || "").trim().toLowerCase(); const token = normalizeActivationToken(extractToken(String(body.activationValue || "")));
+  if (!isActivationToken(token)) return NextResponse.json({ ok: false, error: "ACTIVATION_INVALID" }, { status: 400 });
   const tokenHash = hashActivationToken(token);
   const target = publicSlug ? await prisma.card.findUnique({ where: { publicSlug }, select: { id: true, publicSlug: true, activationTokenHash: true, activationTokenConsumedAt: true, assignmentStatus: true, ownerId: true, cardStatus: true } }) : await prisma.card.findUnique({ where: { activationTokenHash: tokenHash }, select: { id: true, publicSlug: true, activationTokenHash: true, activationTokenConsumedAt: true, assignmentStatus: true, ownerId: true, cardStatus: true } });
   if (!target) return NextResponse.json({ ok: false, error: "ACTIVATION_INVALID" }, { status: 400 });

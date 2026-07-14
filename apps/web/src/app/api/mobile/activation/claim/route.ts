@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`);
 
       const now = new Date();
+      const producedTag = await tx.producedTag.findUnique({ where: { cardId: claim.cardId }, select: { id: true, batch: { select: { batchCode: true } } } });
       const [override, subscription, freePlan, ownedCards] = await Promise.all([
         tx.userLimitOverride.findUnique({ where: { userId: user.id }, select: { maxCards: true } }),
         tx.userPlan.findFirst({
@@ -81,6 +82,11 @@ export async function POST(request: Request) {
         },
       });
       if (updated.count !== 1) return false;
+
+      if (producedTag) {
+        await tx.producedTag.update({ where: { id: producedTag.id }, data: { status: "ACTIVATED", assignedUserId: user.id, activatedAt: now } });
+        await tx.inventoryBatch.updateMany({ where: { batchCode: producedTag.batch.batchCode, availableQuantity: { gt: 0 } }, data: { availableQuantity: { decrement: 1 }, assignedQuantity: { increment: 1 } } });
+      }
 
       await tx.activationClaimSession.update({
         where: { id: claim.id },

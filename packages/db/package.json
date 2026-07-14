@@ -16,6 +16,7 @@
     "migrate:dev": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
     "repair": "tsx prisma/repair.ts",
+    "backfill:tap-upgrade": "tsx prisma/backfill-tap-upgrade.ts",
     "admin:ensure": "tsx prisma/ensure-admin.ts"
   },
   "dependencies": {
