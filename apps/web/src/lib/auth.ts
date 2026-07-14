@@ -6,6 +6,7 @@ import { prisma } from "@popwam/db";
 import bcrypt from "bcryptjs";
 import { ensureUserDefaults } from "./ensure-user";
 import { hashActivationToken } from "./card-tokens";
+import { verifyStoredAdminPassword } from "./admin-access";
 
 const providers: NextAuthOptions["providers"] = [
   CredentialsProvider({
@@ -26,7 +27,7 @@ const providers: NextAuthOptions["providers"] = [
       const email = credentials?.email?.trim().toLowerCase();
       if (!email || !credentials?.password) return null;
       const user = await prisma.user.findUnique({ where: { email } });
-      if (!user?.passwordHash || user.status !== "ACTIVE" || !(await bcrypt.compare(credentials.password, user.passwordHash))) return null;
+      if (!user || !(await verifyStoredAdminPassword(user, credentials.password, bcrypt.compare))) return null;
       await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
       await ensureUserDefaults(user.id);
       return { id: user.id, email: user.email, name: user.name, image: user.image, role: user.role };

@@ -9,6 +9,7 @@ datasource db {
 }
 
 enum SystemRole {
+  SUPER_ADMIN
   ADMIN
   STAFF
   USER

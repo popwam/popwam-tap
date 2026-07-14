@@ -15,7 +15,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
-    "repair": "tsx prisma/repair.ts"
+    "repair": "tsx prisma/repair.ts",
+    "admin:ensure": "tsx prisma/ensure-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.1",

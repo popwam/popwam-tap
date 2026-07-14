@@ -24,7 +24,9 @@
     "db:deploy": "pnpm --filter @popwam/db prisma migrate deploy",
     "seed": "pnpm --filter @popwam/db seed",
     "db:repair": "pnpm --filter @popwam/db repair",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "admin:ensure": "pnpm --filter @popwam/db admin:ensure",
+    "i18n:audit": "node scripts/i18n-audit.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.6"

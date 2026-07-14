@@ -6,6 +6,7 @@ const styles: Record<string, string> = {
   LOST: "border-red-400/20 bg-red-400/10 text-red-300",
   DISABLED: "border-slate-400/20 bg-slate-400/10 text-slate-300",
   ADMIN: "border-brand-400/20 bg-brand-400/10 text-brand-300",
+  SUPER_ADMIN: "border-brand-400/20 bg-brand-400/10 text-brand-300",
 };
 
 export function Badge({ value }: { value: string }) {

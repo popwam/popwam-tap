@@ -1,5 +1,6 @@
 import { CardType, Prisma, prisma } from "@popwam/db";
 import { csrfRejected, getApiUser, isSameOriginMutation } from "@/lib/api-auth";
+import { isAdminRole } from "@/lib/admin-access";
 import { createOpaqueToken, csvCell, hashActivationToken, MAX_BATCH_QUANTITY, normalizeBatchPrefix } from "@/lib/card-tokens";
 import { getActivationQrValue, getPermanentCardUrl } from "@popwam/shared";
 
@@ -13,7 +14,7 @@ const money = (form: FormData, key: string) => {
 export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) return csrfRejected();
   const admin = await getApiUser();
-  if (!admin || admin.role !== "ADMIN") return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  if (!admin || !isAdminRole(admin.role)) return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   const form = await request.formData();
   const name = value(form, "name");
   const quantity = Number(value(form, "quantity"));

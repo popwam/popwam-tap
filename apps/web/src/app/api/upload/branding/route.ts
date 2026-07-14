@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@popwam/db";
 import { createStorageKey, isStorageEnabled, uploadPublicImage, validateImageUpload } from "@popwam/storage";
 import { csrfRejected, getApiUser, isSameOriginMutation, unauthorized } from "@/lib/api-auth";
+import { isAdminRole } from "@/lib/admin-access";
 
 const assetFields = {
   mainLogo: ["mainLogoUrl", "mainLogoStorageKey"], lightLogo: ["lightLogoUrl", "lightLogoStorageKey"], darkLogo: ["darkLogoUrl", "darkLogoStorageKey"],
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) return csrfRejected();
   const user = await getApiUser();
   if (!user) return unauthorized();
-  if (user.role !== "ADMIN") return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  if (!isAdminRole(user.role)) return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   if (!isStorageEnabled()) return Response.json({ error: "R2_NOT_CONFIGURED" }, { status: 503 });
   try {
     const body = await request.formData();

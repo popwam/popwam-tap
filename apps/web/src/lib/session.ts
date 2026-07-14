@@ -1,7 +1,8 @@
 import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import { authOptions } from "./auth";
 import { prisma } from "@popwam/db";
+import { isAdminRole } from "./admin-access";
 
 export async function requireUser() {
   const session = await getServerSession(authOptions);
@@ -12,7 +13,9 @@ export async function requireUser() {
 }
 
 export async function requireAdmin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") redirect("/dashboard");
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/admin/login");
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true, image: true, role: true, status: true } });
+  if (!user || user.status !== "ACTIVE" || !isAdminRole(user.role)) forbidden();
   return user;
 }
