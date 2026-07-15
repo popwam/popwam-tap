@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { normalizePhone, maskPhone } from "@/lib/phone";
 import { createOtpCode, hashOtp, hashPhone, hashRequestIp } from "@/lib/otp-crypto";
 import { getSmsProvider, type SmsDelivery } from "@/lib/sms";
+import { getSmsRuntimeSettings } from "@/lib/sms/runtime";
 import { otpHourlyLimitReached, otpPolicyFromEnv, otpRetryAfter } from "@/lib/otp-policy";
 import { getOtpTestDelivery } from "@/lib/otp-test-mode";
 import { deliverOtpCode } from "@/lib/otp-delivery";
@@ -44,8 +45,8 @@ export async function POST(request: Request) {
 
   const testDelivery = getOtpTestDelivery(normalized.e164);
   const code = testDelivery.code || createOtpCode();
-  const provider = testDelivery.testDelivery ? null : getSmsProvider();
-  const providerName = testDelivery.testDelivery ? "test-allowlist" : provider!.name;
+  const runtime=await getSmsRuntimeSettings();const provider = testDelivery.testDelivery||!runtime.enabled ? null : getSmsProvider(runtime);
+  const providerName = testDelivery.testDelivery ? "test-allowlist" : provider?.name||"disabled";
   const challenge = await prisma.otpChallenge.create({ data: {
     phone: normalized.e164, purpose, claimSessionId, otpHash: hashOtp(normalized.e164, code),
     expiresAt: new Date(now.getTime() + policy.expiryMinutes * 60_000), maxAttempts: policy.maxAttempts,

@@ -14,6 +14,13 @@ export function templateCssVariables(configuration: unknown): Record<string, str
 
 export function templateLayoutClass(configuration: unknown) {
   if (!configuration || typeof configuration !== "object" || Array.isArray(configuration)) return "template-list";
-  const layout = (configuration as Record<string, unknown>).linkLayout;
-  return layout === "grid" ? "template-grid" : layout === "compact" ? "template-compact" : "template-list";
+  const config = configuration as Record<string, unknown>;
+  const pick=(key:string,allowed:string[],fallback:string)=>typeof config[key]==="string"&&allowed.includes(config[key] as string)?config[key] as string:fallback;
+  const layout=pick("linkLayout",["grid","compact","list"],"list");
+  const avatar=pick("avatarPosition",["start","center","end"],"start");
+  const header=pick("headerAlign",["start","center","end"],"start");
+  const cover=pick("coverStyle",["full","inset","banner","minimal"],"full");
+  const contacts=pick("contactLayout",["grid","row","list"],"grid");
+  const desktop=pick("desktopLayout",["narrow","wide","split"],"narrow");
+  return `template-${layout} template-avatar-${avatar} template-header-${header} template-cover-${cover} template-contacts-${contacts} template-desktop-${desktop}`;
 }

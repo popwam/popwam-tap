@@ -96,6 +96,30 @@ export function googleWalletConfigured(env: Record<string, string | undefined> =
   return ["GOOGLE_WALLET_ISSUER_ID", "GOOGLE_WALLET_CLASS_SUFFIX", "GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WALLET_PRIVATE_KEY"].every(key => Boolean(env[key]));
 }
 
+export type WalletReadinessItem = { key:string;label:string;configured:boolean;detail:string };
+export function googleWalletReadiness(env: Record<string,string|undefined> = process.env) {
+  const items:WalletReadinessItem[] = [
+    {key:"issuerStatus",label:"Issuer account status",configured:Boolean(env.GOOGLE_WALLET_ISSUER_STATUS),detail:env.GOOGLE_WALLET_ISSUER_STATUS || "Not confirmed"},
+    {key:"issuerId",label:"Issuer ID",configured:Boolean(env.GOOGLE_WALLET_ISSUER_ID),detail:env.GOOGLE_WALLET_ISSUER_ID ? "Configured" : "GOOGLE_WALLET_ISSUER_ID is missing"},
+    {key:"serviceAccount",label:"Service account",configured:Boolean(env.GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL && env.GOOGLE_WALLET_PRIVATE_KEY),detail:env.GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL && env.GOOGLE_WALLET_PRIVATE_KEY ? "Signing credentials configured" : "Service account email or private key is missing"},
+    {key:"genericClass",label:"Generic Pass class",configured:Boolean(env.GOOGLE_WALLET_CLASS_SUFFIX),detail:env.GOOGLE_WALLET_CLASS_SUFFIX ? "Configured" : "GOOGLE_WALLET_CLASS_SUFFIX is missing"},
+    {key:"mode",label:"Mode",configured:true,detail:(env.GOOGLE_WALLET_MODE || "test").toLowerCase() === "production" ? "Production" : "Test"},
+  ];
+  return { ready: googleWalletConfigured(env), items };
+}
+
+export function appleWalletReadiness(env: Record<string,string|undefined> = process.env) {
+  const items:WalletReadinessItem[] = [
+    {key:"membership",label:"Apple Developer membership",configured:Boolean(env.APPLE_WALLET_TEAM_ID),detail:env.APPLE_WALLET_TEAM_ID ? "Team configured" : "APPLE_WALLET_TEAM_ID is missing"},
+    {key:"passTypeId",label:"Pass Type ID",configured:Boolean(env.APPLE_WALLET_PASS_TYPE_ID),detail:env.APPLE_WALLET_PASS_TYPE_ID ? "Configured" : "APPLE_WALLET_PASS_TYPE_ID is missing"},
+    {key:"signingCertificate",label:"Signing certificate",configured:Boolean(env.APPLE_WALLET_SIGNER_CERT_BASE64 && env.APPLE_WALLET_SIGNER_KEY_BASE64),detail:env.APPLE_WALLET_SIGNER_CERT_BASE64 && env.APPLE_WALLET_SIGNER_KEY_BASE64 ? "Certificate and key configured" : "Signing certificate or key is missing"},
+    {key:"wwdr",label:"WWDR certificate",configured:Boolean(env.APPLE_WALLET_WWDR_CERT_BASE64),detail:env.APPLE_WALLET_WWDR_CERT_BASE64 ? "Configured" : "APPLE_WALLET_WWDR_CERT_BASE64 is missing"},
+    {key:"webService",label:"webServiceURL",configured:Boolean(env.APPLE_WALLET_WEB_SERVICE_URL),detail:env.APPLE_WALLET_WEB_SERVICE_URL || "Optional updates service is not configured"},
+    {key:"authenticationToken",label:"Authentication token secret",configured:Boolean(env.APPLE_WALLET_AUTH_SECRET),detail:env.APPLE_WALLET_AUTH_SECRET ? "Configured" : "Required when webServiceURL is enabled"},
+  ];
+  return { ready: appleWalletConfigured(env), items };
+}
+
 export function generateApplePkpass(data: WalletCardData) {
   if (!appleWalletConfigured()) throw new Error("APPLE_WALLET_NOT_CONFIGURED");
   const passData = buildApplePassData(data, {

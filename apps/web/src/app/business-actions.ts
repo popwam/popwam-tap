@@ -7,7 +7,7 @@ import { requireAdmin, requireUser } from "@/lib/session";
 import { assertWithinLimit } from "@/lib/plans";
 import { parseMoney } from "@/lib/money";
 import { calculateInventoryByProduct } from "@/lib/inventory";
-import { normalizeAndValidate } from "@/lib/url";
+import { isSafeDestinationUrl, normalizeAndValidate } from "@/lib/url";
 
 const text = (data: FormData, key: string) => String(data.get(key) || "").trim();
 const optional = (data: FormData, key: string) => text(data, key) || null;
@@ -38,8 +38,9 @@ export async function createInventoryItem(data: FormData) {
   const admin = await requireAdmin(); const type = text(data, "type") as InventoryItemType;
   if (!text(data, "sku") || !text(data, "nameAr") || !text(data, "nameEn") || !Object.values(InventoryItemType).includes(type)) throw new Error("INVENTORY_ITEM_INVALID");
   const quantityOnHand = Math.max(0, Math.trunc(number(data, "quantityOnHand"))); const unitCost = money(data, "unitCost");
+  const imageUrl=optional(data,"imageUrl");if(imageUrl&&!isSafeDestinationUrl(imageUrl))throw new Error("INVALID_URL");
   await prisma.$transaction(async tx => {
-    const item = await tx.inventoryItem.create({ data: { sku: text(data, "sku").toUpperCase(), nameAr: text(data, "nameAr"), nameEn: text(data, "nameEn"), type, supplierId: optional(data, "supplierId"), quantityOnHand, reorderLevel: Math.max(0, Math.trunc(number(data, "reorderLevel"))), unitCost, sellingPrice: money(data, "sellingPrice") } });
+    const item = await tx.inventoryItem.create({ data: { sku: text(data, "sku").toUpperCase(), nameAr: text(data, "nameAr"), nameEn: text(data, "nameEn"), type, quantityOnHand, reorderLevel: Math.max(0, Math.trunc(number(data, "reorderLevel"))), unitCost, sellingPrice: money(data, "sellingPrice"),imageUrl,isActive:data.get("isActive")==="on" } });
     if (quantityOnHand > 0) await tx.inventoryMovement.create({ data: { inventoryItemId: item.id, type: "ADJUSTMENT_IN", quantity: quantityOnHand, unitCost, referenceType: "OPENING_BALANCE", referenceId: item.id, notes: "Opening inventory balance", createdBy: admin.id } });
     await tx.auditLog.create({ data: { actorId: admin.id, operation: "admin.inventory_item.create", targetId: item.id, metadata: { openingQuantity: quantityOnHand } } });
   }); revalidatePath("/admin/inventory"); revalidatePath("/admin/inventory/items");
@@ -122,6 +123,20 @@ export async function createOrder(data: FormData) { const admin=await requireAdm
 
 export async function updateCardState(data: FormData) {
   const admin=await requireAdmin();const id=text(data,"cardId");const action=text(data,"cardAction");const card=await prisma.card.findUnique({where:{id}});if(!card)throw new Error("CARD_NOT_FOUND");
+  if(action==="damaged"){
+    await prisma.$transaction(async tx=>{
+      const produced=await tx.producedTag.findUnique({where:{cardId:id},include:{batch:{select:{batchCode:true}}}});
+      await tx.card.update({where:{id},data:{cardStatus:"DISABLED",inventoryStatus:"DAMAGED"}});
+      if(produced&&produced.status!=="DAMAGED"){
+        const wasAvailable=produced.status==="UNASSIGNED"||produced.status==="RESERVED";
+        const wasAssigned=produced.status==="ASSIGNED"||produced.status==="ACTIVATED";
+        await tx.inventoryBatch.updateMany({where:{batchCode:produced.batch.batchCode},data:{damagedQuantity:{increment:1},...(wasAvailable?{availableQuantity:{decrement:1}}:{}),...(wasAssigned?{assignedQuantity:{decrement:1}}:{})}});
+        await tx.producedTag.update({where:{id:produced.id},data:{status:"DAMAGED"}});
+      }
+      await tx.auditLog.create({data:{actorId:admin.id,operation:"admin.card.damaged",targetId:id}});
+    },{isolationLevel:"Serializable"});
+    revalidatePath("/admin/cards");revalidatePath(`/admin/cards/${id}`);return;
+  }
   const statusMap:Record<string,CardStatus>={pause:"PAUSED",restore:"ACTIVE",lost:"LOST",disable:"DISABLED",archive:"ARCHIVED"};const status=statusMap[action];if(!status)throw new Error("CARD_ACTION_INVALID");
   await prisma.card.update({where:{id},data:{cardStatus:status,...(action==="lost"?{inventoryStatus:"LOST"}:{}),...(action==="restore"&&card.inventoryStatus==="LOST"?{inventoryStatus:card.ownerId?"ASSIGNED":"AVAILABLE"}: {})}});await prisma.auditLog.create({data:{actorId:admin.id,operation:`admin.card.${action}`,targetId:id}});revalidatePath("/admin/cards");revalidatePath(`/admin/cards/${id}`);
 }

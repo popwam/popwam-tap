@@ -1,4 +1,4 @@
-export const ONBOARDING_STEPS = 6;
+export const ONBOARDING_STEPS = 15;
 
 export function nextOnboardingStep(currentStep: number, completed = false) {
   if (completed) return ONBOARDING_STEPS;

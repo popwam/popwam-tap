@@ -1,10 +1,15 @@
-import { Prisma, prisma } from "@popwam/db";
+import { DestinationType, Prisma, prisma } from "@popwam/db";
 
 export const LIMIT_KEYS = ["maxProfiles", "maxVirtualCards", "maxLinks", "maxCustomFields", "maxTags", "maxCards", "maxUploads", "maxFiles", "maxStorageBytes"] as const;
-export const FEATURE_KEYS = ["allowCustomSlug", "customSlugAllowed", "allowThemes", "allowCustomTheme", "allowAnalytics", "analyticsAllowed", "allowFileUploads", "allowCustomIcons", "allowBusinessCards", "allowWalletPasses", "allowCustomLinks"] as const;
+export const FEATURE_KEYS = ["allowCustomSlug", "customSlugAllowed", "allowThemes", "allowCustomTheme", "allowAnalytics", "analyticsAllowed", "allowFileUploads", "allowCustomIcons", "allowBusinessCards", "allowWalletPasses", "allowCustomLinks", "allowInstallableProfiles"] as const;
 export const CATALOG_KEYS = ["availableProfileTypes", "availableThemes"] as const;
 export type LimitKey = (typeof LIMIT_KEYS)[number];
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
+const CORE_CONTACT_DESTINATION_TYPE_LIST: DestinationType[] = ["PROFILE", "PHONE", "EMAIL", "WEBSITE", "WHATSAPP_BUSINESS", "WHATSAPP_PRIVATE", "VCF"];
+const CORE_CONTACT_DESTINATION_TYPES = new Set<string>(CORE_CONTACT_DESTINATION_TYPE_LIST);
+export function countsTowardLinkLimit(type: string) { return !CORE_CONTACT_DESTINATION_TYPES.has(type); }
+const EXTRA_LINK_FILTER = { type: { notIn: CORE_CONTACT_DESTINATION_TYPE_LIST } } as const;
 
 export function mergeEntitlements<T extends Record<string, unknown>, U extends Record<string, unknown>>(plan: T, override?: U | null) {
   const result = { ...plan } as T & U;
@@ -26,7 +31,7 @@ export async function getUserUsage(userId: string) {
   const [profiles, virtualCards, links, customFields, tags, cards, uploads, storage] = await Promise.all([
     prisma.profile.count({ where: { userId } }),
     prisma.virtualCard.count({ where: { userId, status: { not: "ARCHIVED" } } }),
-    prisma.destination.count({ where: { userId } }),
+    prisma.destination.count({ where: { userId, ...EXTRA_LINK_FILTER } }),
     prisma.profileField.count({ where: { userId } }), prisma.tag.count({ where: { ownerId: userId } }), prisma.card.count({ where: { ownerId: userId } }),
     prisma.uploadedFile.count({ where: { uploaderUserId: userId } }),
     prisma.uploadedFile.aggregate({ where: { uploaderUserId: userId }, _sum: { sizeBytes: true } }),
@@ -59,7 +64,7 @@ export async function assertWithinLimitLocked(tx: Prisma.TransactionClient, user
   const effective = mergeEntitlements(plan, override);
   const used = resource === "profiles" ? await tx.profile.count({ where: { userId } })
     : resource === "virtualCards" ? await tx.virtualCard.count({ where: { userId, status: { not: "ARCHIVED" } } })
-    : resource === "links" ? await tx.destination.count({ where: { userId } })
+    : resource === "links" ? await tx.destination.count({ where: { userId, ...EXTRA_LINK_FILTER } })
     : resource === "customFields" ? await tx.profileField.count({ where: { userId } })
     : resource === "tags" ? await tx.tag.count({ where: { ownerId: userId } })
     : resource === "cards" ? await tx.card.count({ where: { ownerId: userId } })

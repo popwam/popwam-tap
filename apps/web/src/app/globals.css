@@ -49,6 +49,23 @@ html[lang="ar"] .public-theme { --profile-font:var(--font-arabic); }
 .template-grid .profile-card section > .grid { grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--template-spacing,.75rem); }
 .template-compact .profile-item { padding:.55rem .75rem; }
 .template-compact .profile-card section { margin-top:1rem; }
+.template-avatar-start .profile-avatar-wrap { justify-content:flex-start; }
+.template-avatar-center .profile-avatar-wrap { justify-content:center; }
+.template-avatar-end .profile-avatar-wrap { justify-content:flex-end; }
+.template-header-center :is(.profile-name,.profile-title,.profile-company,.profile-bio) { text-align:center; }
+.template-header-center .profile-location { justify-content:center; }
+.template-header-end :is(.profile-name,.profile-title,.profile-company,.profile-bio) { text-align:end; }
+.template-header-end .profile-location { justify-content:flex-end; }
+.template-cover-inset .profile-cover { margin:1rem;border-radius:calc(var(--profile-radius) * .7);overflow:hidden; }
+.template-cover-banner .profile-cover { height:11rem;clip-path:polygon(0 0,100% 0,100% 78%,0 100%); }
+.template-cover-minimal .profile-cover { height:5rem;opacity:.72; }
+.template-contacts-row .profile-contacts { display:flex;overflow-x:auto; }
+.template-contacts-row .profile-contacts > * { min-width:7rem;flex:1; }
+.template-contacts-list .profile-contacts { grid-template-columns:1fr; }
+.template-contacts-list .profile-contacts > * { min-height:3.5rem;flex-direction:row;gap:.75rem; }
+.template-desktop-wide .profile-card { max-width:52rem; }
+.template-desktop-split .profile-card { max-width:58rem; }
+@media (min-width:768px){.template-desktop-split .profile-contacts{grid-template-columns:repeat(4,minmax(0,1fr));}.template-desktop-split .profile-card{border-inline-start:5px solid var(--profile-accent)}}
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
 input[type="tel"], input[autocomplete="one-time-code"], .ltr-token { direction:ltr;unicode-bidi:isolate;text-align:start;font-variant-numeric:tabular-nums; }

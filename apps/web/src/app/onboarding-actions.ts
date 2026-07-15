@@ -1,60 +1,32 @@
 "use server";
 
-import { DestinationType, Prisma, prisma } from "@popwam/db";
-import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/session";
-import { assertWithinLimitLocked } from "@/lib/plans";
-import { mergeOnboardingData, nextOnboardingStep, ONBOARDING_STEPS } from "@/lib/onboarding";
-import { isSafeDestinationUrl } from "@/lib/url";
+import {DestinationType,Prisma,prisma} from "@popwam/db";
+import {redirect} from "next/navigation";
+import {requireUser} from "@/lib/session";
+import {assertWithinLimitLocked,getUserEntitlements} from "@/lib/plans";
+import {mergeOnboardingData,nextOnboardingStep,ONBOARDING_STEPS} from "@/lib/onboarding";
+import {isSafeDestinationUrl} from "@/lib/url";
+import {buildPlatformUrl} from "@/lib/link-platforms";
+import {templateAllowed} from "@/lib/virtual-cards";
 
-const text = (data: FormData, key: string) => String(data.get(key) || "").trim();
+const text=(data:FormData,key:string)=>String(data.get(key)||"").trim();
+const checked=(data:FormData,key:string)=>data.get(key)==="on";
 
-export async function saveOnboardingStep(data: FormData) {
-  const user = await requireUser();
-  const step = Math.min(ONBOARDING_STEPS, Math.max(1, Number(text(data, "step") || 1)));
-  const [progress, card] = await Promise.all([
-    prisma.onboardingProgress.findUnique({ where: { userId: user.id } }),
-    prisma.virtualCard.findFirst({ where: { userId: user.id, isDefault: true }, include: { profile: true } }),
-  ]);
-  if (!card) throw new Error("DEFAULT_VIRTUAL_CARD_MISSING");
-  let update: Record<string, unknown> = {};
-  if (step === 1) {
-    const displayName = text(data, "displayName"); if (!displayName) throw new Error("DISPLAY_NAME_REQUIRED");
-    update = { displayName, preferredName: text(data, "preferredName") };
-    await prisma.$transaction([prisma.user.update({ where: { id: user.id }, data: { name: displayName } }), prisma.profile.update({ where: { id: card.profileId }, data: { displayName } }), prisma.virtualCard.update({ where: { id: card.id }, data: { name: displayName } })]);
-  }
-  if (step === 2) {
-    update = { jobTitle: text(data, "jobTitle"), profession: text(data, "profession") };
-    await prisma.profile.update({ where: { id: card.profileId }, data: { title: text(data, "jobTitle") || null, industryEn: text(data, "profession") || null } });
-  }
-  if (step === 3) {
-    update = { company: text(data, "company"), employmentType: text(data, "employmentType"), organization: text(data, "organization") };
-    await prisma.profile.update({ where: { id: card.profileId }, data: { company: text(data, "company") || null } });
-  }
-  if (step === 4) {
-    const website = text(data, "website"); if (website && !isSafeDestinationUrl(website)) throw new Error("INVALID_URL");
-    update = { website };
-    await prisma.profile.update({ where: { id: card.profileId }, data: { website: website || null } });
-  }
-  if (step === 5) {
-    const avatarKind = ["UPLOADED", "GENERATED", "INITIALS"].includes(text(data, "avatarKind")) ? text(data, "avatarKind") : "INITIALS";
-    update = { avatarKind, avatarValue: text(data, "avatarValue") };
-    await prisma.$transaction([prisma.profile.update({ where: { id: card.profileId }, data: { avatarUrl: text(data, "avatarUrl") || card.profile.avatarUrl, avatarStorageKey: text(data, "avatarStorageKey") || card.profile.avatarStorageKey } }), prisma.virtualCard.update({ where: { id: card.id }, data: { avatarKind, avatarValue: text(data, "avatarValue") || null } })]);
-  }
-  if (step === 6 && data.get("skip") !== "true") {
-    const platform = await prisma.linkPlatform.findFirst({ where: { id: text(data, "linkPlatformId"), isActive: true } });
-    const url = text(data, "url");
-    if (!platform || !isSafeDestinationUrl(url)) throw new Error("LINK_INVALID");
-    if (platform.validationPattern && platform.validationPattern.length <= 200) { try { if (!new RegExp(platform.validationPattern).test(url)) throw new Error("LINK_VALIDATION_FAILED"); } catch (error) { if (error instanceof Error && error.message === "LINK_VALIDATION_FAILED") throw error; } }
-    await prisma.$transaction(async tx => {
-      await assertWithinLimitLocked(tx, user.id, "links");
-      await tx.destination.create({ data: { userId: user.id, profileId: card.profileId, linkPlatformId: platform.id, title: platform.nameEn, titleAr: platform.nameAr, titleEn: platform.nameEn, type: DestinationType.CUSTOM_URL, url, iconKey: platform.iconKey, customIconUrl: platform.customIconUrl, isActive: true, isVisible: true, sortOrder: await tx.destination.count({ where: { profileId: card.profileId } }) } });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    update = { firstLinkPlatform: platform.slug };
-  }
-  const completed = step === ONBOARDING_STEPS;
-  const nextStep = nextOnboardingStep(step, completed);
-  const merged = mergeOnboardingData(progress?.data, update) as Prisma.InputJsonValue;
-  await prisma.onboardingProgress.upsert({ where: { userId: user.id }, update: { currentStep: nextStep, completedAt: completed ? new Date() : null, data: merged }, create: { userId: user.id, currentStep: nextStep, completedAt: completed ? new Date() : null, data: merged } });
-  redirect(completed ? "/dashboard" : `/onboarding?step=${nextStep}`);
-}
+export async function saveOnboardingStep(data:FormData){const user=await requireUser();const step=Math.min(ONBOARDING_STEPS,Math.max(1,Number(text(data,"step")||1)));const [progress,card,entitlements]=await Promise.all([prisma.onboardingProgress.findUnique({where:{userId:user.id}}),prisma.virtualCard.findFirst({where:{userId:user.id,isDefault:true},include:{profile:true}}),getUserEntitlements(user.id)]);if(!card)throw new Error("DEFAULT_VIRTUAL_CARD_MISSING");const skip=data.get("skip")==="true";let update:Record<string,unknown>={};const completed=step===ONBOARDING_STEPS;await prisma.$transaction(async tx=>{
+  if(step===1){const displayName=text(data,"displayName");if(!displayName)throw new Error("DISPLAY_NAME_REQUIRED");update={displayName,preferredName:text(data,"preferredName")};await tx.user.update({where:{id:user.id},data:{name:displayName}});await tx.profile.update({where:{id:card.profileId},data:{displayName}});await tx.virtualCard.update({where:{id:card.id},data:{name:displayName}});}
+  if(step===2){update={jobTitle:text(data,"jobTitle"),profession:text(data,"profession")};await tx.profile.update({where:{id:card.profileId},data:{title:text(data,"jobTitle")||null,industryEn:text(data,"profession")||null}});}
+  if(step===3){update={company:text(data,"company"),employmentType:text(data,"employmentType"),organization:text(data,"organization")};await tx.profile.update({where:{id:card.profileId},data:{company:text(data,"company")||null}});}
+  if(step===4&&!skip){const website=text(data,"website");if(website&&!isSafeDestinationUrl(website))throw new Error("INVALID_URL");update={website};await tx.profile.update({where:{id:card.profileId},data:{website:website||null}});}
+  if(step===5){const avatarKind=["UPLOADED","GENERATED","INITIALS"].includes(text(data,"avatarKind"))?text(data,"avatarKind"):"INITIALS";update={avatarKind,avatarValue:text(data,"avatarValue")};await tx.profile.update({where:{id:card.profileId},data:{avatarUrl:text(data,"avatarUrl")||card.profile.avatarUrl,avatarStorageKey:text(data,"avatarStorageKey")||card.profile.avatarStorageKey}});await tx.virtualCard.update({where:{id:card.id},data:{avatarKind,avatarValue:text(data,"avatarValue")||null}});}
+  if(step===6){const type=text(data,"profileType");const allowed=(entitlements.effective.availableProfileTypes as string[]).includes(type);if(!allowed)throw new Error("PROFILE_TYPE_PLAN_REQUIRED");await tx.virtualCard.update({where:{id:card.id},data:{type:type as "PERSONAL"|"BUSINESS"|"PROFESSIONAL"|"CREATOR"}});update={profileType:type};}
+  if(step===7){const template=await tx.profileTemplate.findFirst({where:{id:text(data,"templateId"),isActive:true}});if(!template||!templateAllowed(entitlements.plan.slug,template.minimumPlan))throw new Error("TEMPLATE_PLAN_REQUIRED");await tx.virtualCard.update({where:{id:card.id},data:{themeId:template.id}});update={template:template.slug};}
+  if(step===8){const email=text(data,"email");const website=text(data,"website");if(website&&!isSafeDestinationUrl(website))throw new Error("INVALID_URL");await tx.profile.update({where:{id:card.profileId},data:{phone:text(data,"phone")||null,email:email||null,whatsappPrivate:text(data,"whatsapp")||null,website:website||null}});update={coreContactComplete:Boolean(text(data,"phone")||email||website)};}
+  if(step===9&&!skip){const platform=await tx.linkPlatform.findFirst({where:{id:text(data,"linkPlatformId"),isActive:true}});if(!platform)throw new Error("LINK_INVALID");const built=buildPlatformUrl(platform,text(data,"url"));if(!built.valid)throw new Error("LINK_INVALID");await assertWithinLimitLocked(tx,user.id,"links");await tx.destination.create({data:{userId:user.id,profileId:card.profileId,linkPlatformId:platform.id,title:platform.nameEn,titleAr:platform.nameAr,titleEn:platform.nameEn,type:DestinationType.CUSTOM_URL,url:built.url,iconKey:platform.iconKey,customIconUrl:platform.customIconUrl,isActive:true,isVisible:true,sortOrder:await tx.destination.count({where:{profileId:card.profileId}})}});update={firstLinkPlatform:platform.slug};}
+  if(step===10){const visibility={showAvatar:checked(data,"showAvatar"),showCover:checked(data,"showCover"),showPhone:checked(data,"showPhone"),showEmail:checked(data,"showEmail"),showWebsite:checked(data,"showWebsite"),showSocialLinks:checked(data,"showSocialLinks"),showUploadedFiles:checked(data,"showUploadedFiles")};await tx.profile.update({where:{id:card.profileId},data:visibility});update={visibility};}
+  if(step===11){const language=["ar","en","both"].includes(text(data,"language"))?text(data,"language"):"ar";await tx.profile.update({where:{id:card.profileId},data:{primaryLanguage:language}});update={language};}
+  if(step===12){const allowInstallable=checked(data,"allowInstallable");if(allowInstallable&&!entitlements.effective.allowInstallableProfiles)throw new Error("INSTALLABLE_PROFILE_PLAN_REQUIRED");await tx.profile.update({where:{id:card.profileId},data:{allowInstallable}});update={allowInstallable};}
+  if(step===13)update={walletRequested:checked(data,"walletRequested")};
+  if(step===14){const selected=await tx.virtualCard.findFirst({where:{id:text(data,"activeVirtualCardId"),userId:user.id,status:"ACTIVE"}});if(!selected)throw new Error("ACTIVE_PROFILE_INVALID");await tx.virtualCard.updateMany({where:{userId:user.id,isDefault:true},data:{isDefault:false}});await tx.virtualCard.update({where:{id:selected.id},data:{isDefault:true}});update={activeVirtualCard:selected.id};}
+  if(step===15)update={completed:true};
+  const nextStep=nextOnboardingStep(step,completed);const merged=mergeOnboardingData(progress?.data,update) as Prisma.InputJsonValue;await tx.onboardingProgress.upsert({where:{userId:user.id},update:{currentStep:nextStep,completedAt:completed?new Date():null,data:merged},create:{userId:user.id,currentStep:nextStep,completedAt:completed?new Date():null,data:merged}});await tx.auditLog.create({data:{actorId:user.id,operation:completed?"onboarding.complete":"onboarding.step.save",metadata:{step}}});
+},{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});redirect(completed?"/dashboard":`/onboarding?step=${nextOnboardingStep(step,false)}`);}

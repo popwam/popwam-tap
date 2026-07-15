@@ -3,6 +3,7 @@ import { OtpPurpose, Prisma, prisma } from "@popwam/db";
 import { normalizePhone, maskPhone } from "@/lib/phone";
 import { createOtpCode, hashOtp, hashPhone, otpMatches } from "@/lib/otp-crypto";
 import { getSmsProvider, type SmsDelivery } from "@/lib/sms";
+import { getSmsRuntimeSettings } from "@/lib/sms/runtime";
 import { isOtpUsable, otpHourlyLimitReached, otpPolicyFromEnv, otpRetryAfter } from "@/lib/otp-policy";
 import { getOtpTestDelivery } from "@/lib/otp-test-mode";
 import { deliverOtpCode } from "@/lib/otp-delivery";
@@ -18,7 +19,7 @@ export async function sendMobileOtp(rawPhone: string, locale: "ar" | "en") {
   const phoneHash = hashPhone(normalized.e164);
   const recentSendCount = await prisma.otpSendLog.count({ where: { phoneHash, createdAt: { gte: new Date(now.getTime() - 60 * 60_000) } } });
   if (otpHourlyLimitReached(recentSendCount, policy.hourlySendLimit)) return { ok: false as const, status: 429, error: "OTP_LIMIT_REACHED" };
-  const testDelivery = getOtpTestDelivery(normalized.e164); const code = testDelivery.code || createOtpCode(); const provider = testDelivery.testDelivery ? null : getSmsProvider(); const providerName = testDelivery.testDelivery ? "test-allowlist" : provider!.name;
+  const testDelivery = getOtpTestDelivery(normalized.e164); const code = testDelivery.code || createOtpCode();const runtime=await getSmsRuntimeSettings(); const provider = testDelivery.testDelivery||!runtime.enabled ? null : getSmsProvider(runtime); const providerName = testDelivery.testDelivery ? "test-allowlist" : provider?.name||"disabled";
   const challenge = await prisma.otpChallenge.create({ data: { phone: normalized.e164, purpose: OtpPurpose.LOGIN, otpHash: hashOtp(normalized.e164, code), expiresAt: new Date(now.getTime() + policy.expiryMinutes * 60_000), maxAttempts: policy.maxAttempts, provider: providerName } });
   const delivery: SmsDelivery = await deliverOtpCode({ testDelivery: testDelivery.testDelivery, provider, otp: { to: normalized.e164, code, expiresMinutes: policy.expiryMinutes, locale } });
   await prisma.$transaction([

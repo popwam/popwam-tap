@@ -1,6 +1,18 @@
 import { getPermanentCardUrl } from "@popwam/shared";
 import { createActivationCode, createOpaqueToken, hashActivationToken } from "./card-tokens";
 
+export function cardTypeForInventoryItem(type: string) {
+  if (type === "BLANK_STICKER") return "NFC_STICKER" as const;
+  if (type === "BLANK_WRISTBAND") return "WRISTBAND" as const;
+  if (type === "QR_PRODUCT") return "QR_ONLY" as const;
+  return "NFC_CARD" as const;
+}
+
+export function serialPrefixForProduct(sku: string) {
+  const normalized = sku.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  return normalized || "PW";
+}
+
 export function createProductionRows(input: {
   quantity: number;
   startingSerialNumber: number;

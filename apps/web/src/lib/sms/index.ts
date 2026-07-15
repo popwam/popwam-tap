@@ -1,6 +1,7 @@
 import "server-only";
 import { maskPhone } from "@/lib/phone";
 import { parseSmsMisrResponse, smsMisrTransportFailure, toSmsMisrMobile } from "./smsmisr";
+import type { SmsRuntimeSettings } from "./runtime";
 export { SMSMISR_CODES, parseSmsMisrResponse, smsMisrTransportFailure, toSmsMisrMobile } from "./smsmisr";
 
 export type SmsOtpInput = { to: string; code: string; expiresMinutes: number; locale: "ar" | "en" };
@@ -25,12 +26,13 @@ class DevelopmentSmsProvider implements SmsProvider {
 
 class WebhookSmsProvider implements SmsProvider {
   name = "webhook";
+  constructor(private readonly runtime?:SmsRuntimeSettings){}
   async sendOtp(input: SmsOtpInput): Promise<SmsDelivery> {
     const url = process.env.SMS_API_URL; const token = process.env.SMS_API_TOKEN;
     if (!url || !token) return { status: "FAILED", provider: this.name, error: "CONFIGURATION" };
-    const message = input.locale === "ar" ? `رمز POPWAM Tap هو ${input.code}. صالح لمدة ${input.expiresMinutes} دقائق.` : `Your POPWAM Tap code is ${input.code}. It expires in ${input.expiresMinutes} minutes.`;
+    const source=input.locale==="ar"?this.runtime?.templateAr:this.runtime?.templateEn;const message=(source||(input.locale === "ar" ? "رمز POPWAM Tap هو {code}. صالح لمدة {minutes} دقائق." : "Your POPWAM Tap code is {code}. It expires in {minutes} minutes.")).replaceAll("{code}",input.code).replaceAll("{minutes}",String(input.expiresMinutes));
     try {
-      const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ to: input.to, message, senderId: process.env.SMS_SENDER_ID || "POPWAM" }), cache: "no-store", signal: AbortSignal.timeout(Number(process.env.SMS_TIMEOUT_MS || 10_000)) });
+      const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ to: input.to, message, senderId: this.runtime?.senderName || process.env.SMS_SENDER_ID || "POPWAM" }), cache: "no-store", signal: AbortSignal.timeout(Number(process.env.SMS_TIMEOUT_MS || 10_000)) });
       if (!response.ok) return { status: "FAILED", provider: this.name, responseCode: String(response.status), error: "PROVIDER_REJECTED" };
       const result = await response.json().catch(() => ({})) as { messageId?: unknown };
       return { status: "SENT", provider: this.name, messageId: typeof result.messageId === "string" ? result.messageId : undefined };
@@ -56,10 +58,10 @@ class SmsMisrProvider implements SmsProvider {
   }
 }
 
-export function getSmsProvider(): SmsProvider {
-  const provider = (process.env.SMS_PROVIDER || "development").toLowerCase();
+export function getSmsProvider(runtime?:SmsRuntimeSettings): SmsProvider {
+  const provider = (runtime?.providerMode&&runtime.providerMode!=="environment"?runtime.providerMode:process.env.SMS_PROVIDER || "development").toLowerCase();
   if (provider === "development" || provider === "test") return new DevelopmentSmsProvider();
-  if (provider === "webhook") return new WebhookSmsProvider();
+  if (provider === "webhook") return new WebhookSmsProvider(runtime);
   if (provider === "smsmisr") return new SmsMisrProvider();
   throw new Error("SMS_PROVIDER_UNKNOWN");
 }

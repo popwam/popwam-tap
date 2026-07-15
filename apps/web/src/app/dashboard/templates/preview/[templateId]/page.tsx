@@ -1,0 +1,6 @@
+import { notFound } from "next/navigation";
+import { prisma } from "@popwam/db";
+import { PublicProfile } from "@/components/public-profile";
+import { requireUser } from "@/lib/session";
+
+export default async function TemplatePreviewPage({params,searchParams}:{params:Promise<{templateId:string}>;searchParams:Promise<{card?:string}>}){const user=await requireUser();const [{templateId},{card:cardId}]=await Promise.all([params,searchParams]);const [template,card]=await Promise.all([prisma.profileTemplate.findFirst({where:{id:templateId,isActive:true}}),prisma.virtualCard.findFirst({where:{id:cardId,userId:user.id},select:{profileId:true}})]);if(!template||!card)notFound();const profile=await prisma.profile.findUnique({where:{id:card.profileId},include:{user:{select:{email:true}},fields:true,uploads:true,destinations:true,services:true,branches:true,virtualCard:{include:{template:true}}}});if(!profile||!profile.virtualCard)notFound();return <div><div className="sticky top-3 z-30 mx-auto mb-3 flex max-w-xl items-center justify-between rounded-xl border border-white/10 bg-slate-950/95 p-3"><strong>Live preview: {template.nameEn}</strong><a className="btn-secondary" href="/dashboard/templates">Back</a></div><PublicProfile profile={{...profile,virtualCard:{...profile.virtualCard,template}}}/></div>}

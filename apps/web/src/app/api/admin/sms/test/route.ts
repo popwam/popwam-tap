@@ -2,6 +2,7 @@ import { OtpPurpose, prisma } from "@popwam/db";
 import { normalizePhone } from "@/lib/phone";
 import { createOtpCode, hashPhone } from "@/lib/otp-crypto";
 import { getSmsProvider, type SmsDelivery } from "@/lib/sms";
+import { getSmsRuntimeSettings } from "@/lib/sms/runtime";
 import { otpHourlyLimitReached, otpPolicyFromEnv } from "@/lib/otp-policy";
 import { getOtpTestDelivery } from "@/lib/otp-test-mode";
 import { deliverOtpCode } from "@/lib/otp-delivery";
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   const phoneHash = hashPhone(normalized.e164); const policy = otpPolicyFromEnv();
   const recentSendCount = await prisma.otpSendLog.count({ where: { phoneHash, createdAt: { gte: new Date(Date.now() - 60 * 60_000) } } });
   if (otpHourlyLimitReached(recentSendCount, policy.hourlySendLimit)) return Response.json({ ok: false, error: "RATE_LIMITED" }, { status: 429 });
-  const testDelivery = getOtpTestDelivery(normalized.e164); const code = testDelivery.code || createOtpCode(); const provider = testDelivery.testDelivery ? null : getSmsProvider();
+  const testDelivery = getOtpTestDelivery(normalized.e164); const code = testDelivery.code || createOtpCode();const runtime=await getSmsRuntimeSettings(); const provider = testDelivery.testDelivery||!runtime.enabled ? null : getSmsProvider(runtime);
   const delivery: SmsDelivery = await deliverOtpCode({ testDelivery: testDelivery.testDelivery, provider, otp: { to: normalized.e164, code, expiresMinutes: policy.expiryMinutes, locale: "ar" } });
   await prisma.$transaction([prisma.otpSendLog.create({ data: { phoneHash, purpose: OtpPurpose.LOGIN, status: delivery.status, provider: delivery.provider, responseCode: delivery.responseCode, messageId: delivery.messageId, cost: delivery.cost } }), prisma.auditLog.create({ data: { actorId: admin.id, operation: "sms.test", targetId: delivery.messageId } })]);
   return delivery.status === "SENT" ? Response.json({ ok: true, testBypass: testDelivery.testDelivery }) : Response.json({ ok: false, error: "SEND_FAILED" }, { status: 503 });

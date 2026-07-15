@@ -5,6 +5,7 @@ import {
   calculatePhysicalStock,
   inventoryReconciliation,
 } from "./inventory";
+import { ORDER_TRANSITIONS, storeAvailability, SUBSCRIPTION_TRANSITIONS, transitionAllowed } from "./commerce";
 
 describe("physical inventory ledger", () => {
   it("shows 1000 units even when their value is 2000", () => {
@@ -35,4 +36,10 @@ describe("physical inventory ledger", () => {
       ),
     ).toEqual([{ productId: "nfc", cachedQuantity: 2000, ledgerQuantity: 1000, difference: -1000 }]);
   });
+});
+
+describe("store and manual approval workflows",()=>{
+  it("uses produced stock for NFC products and raw stock for accessories",()=>{expect(storeAvailability({type:"BLANK_CARD",rawAvailable:1000,producedAvailable:25})).toBe(25);expect(storeAvailability({type:"ACCESSORY",rawAvailable:40,producedAvailable:0})).toBe(40);});
+  it("requires admin subscription approval before activation",()=>{expect(transitionAllowed(SUBSCRIPTION_TRANSITIONS,"REQUESTED","ACTIVE")).toBe(false);expect(transitionAllowed(SUBSCRIPTION_TRANSITIONS,"APPROVED","ACTIVE")).toBe(true);});
+  it("allows store orders to follow fulfillment states",()=>{expect(transitionAllowed(ORDER_TRANSITIONS,"NEW","PAID")).toBe(true);expect(transitionAllowed(ORDER_TRANSITIONS,"NEW","DELIVERED")).toBe(false);});
 });

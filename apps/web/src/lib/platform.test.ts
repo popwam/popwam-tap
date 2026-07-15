@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { defaultIconKeys, normalizeShortCode, validateShortCode } from "@popwam/shared";
 import { validateFileUpload, validateImageUpload } from "@popwam/storage";
 import { decideTagResolution } from "./tag-resolution";
-import { mergeEntitlements } from "./plans";
+import { countsTowardLinkLimit, mergeEntitlements } from "./plans";
+import { buildPlatformUrl, platformOpenTarget } from "./link-platforms";
 import { normalizeEmail, isUniqueConstraintError, runAtomicUserCreation } from "./user-validation";
 import { resolveProfileFieldUrl, visibleProfileFields } from "./profile-fields";
 import { activationTokenMatches, createActivationCode, createOpaqueToken, hashActivationToken, isActivationToken, MAX_BATCH_QUANTITY, normalizeBatchPrefix, openActivationCode, sealActivationCode } from "./card-tokens";
@@ -29,6 +30,13 @@ describe("plans and limits", () => {
   const plan = { maxLinks:5,maxTags:1,allowFileUploads:false,allowThemes:false };
   it("applies per-user overrides first", () => expect(mergeEntitlements(plan,{ maxLinks:12,maxTags:null,allowFileUploads:true })).toMatchObject({ maxLinks:12,maxTags:1,allowFileUploads:true }));
   it("inherits null overrides", () => expect(mergeEntitlements(plan,{ maxLinks:null })).toMatchObject({ maxLinks:5 }));
+  it("excludes the public profile and core contact destinations from the link limit", () => { for (const type of ["PROFILE","PHONE","EMAIL","WEBSITE","WHATSAPP_PRIVATE","VCF"]) expect(countsTowardLinkLimit(type)).toBe(false); expect(countsTowardLinkLimit("INSTAGRAM")).toBe(true); expect(countsTowardLinkLimit("CUSTOM_URL")).toBe(true); });
+});
+
+describe("configurable link platforms", () => {
+  it("builds username links and accepts the manual full-link fallback", () => { const instagram={slug:"instagram",inputType:"USERNAME_OR_URL",urlTemplate:"https://instagram.com/{value}"};expect(buildPlatformUrl(instagram,"@popwam")).toEqual({valid:true,url:"https://instagram.com/popwam"});expect(buildPlatformUrl(instagram,"https://instagram.com/popwam")).toEqual({valid:true,url:"https://instagram.com/popwam"}); });
+  it("normalizes Egyptian and international WhatsApp numbers", () => { const whatsapp={slug:"whatsapp",inputType:"PHONE",urlTemplate:"https://wa.me/{value}"};expect(buildPlatformUrl(whatsapp,"010 1234 5678")).toEqual({valid:true,url:"https://wa.me/201012345678"});expect(buildPlatformUrl(whatsapp,"+373 60 000 000")).toEqual({valid:true,url:"https://wa.me/37360000000"}); });
+  it("uses app links only when present and keeps a web fallback", () => { const platform={slug:"x",inputType:"USERNAME",androidAppUrl:"x://profile",webFallback:"https://x.com"};expect(platformOpenTarget(platform,"android")).toBe("x://profile");expect(platformOpenTarget(platform,"ios")).toBe("https://x.com"); });
 });
 
 describe("financial integrity", () => {

@@ -10,20 +10,22 @@ const text = (data: FormData, key: string) => String(data.get(key) || "").trim()
 export async function requestTagTransfer(data: FormData) {
   const user = await requireUser();
   const cardId = text(data, "cardId");
-  const invitedEmail = text(data, "email").toLowerCase();
-  if (!/^\S+@\S+\.\S+$/.test(invitedEmail) || invitedEmail === user.email.toLowerCase()) throw new Error("TRANSFER_EMAIL_INVALID");
+  const recipientUsername = text(data, "username").toLowerCase().replace(/^@/, "");
+  if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(recipientUsername) || recipientUsername === user.username) throw new Error("TRANSFER_USERNAME_INVALID");
   const [card, recipient, pending] = await Promise.all([
     prisma.card.findFirst({ where: { id: cardId, ownerId: user.id }, select: { id: true } }),
-    prisma.user.findUnique({ where: { email: invitedEmail }, select: { id: true, status: true } }),
+    prisma.user.findUnique({ where: { username: recipientUsername }, select: { id: true, status: true } }),
     prisma.tagTransfer.findFirst({ where: { tagId: cardId, status: "PENDING", expiresAt: { gt: new Date() } }, select: { id: true } }),
   ]);
   if (!card) throw new Error("CARD_NOT_FOUND");
   if (pending) throw new Error("TRANSFER_ALREADY_PENDING");
-  if (recipient && recipient.status !== "ACTIVE") throw new Error("RECIPIENT_NOT_ACTIVE");
-  const transfer = await prisma.tagTransfer.create({ data: { tagId: card.id, fromUserId: user.id, toUserId: recipient?.id, invitedEmail, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } });
+  if (!recipient || recipient.status !== "ACTIVE") throw new Error("RECIPIENT_NOT_ACTIVE");
+  const transfer = await prisma.tagTransfer.create({ data: { tagId: card.id, fromUserId: user.id, toUserId: recipient.id, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } });
   await prisma.auditLog.create({ data: { actorId: user.id, operation: "tag.transfer.request", targetId: transfer.id, metadata: { cardId } } });
   revalidatePath("/dashboard/transfers");
 }
+
+export async function updateTransferUsername(data:FormData){const user=await requireUser();const username=text(data,"username").toLowerCase().replace(/^@/,"");if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username))throw new Error("USERNAME_INVALID");await prisma.user.update({where:{id:user.id},data:{username}});await prisma.auditLog.create({data:{actorId:user.id,operation:"account.username.update"}});revalidatePath("/dashboard/transfers");revalidatePath("/dashboard/settings");}
 
 export async function respondToTagTransfer(data: FormData) {
   const user = await requireUser();

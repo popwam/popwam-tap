@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeOnboardingPlatforms, mergeOnboardingData, nextOnboardingStep } from "./onboarding";
+import { activeOnboardingPlatforms, mergeOnboardingData, nextOnboardingStep, ONBOARDING_STEPS } from "./onboarding";
 
 describe("resumable onboarding", () => {
   it("preserves previous answers while advancing one step", () => {
@@ -7,7 +7,7 @@ describe("resumable onboarding", () => {
     expect(nextOnboardingStep(3)).toBe(4);
   });
 
-  it("never advances past the final step", () => expect(nextOnboardingStep(6)).toBe(6));
+  it("never advances past the final step", () => expect(nextOnboardingStep(ONBOARDING_STEPS)).toBe(ONBOARDING_STEPS));
 
   it("shows an admin-created active platform in configured order", () => {
     const result = activeOnboardingPlatforms([{ slug: "website", isActive: true, sortOrder: 20 }, { slug: "anghami", isActive: true, sortOrder: 10 }, { slug: "disabled", isActive: false, sortOrder: 1 }]);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activationCodeCanBeConsumed, createProductionRows } from "./production";
+import { activationCodeCanBeConsumed, cardTypeForInventoryItem, createProductionRows, serialPrefixForProduct } from "./production";
 
 describe("production batches", () => {
   it("creates exactly 100 permanent URLs and 100 activation codes", () => {
@@ -19,4 +19,6 @@ describe("production batches", () => {
     expect(activationCodeCanBeConsumed({ ownerId: null, assignmentStatus: "UNASSIGNED", consumedAt: null })).toBe(true);
     expect(activationCodeCanBeConsumed({ ownerId: "user", assignmentStatus: "SELF_CLAIMED", consumedAt: new Date() })).toBe(false);
   });
+
+  it("derives production metadata from the selected inventory product",()=>{expect(cardTypeForInventoryItem("BLANK_STICKER")).toBe("NFC_STICKER");expect(cardTypeForInventoryItem("BLANK_CARD")).toBe("NFC_CARD");expect(serialPrefixForProduct("pw-card-01")).toBe("PWCARD");});
 });
