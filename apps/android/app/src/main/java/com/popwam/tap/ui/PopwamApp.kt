@@ -76,10 +76,10 @@ private enum class EntryScreen { SPLASH, WELCOME, SCAN, LOGIN }
         return
     }
     LaunchedEffect(authState.authenticated){main.reload();if(pendingActivation.isNotBlank()){main.inspectActivation(pendingActivation);pendingActivation=""}}
-    MainNavigation(main,initialRoute=pendingRoute,onLogout={entry=EntryScreen.WELCOME.name;auth.logout()})
+    FigmaMainNavigation(main,initialRoute=pendingRoute,onLogout={entry=EntryScreen.WELCOME.name;auth.logout()})
 }
 
-private fun currentLocale():String{val selected=AppCompatDelegate.getApplicationLocales().toLanguageTags();return if((selected.ifBlank{Locale.getDefault().language}).startsWith("ar"))"ar" else "en"}
+fun currentLocale():String{val selected=AppCompatDelegate.getApplicationLocales().toLanguageTags();return if((selected.ifBlank{Locale.getDefault().language}).startsWith("ar"))"ar" else "en"}
 
 @Composable private fun SplashScreen(){Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)){Text("POPWAM",style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Black,color=MaterialTheme.colorScheme.primary);CircularProgressIndicator(Modifier.size(28.dp),strokeWidth=2.dp)}}}
 
@@ -103,7 +103,7 @@ private fun currentLocale():String{val selected=AppCompatDelegate.getApplication
 @Composable private fun PreAuthScanScreen(back:()->Unit,onScanned:(String)->Unit){var manual by rememberSaveable{mutableStateOf("")};LazyColumn(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){item{Row(verticalAlignment=Alignment.CenterVertically){IconButton(back){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))};Text(stringResource(R.string.scan_qr),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Black)}};item{QrScanner(onScanned)};item{LtrField(manual,{manual=it},R.string.manual_code,null,KeyboardType.Ascii,true)};item{Button({onScanned(manual)},Modifier.fillMaxWidth(),enabled=manual.isNotBlank()){Text(stringResource(R.string.validate_qr))}}}}
 
 @Composable private fun rememberOnline():Boolean{val context=LocalContext.current;val manager=remember{context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager};var online by remember{mutableStateOf(manager.getNetworkCapabilities(manager.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)==true)};DisposableEffect(manager){val callback=object:ConnectivityManager.NetworkCallback(){override fun onAvailable(network:Network){online=true};override fun onLost(network:Network){online=manager.activeNetwork!=null}};manager.registerNetworkCallback(NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),callback);onDispose{runCatching{manager.unregisterNetworkCallback(callback)}}};return online}
-private fun toggleLanguage(){val next=if(currentLocale()=="ar")"en" else "ar";AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(next))}
+fun toggleLanguage(){val next=if(currentLocale()=="ar")"en" else "ar";AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(next))}
 private fun openWeb(context:Context,path:String){context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("${BuildConfig.API_BASE_URL.trimEnd('/')}/$path")))}
 
 @Composable private fun LoginScreen(state:AuthUiState,onSend:(String)->Unit,onVerify:(String)->Unit,back:()->Unit){var phone by remember{mutableStateOf("")};var code by remember{mutableStateOf("")};Box(Modifier.fillMaxSize().padding(24.dp),contentAlignment=Alignment.Center){Card(Modifier.fillMaxWidth()){Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){Row(verticalAlignment=Alignment.CenterVertically){IconButton(back){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))};Text("POPWAM Tap",style=MaterialTheme.typography.headlineMedium,color=MaterialTheme.colorScheme.primary)};Text(stringResource(R.string.phone_help),style=MaterialTheme.typography.bodySmall);LtrField(phone,{phone=it},R.string.phone_number,R.string.phone_hint,KeyboardType.Phone,state.challengeId==null);if(state.challengeId==null)Button({onSend(phone)},Modifier.fillMaxWidth(),enabled=!state.loading&&phone.isNotBlank()){Text(stringResource(R.string.send_code))}else{state.maskedPhone?.let{LtrText(it)};state.developmentCode?.let{LtrText(it)};LtrField(code,{code=it.filter(Char::isDigit).take(6)},R.string.verification_code,null,KeyboardType.NumberPassword,true);Button({onVerify(code)},Modifier.fillMaxWidth(),enabled=!state.loading&&code.length==6){Text(stringResource(R.string.verify_continue))}};if(BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank())Text(stringResource(R.string.google_optional),style=MaterialTheme.typography.bodySmall);state.error?.let{ErrorText(it)};if(state.loading)LinearProgressIndicator(Modifier.fillMaxWidth())}}}}
@@ -370,3 +370,12 @@ private fun shareQr(context: Context, value: String, bitmap: android.graphics.Bi
     }
     context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_qr)))
 }
+
+@Composable fun LegacyPhysicalCardDetails(card:CardDetailDto?,destinations:List<DestinationDto>,update:(String?,String?)->Unit,back:()->Unit)=CardDetailScreen(card,destinations,update,back)
+@Composable fun LegacyProfileEditor(profile:ProfileDto?,vm:MainViewModel,back:()->Unit)=ProfileEditor(profile,vm,back)
+@Composable fun LegacyActivation(state:MainUiState,vm:MainViewModel)=ActivationScreen(state,vm)
+@Composable fun LegacyNfcTools(state:MainUiState,vm:MainViewModel,program:()->Unit,hce:()->Unit)=NfcToolsScreen(state,vm,program,hce)
+@Composable fun LegacyProgrammingList(cards:List<CardDto>,open:(String)->Unit)=ProgrammingList(cards,open)
+@Composable fun LegacyProgramming(card:CardDto,state:MainUiState,vm:MainViewModel)=ProgrammingScreen(card,state,vm)
+@Composable fun LegacyHce(cards:List<CardDto>)=HceScreen(cards)
+@Composable fun LegacySettings(logout:()->Unit)=SettingsScreen(logout)

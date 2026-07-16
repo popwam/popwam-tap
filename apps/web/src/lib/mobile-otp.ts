@@ -44,5 +44,12 @@ export async function verifyMobileOtp(challengeId: string, code: string, deviceN
     await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), phoneVerifiedAt: user.phoneVerifiedAt || new Date() } });
     const session = await issueMobileSession(tx, user, deviceName);
     return { session, user: { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role, locale: user.locale } };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }); } catch { return null; }
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    maxWait: 10_000,
+    timeout: 30_000,
+  }); } catch (error) {
+    if (process.env.NODE_ENV !== "production") console.error("MOBILE_OTP_VERIFY_FAILED", error);
+    return null;
+  }
 }

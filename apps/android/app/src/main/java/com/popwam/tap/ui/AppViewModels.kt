@@ -12,7 +12,10 @@ import com.popwam.tap.data.api.CardDto
 import com.popwam.tap.data.api.DestinationDto
 import com.popwam.tap.data.api.DestinationWriteRequest
 import com.popwam.tap.data.api.ProfileDto
+import com.popwam.tap.data.api.ProfileTemplateDto
 import com.popwam.tap.data.api.ProfileWriteRequest
+import com.popwam.tap.data.api.VirtualCardCreateRequest
+import com.popwam.tap.data.api.WalletCapabilitiesDto
 import com.popwam.tap.data.api.VerifyNfcResponse
 import com.popwam.tap.data.auth.SessionRepository
 import com.popwam.tap.data.repository.PopwamRepository
@@ -82,6 +85,9 @@ class AuthViewModel(private val sessions: SessionRepository) : ViewModel() {
 data class MainUiState(
     val cards: List<CardDto> = emptyList(),
     val profiles: List<ProfileDto> = emptyList(),
+    val templates: List<ProfileTemplateDto> = emptyList(),
+    val planSlug: String = "free",
+    val wallet: WalletCapabilitiesDto = WalletCapabilitiesDto(),
     val selectedCard: CardDetailDto? = null,
     val destinations: List<DestinationDto> = emptyList(),
     val programmingCards: List<CardDto> = emptyList(),
@@ -109,7 +115,8 @@ class MainViewModel(
         working {
             val cards = repo.cards()
             val profiles = repo.profiles()
-            _state.value = _state.value.copy(cards = cards.cards, profiles = profiles.profiles)
+            val templates = repo.templates()
+            _state.value = _state.value.copy(cards = cards.cards, profiles = profiles.profiles, templates = templates.templates, planSlug = templates.planSlug, wallet = profiles.wallet)
         }
     }
 
@@ -176,6 +183,55 @@ class MainViewModel(
             } else {
                 fail(result.error ?: "PROFILE_SAVE_FAILED")
             }
+        }
+    }
+
+    fun createVirtualCard(
+        context: Context,
+        body: VirtualCardCreateRequest,
+        avatarUri: Uri?,
+        logoUri: Uri?,
+        onCreated: (String) -> Unit,
+    ) = viewModelScope.launch {
+        working {
+            val created = repo.createVirtualCard(body)
+            val profile = created.profile
+            if (!created.ok || profile == null) {
+                fail(created.error ?: "PROFILE_SAVE_FAILED")
+                return@working
+            }
+            suspend fun upload(uri: Uri, kind: String) {
+                val resolver = context.contentResolver
+                val mime = resolver.getType(uri) ?: "image/jpeg"
+                val name = uri.lastPathSegment?.substringAfterLast('/') ?: "$kind.jpg"
+                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+                val result = repo.uploadMedia(profile.id, kind, name, mime, bytes)
+                if (!result.ok) throw IllegalStateException(result.error ?: "UPLOAD_FAILED")
+            }
+            avatarUri?.let { upload(it, "avatar") }
+            logoUri?.let { upload(it, "logo") }
+            _state.value = _state.value.copy(message = "PROFILE_SAVED")
+            reload()
+            onCreated(profile.id)
+        }
+    }
+
+    fun selectTemplate(virtualCardId: String, templateId: String, onComplete: () -> Unit = {}) = viewModelScope.launch {
+        working {
+            val result = repo.selectTemplate(virtualCardId, templateId)
+            if (!result.ok) {
+                fail(result.error)
+                return@working
+            }
+            reload()
+            onComplete()
+        }
+    }
+
+    fun openGoogleWallet(virtualCardId: String, onReady: (String) -> Unit) = viewModelScope.launch {
+        working {
+            val result = repo.googleWallet(virtualCardId)
+            if (!result.ok || result.url.isNullOrBlank()) fail(result.error) else onReady(result.url)
         }
     }
 

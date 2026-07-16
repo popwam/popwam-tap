@@ -17,7 +17,11 @@ interface PopwamApi {
     @PATCH("api/mobile/cards/{id}") suspend fun updateCard(@Path("id") id:String,@Body body:CardUpdateRequest):ApiResult
     @GET("api/mobile/profiles") suspend fun profiles():ProfilesResponse
     @POST("api/mobile/profiles") suspend fun createProfile(@Body body:ProfileWriteRequest):ProfileCreateResponse
+    @POST("api/mobile/profiles") suspend fun createVirtualCard(@Body body:VirtualCardCreateRequest):ProfileCreateResponse
     @PATCH("api/mobile/profiles/{id}") suspend fun updateProfile(@Path("id") id:String,@Body body:ProfileWriteRequest):ApiResult
+    @GET("api/mobile/templates") suspend fun templates():TemplatesResponse
+    @PATCH("api/mobile/virtual-cards/{id}/template") suspend fun selectTemplate(@Path("id") id:String,@Body body:TemplateSelectionRequest):ApiResult
+    @POST("api/mobile/virtual-cards/{id}/google-wallet") suspend fun googleWallet(@Path("id") id:String):GoogleWalletLinkResponse
     @Multipart @POST("api/mobile/profiles/{id}/media") suspend fun uploadMedia(@Path("id") id:String,@Part("kind") kind:RequestBody,@Part file:MultipartBody.Part):ApiResult
     @Multipart @POST("api/mobile/profiles/{id}/files") suspend fun uploadFile(@Path("id") id:String,@Part("titleAr") titleAr:RequestBody,@Part("titleEn") titleEn:RequestBody,@Part file:MultipartBody.Part):ApiResult
     @GET("api/mobile/profiles/{id}/destinations") suspend fun destinations(@Path("id") id:String):Map<String,Any>

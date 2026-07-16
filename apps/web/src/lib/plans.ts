@@ -71,5 +71,5 @@ export async function assertWithinLimitLocked(tx: Prisma.TransactionClient, user
     : await tx.uploadedFile.count({ where: { uploaderUserId: userId } });
   const key = ({ profiles: "maxProfiles", virtualCards: "maxVirtualCards", links: "maxLinks", customFields: "maxCustomFields", tags: "maxTags", cards: "maxCards", uploads: "maxUploads", files: "maxFiles" } as const)[resource];
   if (used + increment > Number(effective[key])) throw new Error(`LIMIT_REACHED:${resource}`);
-  return { effective, used };
+  return { effective, used, plan };
 }
