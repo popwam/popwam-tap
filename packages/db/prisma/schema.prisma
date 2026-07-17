@@ -151,8 +151,45 @@ enum CardStatus {
   ACTIVE
   PAUSED
   LOST
+  STOLEN
   DISABLED
+  TRANSFER_PENDING
   ARCHIVED
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  HIDDEN
+  ARCHIVED
+}
+
+enum ProductInventoryStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+  PREORDER
+  UNAVAILABLE
+}
+
+enum ContentVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+enum UserReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
 }
 
 enum CardInventoryStatus {
@@ -318,6 +355,9 @@ model User {
   role                     SystemRole               @default(USER)
   status                   AccountStatus            @default(ACTIVE)
   locale                   String?
+  shareActivityIdentity    Boolean                  @default(false)
+  allowNearbyDiscovery     Boolean                  @default(false)
+  defaultSharingCardId     String?
   lastLoginAt              DateTime?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
@@ -349,10 +389,10 @@ model User {
   activationClaims         ActivationClaimSession[]
   authTickets              AuthTicket[]
   mobileRefreshTokens      MobileRefreshToken[]
-  friendshipsA             Friendship[]            @relation("FriendshipUserA")
-  friendshipsB             Friendship[]            @relation("FriendshipUserB")
-  friendshipRequests       Friendship[]            @relation("FriendshipRequester")
-  friendshipBlocks         Friendship[]            @relation("FriendshipBlocker")
+  friendshipsA             Friendship[]             @relation("FriendshipUserA")
+  friendshipsB             Friendship[]             @relation("FriendshipUserB")
+  friendshipRequests       Friendship[]             @relation("FriendshipRequester")
+  friendshipBlocks         Friendship[]             @relation("FriendshipBlocker")
   privacyRulesOwned        FriendPrivacyRule[]      @relation("PrivacyRuleOwner")
   privacyRulesReceived     FriendPrivacyRule[]      @relation("PrivacyRuleFriend")
   chatMemberships          ChatMember[]
@@ -362,45 +402,56 @@ model User {
   featureRequests          FeatureRequest[]
   featureVotes             FeatureVote[]
   featureComments          FeatureComment[]
+  contentEntries           ContentEntry[]
+  followsCreated           Follow[]                 @relation("FollowFollower")
+  followsReceived          Follow[]                 @relation("FollowFollowing")
+  blocksCreated            UserBlock[]              @relation("UserBlockOwner")
+  blocksReceived           UserBlock[]              @relation("UserBlocked")
+  reportsCreated           UserReport[]             @relation("UserReportReporter")
+  reportsReceived          UserReport[]             @relation("UserReportSubject")
+  moderatedUserReports     UserReport[]             @relation("UserReportReviewer")
+  nearbyPreference         NearbyPreference?
+  deviceSessions           DeviceSession[]
+  productStatusHistory     ProductStatusHistory[]   @relation("ProductStatusActor")
 }
 
 model Plan {
-  id                    String     @id @default(cuid())
-  name                  String
-  nameAr                String?
-  nameEn                String?
-  slug                  String     @unique
-  description           String?
-  descriptionAr         String?
-  descriptionEn         String?
-  isActive              Boolean    @default(true)
-  sortOrder             Int        @default(0)
-  maxProfiles           Int        @default(1)
-  maxVirtualCards       Int        @default(1)
-  maxLinks              Int        @default(5)
-  maxCustomFields       Int        @default(3)
-  maxTags               Int        @default(1)
-  maxCards              Int        @default(1)
-  maxUploads            Int        @default(0)
-  maxFiles              Int        @default(0)
-  maxStorageBytes       BigInt     @default(0)
-  allowCustomSlug       Boolean    @default(false)
-  customSlugAllowed     Boolean    @default(false)
-  allowThemes           Boolean    @default(false)
-  allowCustomTheme      Boolean    @default(false)
-  allowAnalytics        Boolean    @default(false)
-  analyticsAllowed      Boolean    @default(false)
-  availableProfileTypes Json?
-  availableThemes       Json?
-  allowFileUploads      Boolean    @default(false)
-  allowCustomIcons      Boolean    @default(false)
-  allowBusinessCards    Boolean    @default(false)
-  allowWalletPasses     Boolean    @default(false)
-  allowCustomLinks      Boolean    @default(false)
-  allowInstallableProfiles Boolean @default(false)
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
-  subscriptions         UserPlan[]
+  id                       String     @id @default(cuid())
+  name                     String
+  nameAr                   String?
+  nameEn                   String?
+  slug                     String     @unique
+  description              String?
+  descriptionAr            String?
+  descriptionEn            String?
+  isActive                 Boolean    @default(true)
+  sortOrder                Int        @default(0)
+  maxProfiles              Int        @default(1)
+  maxVirtualCards          Int        @default(1)
+  maxLinks                 Int        @default(5)
+  maxCustomFields          Int        @default(3)
+  maxTags                  Int        @default(1)
+  maxCards                 Int        @default(1)
+  maxUploads               Int        @default(0)
+  maxFiles                 Int        @default(0)
+  maxStorageBytes          BigInt     @default(0)
+  allowCustomSlug          Boolean    @default(false)
+  customSlugAllowed        Boolean    @default(false)
+  allowThemes              Boolean    @default(false)
+  allowCustomTheme         Boolean    @default(false)
+  allowAnalytics           Boolean    @default(false)
+  analyticsAllowed         Boolean    @default(false)
+  availableProfileTypes    Json?
+  availableThemes          Json?
+  allowFileUploads         Boolean    @default(false)
+  allowCustomIcons         Boolean    @default(false)
+  allowBusinessCards       Boolean    @default(false)
+  allowWalletPasses        Boolean    @default(false)
+  allowCustomLinks         Boolean    @default(false)
+  allowInstallableProfiles Boolean    @default(false)
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+  subscriptions            UserPlan[]
 }
 
 model UserPlan {
@@ -421,34 +472,34 @@ model UserPlan {
 }
 
 model UserLimitOverride {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  maxProfiles           Int?
-  maxVirtualCards       Int?
-  maxLinks              Int?
-  maxCustomFields       Int?
-  maxTags               Int?
-  maxCards              Int?
-  maxUploads            Int?
-  maxFiles              Int?
-  maxStorageBytes       BigInt?
-  allowCustomSlug       Boolean?
-  customSlugAllowed     Boolean?
-  allowThemes           Boolean?
-  allowCustomTheme      Boolean?
-  allowAnalytics        Boolean?
-  analyticsAllowed      Boolean?
-  availableProfileTypes Json?
-  availableThemes       Json?
-  allowFileUploads      Boolean?
-  allowCustomIcons      Boolean?
-  allowBusinessCards    Boolean?
-  allowWalletPasses     Boolean?
-  allowCustomLinks      Boolean?
+  id                       String   @id @default(cuid())
+  userId                   String   @unique
+  maxProfiles              Int?
+  maxVirtualCards          Int?
+  maxLinks                 Int?
+  maxCustomFields          Int?
+  maxTags                  Int?
+  maxCards                 Int?
+  maxUploads               Int?
+  maxFiles                 Int?
+  maxStorageBytes          BigInt?
+  allowCustomSlug          Boolean?
+  customSlugAllowed        Boolean?
+  allowThemes              Boolean?
+  allowCustomTheme         Boolean?
+  allowAnalytics           Boolean?
+  analyticsAllowed         Boolean?
+  availableProfileTypes    Json?
+  availableThemes          Json?
+  allowFileUploads         Boolean?
+  allowCustomIcons         Boolean?
+  allowBusinessCards       Boolean?
+  allowWalletPasses        Boolean?
+  allowCustomLinks         Boolean?
   allowInstallableProfiles Boolean?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {
@@ -522,6 +573,7 @@ model Profile {
   organizationId       String?
   slug                 String?          @unique
   displayName          String
+  displayLabel         String?
   type                 ProfileType      @default(PERSONAL)
   primaryLanguage      String           @default("ar")
   firstName            String?
@@ -625,10 +677,10 @@ model ProfileField {
 }
 
 model UploadedFile {
-  id                 String    @id @default(cuid())
+  id                 String              @id @default(cuid())
   profileId          String?
   uploaderUserId     String
-  storageKey         String    @unique
+  storageKey         String              @unique
   publicUrl          String
   originalFilename   String
   originalName       String?
@@ -637,14 +689,15 @@ model UploadedFile {
   title              String?
   displayTitleAr     String?
   displayTitleEn     String?
-  isVisible          Boolean   @default(true)
-  sortOrder          Int       @default(0)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  profile            Profile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  uploader           User      @relation("UploadedBy", fields: [uploaderUserId], references: [id], onDelete: Cascade)
+  isVisible          Boolean             @default(true)
+  sortOrder          Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  profile            Profile?            @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  uploader           User                @relation("UploadedBy", fields: [uploaderUserId], references: [id], onDelete: Cascade)
   expenseAttachments Expense[]
   chatMessages       Message[]
+  contentAttachments ContentAttachment[]
 
   @@index([uploaderUserId, createdAt])
   @@index([profileId, isVisible])
@@ -904,6 +957,7 @@ model CardBatch {
 model Card {
   id                        String                   @id @default(cuid())
   serialNumber              String                   @unique
+  displayLabel              String?
   publicSlug                String                   @unique
   publicToken               String                   @unique
   activationTokenHash       String                   @unique
@@ -938,6 +992,7 @@ model Card {
   activationAttempts        ActivationAttempt[]
   producedTag               ProducedTag?
   transfers                 TagTransfer[]
+  statusHistory             ProductStatusHistory[]
 
   @@index([batchId])
   @@index([ownerId])
@@ -1182,25 +1237,27 @@ model ProducedTag {
 }
 
 model VirtualCard {
-  id             String            @id @default(cuid())
-  userId         String
-  organizationId String?
-  name           String
-  type           VirtualCardType   @default(PERSONAL)
-  profileId      String            @unique
-  themeId        String?
-  isDefault      Boolean           @default(false)
-  status         VirtualCardStatus @default(ACTIVE)
-  avatarKind     String?
-  avatarValue    String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  profile        Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  template       ProfileTemplate?  @relation(fields: [themeId], references: [id], onDelete: SetNull)
-  walletPasses   WalletPass[]
-  cards          Card[]
+  id                  String               @id @default(cuid())
+  userId              String
+  organizationId      String?
+  name                String
+  displayLabel        String?
+  type                VirtualCardType      @default(PERSONAL)
+  profileId           String               @unique
+  themeId             String?
+  isDefault           Boolean              @default(false)
+  status              VirtualCardStatus    @default(ACTIVE)
+  avatarKind          String?
+  avatarValue         String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  profile             Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  template            ProfileTemplate?     @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  walletPasses        WalletPass[]
+  cards               Card[]
+  contentPublications ContentPublication[]
 
   @@index([userId, status])
   @@index([organizationId])
@@ -1234,6 +1291,299 @@ model LinkPlatform {
   destinations      Destination[]
 
   @@index([isActive, sortOrder])
+}
+
+model ProductCategory {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  nameAr        String
+  nameEn        String
+  descriptionAr String?
+  descriptionEn String?
+  imageUrl      String?
+  isActive      Boolean   @default(true)
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  products      Product[]
+
+  @@index([isActive, sortOrder])
+}
+
+model Product {
+  id                 String           @id @default(cuid())
+  categoryId         String
+  slug               String           @unique
+  nameAr             String
+  nameEn             String
+  shortDescriptionAr String?
+  shortDescriptionEn String?
+  descriptionAr      String?
+  descriptionEn      String?
+  status             ProductStatus    @default(DRAFT)
+  featured           Boolean          @default(false)
+  sortOrder          Int              @default(0)
+  serialPolicy       String?
+  seoTitleAr         String?
+  seoTitleEn         String?
+  seoDescriptionAr   String?
+  seoDescriptionEn   String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  category           ProductCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants           ProductVariant[]
+  images             ProductImage[]
+  prices             ProductPrice[]
+  features           ProductFeature[]
+  media              ProductMedia[]
+  slugs              ProductSlug[]
+
+  @@index([status, featured, sortOrder])
+  @@index([categoryId, status])
+}
+
+model ProductVariant {
+  id         String            @id @default(cuid())
+  productId  String
+  sku        String            @unique
+  nameAr     String
+  nameEn     String
+  attributes Json              @default("{}")
+  isDefault  Boolean           @default(false)
+  isActive   Boolean           @default(true)
+  sortOrder  Int               @default(0)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  product    Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory  ProductInventory?
+  prices     ProductPrice[]
+  images     ProductImage[]
+
+  @@index([productId, isActive, sortOrder])
+}
+
+model ProductImage {
+  id        String          @id @default(cuid())
+  productId String
+  variantId String?
+  url       String
+  altAr     String?
+  altEn     String?
+  sortOrder Int             @default(0)
+  isPrimary Boolean         @default(false)
+  createdAt DateTime        @default(now())
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@index([variantId])
+}
+
+model ProductInventory {
+  id         String                 @id @default(cuid())
+  variantId  String                 @unique
+  quantity   Int                    @default(0)
+  reserved   Int                    @default(0)
+  lowStockAt Int                    @default(5)
+  status     ProductInventoryStatus @default(OUT_OF_STOCK)
+  updatedAt  DateTime               @updatedAt
+  variant    ProductVariant         @relation(fields: [variantId], references: [id], onDelete: Cascade)
+}
+
+model ProductPrice {
+  id         String          @id @default(cuid())
+  productId  String
+  variantId  String?
+  currency   String          @default("EGP")
+  amount     Decimal         @db.Decimal(14, 2)
+  saleAmount Decimal?        @db.Decimal(14, 2)
+  activeFrom DateTime?
+  activeTo   DateTime?
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([productId, isActive])
+  @@index([variantId, isActive])
+}
+
+model ProductFeature {
+  id        String  @id @default(cuid())
+  productId String
+  titleAr   String
+  titleEn   String
+  valueAr   String?
+  valueEn   String?
+  iconKey   String?
+  sortOrder Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model ProductMedia {
+  id        String  @id @default(cuid())
+  productId String
+  type      String
+  url       String
+  titleAr   String?
+  titleEn   String?
+  sortOrder Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model ProductSlug {
+  id          String   @id @default(cuid())
+  productId   String
+  slug        String   @unique
+  isCanonical Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model ContentEntry {
+  id             String               @id @default(cuid())
+  userId         String
+  displayLabel   String
+  normalizedName String
+  slug           String?              @unique
+  titleAr        String?
+  titleEn        String?
+  summaryAr      String?
+  summaryEn      String?
+  bodyAr         String?
+  bodyEn         String?
+  externalUrl    String?
+  coverImageUrl  String?
+  category       String?
+  visibility     ContentVisibility    @default(PRIVATE)
+  ctaAr          String?
+  ctaEn          String?
+  iconKey        String?
+  sortOrder      Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments    ContentAttachment[]
+  publications   ContentPublication[]
+
+  @@unique([userId, normalizedName])
+  @@index([userId, visibility, sortOrder])
+}
+
+model ContentAttachment {
+  id             String       @id @default(cuid())
+  contentEntryId String
+  uploadedFileId String
+  sortOrder      Int          @default(0)
+  contentEntry   ContentEntry @relation(fields: [contentEntryId], references: [id], onDelete: Cascade)
+  uploadedFile   UploadedFile @relation(fields: [uploadedFileId], references: [id], onDelete: Restrict)
+
+  @@unique([contentEntryId, uploadedFileId])
+}
+
+model ContentPublication {
+  id             String       @id @default(cuid())
+  contentEntryId String
+  virtualCardId  String
+  isVisible      Boolean      @default(true)
+  sortOrder      Int          @default(0)
+  contentEntry   ContentEntry @relation(fields: [contentEntryId], references: [id], onDelete: Cascade)
+  virtualCard    VirtualCard  @relation(fields: [virtualCardId], references: [id], onDelete: Cascade)
+
+  @@unique([contentEntryId, virtualCardId])
+  @@index([virtualCardId, isVisible, sortOrder])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("FollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("FollowFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId, createdAt])
+}
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  ownerId   String
+  blockedId String
+  reason    String?
+  createdAt DateTime @default(now())
+  owner     User     @relation("UserBlockOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("UserBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, blockedId])
+}
+
+model UserReport {
+  id           String           @id @default(cuid())
+  reporterId   String
+  subjectId    String?
+  reason       String
+  details      String?
+  status       UserReportStatus @default(OPEN)
+  reviewedById String?
+  reviewNote   String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  reporter     User             @relation("UserReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  subject      User?            @relation("UserReportSubject", fields: [subjectId], references: [id], onDelete: SetNull)
+  reviewedBy   User?            @relation("UserReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([subjectId])
+}
+
+model NearbyPreference {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  enabled       Boolean   @default(false)
+  visibleUntil  DateTime?
+  virtualCardId String?
+  audience      String    @default("EVERYONE_OPTED_IN")
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, visibleUntil])
+}
+
+model DeviceSession {
+  id              String    @id @default(cuid())
+  userId          String
+  tokenFamilyHash String    @unique
+  deviceName      String?
+  platform        String
+  appVersion      String?
+  lastSeenAt      DateTime  @default(now())
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, lastSeenAt])
+}
+
+model ProductStatusHistory {
+  id         String      @id @default(cuid())
+  cardId     String
+  fromStatus CardStatus?
+  toStatus   CardStatus
+  actorId    String?
+  reason     String?
+  createdAt  DateTime    @default(now())
+  card       Card        @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  actor      User?       @relation("ProductStatusActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
 }
 
 model WalletPass {

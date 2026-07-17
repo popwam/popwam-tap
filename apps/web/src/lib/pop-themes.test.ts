@@ -1,0 +1,2 @@
+import {describe,expect,it} from "vitest";import {POP_PLAN_THEMES,popTheme} from "@popwam/shared";
+describe("POP plan themes",()=>{it("contains all six server-known themes",()=>expect(Object.keys(POP_PLAN_THEMES)).toEqual(["default","personal","plus","pro","business","proBusiness"]));it("falls back without accepting an arbitrary client theme",()=>expect(popTheme("hacked")).toBe(POP_PLAN_THEMES.default));it("keeps the Figma gold default",()=>expect(POP_PLAN_THEMES.default.primary).toBe("#D4AF37"));});

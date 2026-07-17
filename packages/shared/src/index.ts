@@ -1,5 +1,7 @@
-export const APP_NAME = "POPWAM Tap";
+export const APP_NAME = "POP by POPWAM";
 export const DEFAULT_PUBLIC_APP_URL = "http://localhost:3000";
+export const PRODUCTION_APP_URL = "https://pop.popwam.com";
+export const PRODUCTION_PUBLIC_URL = "https://go.popwam.com";
 
 export const DESTINATION_TYPES = [
   "PROFILE", "WHATSAPP_BUSINESS", "WHATSAPP_PRIVATE", "PHONE", "EMAIL", "WEBSITE", "VCF",
@@ -48,11 +50,11 @@ export function validateShortCode(value: string) {
 }
 
 export function getPublicAppUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
+  return (process.env.PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
 }
 
 export function getWebAppUrl() {
-  return (process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXTAUTH_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
+  return (process.env.APP_URL || process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXTAUTH_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
 }
 
 export function getTagUrl(token: string) {
@@ -70,3 +72,5 @@ export function getActivationQrValue(activationToken: string) {
 export function getLegacyTagUrl(token: string) {
   return `${getPublicAppUrl()}/t/${encodeURIComponent(token)}`;
 }
+
+export * from "./pop-themes";

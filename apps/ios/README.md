@@ -1,4 +1,4 @@
-# POPWAM Tap iOS NFC module
+# POP by POPWAM iOS NFC module
 
 This directory contains the native Core NFC implementation boundary for the future iOS target. It intentionally does not use Web NFC and never writes an activation code. The host iOS app must add the Near Field Communication Tag Reading capability, `NFCReaderUsageDescription`, Universal/URL-scheme handling for `popwamtap://`, signing, and API authentication in Xcode on macOS.
 

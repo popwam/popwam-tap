@@ -30,7 +30,7 @@ class WebhookSmsProvider implements SmsProvider {
   async sendOtp(input: SmsOtpInput): Promise<SmsDelivery> {
     const url = process.env.SMS_API_URL; const token = process.env.SMS_API_TOKEN;
     if (!url || !token) return { status: "FAILED", provider: this.name, error: "CONFIGURATION" };
-    const source=input.locale==="ar"?this.runtime?.templateAr:this.runtime?.templateEn;const message=(source||(input.locale === "ar" ? "رمز POPWAM Tap هو {code}. صالح لمدة {minutes} دقائق." : "Your POPWAM Tap code is {code}. It expires in {minutes} minutes.")).replaceAll("{code}",input.code).replaceAll("{minutes}",String(input.expiresMinutes));
+    const source=input.locale==="ar"?this.runtime?.templateAr:this.runtime?.templateEn;const message=(source||(input.locale === "ar" ? "رمز POP by POPWAM هو {code}. صالح لمدة {minutes} دقائق." : "Your POP by POPWAM code is {code}. It expires in {minutes} minutes.")).replaceAll("{code}",input.code).replaceAll("{minutes}",String(input.expiresMinutes));
     try {
       const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ to: input.to, message, senderId: this.runtime?.senderName || process.env.SMS_SENDER_ID || "POPWAM" }), cache: "no-store", signal: AbortSignal.timeout(Number(process.env.SMS_TIMEOUT_MS || 10_000)) });
       if (!response.ok) return { status: "FAILED", provider: this.name, responseCode: String(response.status), error: "PROVIDER_REJECTED" };

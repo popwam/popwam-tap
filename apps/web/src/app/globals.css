@@ -69,6 +69,14 @@ html[lang="ar"] .public-theme { --profile-font:var(--font-arabic); }
 
 /* Figma source templates: each slug has a materially different composition. */
 [data-template="personal-free-links"] { --profile-font:"Courier Prime",monospace; }
+[data-template="pop-landscape"],[data-template="pop-portrait"] { background:#050505;color:#fff; }
+[data-template="pop-landscape"] .profile-card { max-width:64rem;border:1px solid #6e5420;border-radius:32px;background:radial-gradient(circle at 78% 14%,transparent 0 3rem,#111 3.1rem 3.2rem,transparent 3.3rem 5rem,#111 5.1rem 5.2rem,transparent 5.3rem),#050505;box-shadow:0 28px 80px #0008; }
+[data-template="pop-portrait"] .profile-card { max-width:36rem;min-height:54rem;border:1px solid #6e5420;border-radius:32px;background:radial-gradient(circle at 80% 12%,transparent 0 3rem,#111 3.1rem 3.2rem,transparent 3.3rem 5rem,#111 5.1rem 5.2rem,transparent 5.3rem),#050505;box-shadow:0 28px 80px #0008; }
+[data-template^="pop-"] .profile-cover { display:none; }
+[data-template^="pop-"] .profile-avatar-wrap { justify-content:flex-start;padding:2rem 2rem 0; }
+[data-template^="pop-"] :is(.profile-name,.profile-title,.profile-company,.profile-bio) { text-align:start;color:#fff; }
+[data-template^="pop-"] .profile-item { border:1px solid #6e5420;background:#0b0b0b;color:#fff;border-radius:16px; }
+[data-template^="pop-"] .profile-item svg { color:#d4af37; }
 [data-template="personal-free-links"] .profile-card { min-height:100vh;border:0;box-shadow:none; }
 [data-template="personal-free-links"] .profile-cover { display:none; }
 [data-template="personal-free-links"] .profile-avatar-wrap { justify-content:center;padding-top:4.5rem; }

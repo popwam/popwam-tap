@@ -1,4 +1,4 @@
-# POPWAM Tap Android
+# POP by POPWAM Android
 
 Native Android client for customer card management and authorized NFC programming. The app is part of this monorepo and uses the web service as its source of truth.
 
@@ -17,7 +17,8 @@ Create `apps/android/local.properties` locally; it is ignored by Git:
 
 ```properties
 sdk.dir=C:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk
-POPWAM_API_BASE_URL=https://app.popwam.com/
+POPWAM_API_BASE_URL=https://pop.popwam.com/
+POPWAM_PUBLIC_BASE_URL=https://go.popwam.com/
 GOOGLE_WEB_CLIENT_ID=
 ```
 

@@ -1,3 +1,3 @@
 export function GET() {
-  return Response.json({ ok: true, app: "POPWAM Tap" });
+  return Response.json({ ok: true, app: "POP by POPWAM" });
 }

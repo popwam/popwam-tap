@@ -1,1 +1,1 @@
-export function GET(){return Response.json({ok:true,api:"POPWAM Tap Mobile",version:1,authentication:"Bearer access token",privacy:{analytics:["totalOpens","lastOpenedAt","dailyCount"],excluded:["ip","device","browser","location"]}},{headers:{"cache-control":"no-store"}})}
+export function GET(){return Response.json({ok:true,api:"POP by POPWAM Mobile",version:1,authentication:"Bearer access token",privacy:{analytics:["totalOpens","lastOpenedAt","dailyCount"],excluded:["ip","device","browser","location"]}},{headers:{"cache-control":"no-store"}})}

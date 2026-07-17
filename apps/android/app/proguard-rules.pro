@@ -1,3 +1,3 @@
 -keepattributes Signature,*Annotation*
--keep class com.popwam.tap.data.api.** { *; }
+-keep class com.popwam.pop.data.api.** { *; }
 -dontwarn javax.annotation.**

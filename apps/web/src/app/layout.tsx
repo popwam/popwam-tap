@@ -10,7 +10,7 @@ const arabic = Cairo({ subsets: ["arabic"], display: "swap", variable: "--font-a
 
 export async function generateMetadata(): Promise<Metadata> {
   const branding = await getBrandingSettings();
-  return { metadataBase: new URL(process.env.NEXTAUTH_URL || "http://localhost:3000"), title: { default: "POPWAM Tap", template: "%s · POPWAM Tap" }, description: "Smart NFC and QR cards controlled securely from the cloud.", applicationName: "POPWAM Tap", manifest: "/manifest.webmanifest", appleWebApp: { capable: true, title: "POPWAM Tap", statusBarStyle: "black-translucent" }, icons: { icon: branding.faviconUrl, apple: branding.appleTouchIconUrl }, openGraph: { images: [branding.defaultOgImageUrl] } };
+  return { metadataBase: new URL(process.env.APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"), title: { default: "POP by POPWAM", template: "%s · POP by POPWAM" }, description: "POP smart cards, products and public profiles.", applicationName: "POP by POPWAM", manifest: "/manifest.webmanifest", appleWebApp: { capable: true, title: "POP by POPWAM", statusBarStyle: "black-translucent" }, icons: { icon: branding.faviconUrl, apple: branding.appleTouchIconUrl }, openGraph: { images: [branding.defaultOgImageUrl] } };
 }
 export const viewport: Viewport = { themeColor: "#07090f", colorScheme: "dark" };
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { const { locale, dir, dictionary } = await getI18n(); return <html lang={locale} dir={dir}><body className={`${inter.variable} ${arabic.variable}`}><PwaClient installLabel={dictionary.pwa.install}/>{children}</body></html>; }

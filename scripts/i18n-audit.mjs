@@ -37,7 +37,7 @@ for (const file of sourceFiles) {
   for (const match of source.matchAll(/>([^<{]*[A-Za-z\u0600-\u06ff][^<{]*)</gu)) {
     const value = match[1].trim();
     const codeLike = /[={}();]|=>/.test(value);
-    const productOrTechnical = /^(?:POPWAM(?: Tap)?|Tap|Admin Portal|ANDROID(?: APP)?|NFC READY|NFC • QR • Profiles|Android • Secure • Fast|SHA-256|PW •+ \d+|\d+ — NFC \+ QR|Mamdouh)$/i.test(value);
+    const productOrTechnical = /^(?:POP|by POPWAM|POP BY POPWAM|POP by POPWAM(?: · 0\.0\.12)?|POPWAM(?: Tap)?|Tap|Admin Portal|ANDROID(?: APP)?|NFC READY|NFC • QR • Profiles|Android • Secure • Fast|SHA-256|PW •+ \d+|\d+ — NFC \+ QR|Mamdouh)$/i.test(value);
     if (value && !codeLike && !productOrTechnical) hardcoded.push(`${file}: ${value.slice(0, 70)}`);
   }
 }

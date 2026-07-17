@@ -7,7 +7,7 @@ import { DestinationIcon } from "@/components/destination-icon";
 import { PageHeading } from "@/components/page-heading";
 import { ProfileAvatar } from "@/components/profile-avatar";
 
-export const metadata = { title: "Links by user | POPWAM Tap" };
+export const metadata = { title: "Links by user | POP by POPWAM" };
 
 export default async function AdminLinksByUserPage({
   searchParams,

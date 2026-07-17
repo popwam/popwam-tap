@@ -3,19 +3,21 @@ import java.util.Properties
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id("org.jetbrains.kotlin.plugin.compose") }
 
 val localProperties = Properties().apply { val file=rootProject.file("local.properties"); if(file.exists()) file.inputStream().use(::load) }
-val apiBaseUrl = (System.getenv("POPWAM_API_BASE_URL") ?: localProperties.getProperty("POPWAM_API_BASE_URL") ?: "https://app.popwam.com/").let { if(it.endsWith('/')) it else "$it/" }
+val apiBaseUrl = (System.getenv("POPWAM_API_BASE_URL") ?: localProperties.getProperty("POPWAM_API_BASE_URL") ?: "https://pop.popwam.com/").let { if(it.endsWith('/')) it else "$it/" }
+val publicBaseUrl = (System.getenv("POPWAM_PUBLIC_BASE_URL") ?: localProperties.getProperty("POPWAM_PUBLIC_BASE_URL") ?: "https://go.popwam.com/").let { if(it.endsWith('/')) it else "$it/" }
 
 android {
-    namespace = "com.popwam.tap"
+    namespace = "com.popwam.pop"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.popwam.tap"
+        applicationId = "com.popwam.pop"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 12
+        versionName = "0.0.12"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "PUBLIC_BASE_URL", "\"$publicBaseUrl\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
         vectorDrawables { useSupportLibrary = true }
     }

@@ -129,7 +129,7 @@
 - المسار: `E:\saas\popwam-tap\apps\android\app\build\outputs\apk\debug\app-debug.apk`
 - الحجم: `47,309,917` bytes.
 - SHA-256: `ADDCA1E45A98153F55BC8EFC24A8FCA1FF6120B04CC97BF2BD4ED96A319371EF`.
-- `BuildConfig.API_BASE_URL`: `https://app.popwam.com/` في الـAPK النهائي. عنوان `10.0.2.2` استُخدم فقط في build اختباري سابق للتشغيل المحلي.
+- `BuildConfig.API_BASE_URL`: `https://pop.popwam.com/` في الـAPK النهائي. عنوان `10.0.2.2` استُخدم فقط في build اختباري سابق للتشغيل المحلي.
 
 ## غير المنفذ أو غير المختبر بالكامل
 

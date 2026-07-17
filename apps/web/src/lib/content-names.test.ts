@@ -1,0 +1,2 @@
+import {describe,expect,it} from "vitest";import {normalizeContentName} from "./content-names";
+describe("content name normalization",()=>{it("rejects harmless Arabic spelling and spacing duplicates",()=>{expect(normalizeContentName("أعمال")).toBe(normalizeContentName(" الأعمال "));expect(normalizeContentName("أعمال")).toBe(normalizeContentName("اعمال"));});it("preserves meaningful words",()=>{expect(normalizeContentName("أعمال التصميم")).not.toBe(normalizeContentName("أعمال التصوير"));});});

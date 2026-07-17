@@ -110,6 +110,7 @@ export async function POST(request: Request) {
       const profileData = {
         type,
         displayName,
+        displayLabel: optional(body.profileLabel) || cardName,
         displayNameAr: optional(body.displayNameAr),
         displayNameEn: optional(body.displayNameEn),
         organizationNameAr: type === "ORGANIZATION" ? optional(body.displayNameAr) : null,
@@ -131,13 +132,13 @@ export async function POST(request: Request) {
       };
       if (reusableBootstrap && bootstrap) {
         await tx.profile.update({ where: { id: bootstrap.profileId }, data: profileData });
-        await tx.virtualCard.update({ where: { id: bootstrap.id }, data: { name: cardName, type: cardType, themeId: template.id, status: "ACTIVE" } });
+        await tx.virtualCard.update({ where: { id: bootstrap.id }, data: { name: cardName, displayLabel:cardName, type: cardType, themeId: template.id, status: "ACTIVE" } });
         await tx.destination.deleteMany({ where: { profileId: bootstrap.profileId, type: { notIn: ["PROFILE", "VCF"] } } });
         if (links.length) await tx.destination.createMany({ data: links.map(link => ({ ...link, userId: user.id, profileId: bootstrap.profileId })) });
         return bootstrap.profileId;
       }
       const created = await tx.profile.create({ data: { userId: user.id, ...profileData } });
-      await tx.virtualCard.create({ data: { userId: user.id, name: cardName, type: cardType, profileId: created.id, themeId: template.id, isDefault: used === 0 } });
+      await tx.virtualCard.create({ data: { userId: user.id, name: cardName, displayLabel:cardName, type: cardType, profileId: created.id, themeId: template.id, isDefault: used === 0 } });
       await tx.destination.createMany({ data: [
         { userId: user.id, profileId: created.id, type: "PROFILE", title: "Public profile", titleAr: "الملف العام", titleEn: "Public profile", url: `/p/id/${created.id}`, iconKey: "profile", sortOrder: 0 },
         { userId: user.id, profileId: created.id, type: "VCF", title: "Save contact", titleAr: "حفظ جهة الاتصال", titleEn: "Save Contact", url: `/api/profiles/${created.id}/contact.vcf`, iconKey: "contact", sortOrder: 1 },

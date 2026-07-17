@@ -11,7 +11,7 @@ describe("wallet pass payloads", () => {
   });
 
   it("generates Apple pass data with QR destination data and no NFC claim", () => {
-    const pass = buildApplePassData(card, { passTypeIdentifier: "pass.com.popwam.tap", teamIdentifier: "TEAM" });
+    const pass = buildApplePassData(card, { passTypeIdentifier: "pass.com.popwam.pop", teamIdentifier: "TEAM" });
     expect(pass.generic.backFields[0].value).toBe(card.publicUrl);
     expect(pass).not.toHaveProperty("nfc");
   });

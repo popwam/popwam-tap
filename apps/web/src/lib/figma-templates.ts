@@ -2,6 +2,14 @@ import { Prisma, prisma } from "@popwam/db";
 
 export const FIGMA_TEMPLATES = [
   {
+    slug:"pop-landscape",nameAr:"POP أفقي",nameEn:"POP Landscape",category:"POP",minimumPlan:"free",previewImageUrl:"/brand/pop/card-landscape-front.png",sortOrder:1,
+    configuration:{templateVariant:"pop-landscape",frontAsset:"/brand/pop/card-landscape-front.svg",backAsset:"/brand/pop/card-landscape-back.svg",background:"#050505",panel:"#050505",text:"#FFFFFF",muted:"#B8B8B8",accent:"#D4AF37",accentText:"#050505",radius:"32px",itemRadius:"16px",buttonRadius:"99px",spacing:"14px",linkLayout:"list",avatarPosition:"start",headerAlign:"start",coverStyle:"nfc-arcs",contactLayout:"row",desktopLayout:"wide"},
+  },
+  {
+    slug:"pop-portrait",nameAr:"POP رأسي",nameEn:"POP Portrait",category:"POP",minimumPlan:"pro",previewImageUrl:"/brand/pop/card-portrait-front.png",sortOrder:2,
+    configuration:{templateVariant:"pop-portrait",frontAsset:"/brand/pop/card-portrait-front.svg",backAsset:"/brand/pop/card-portrait-back.svg",background:"#050505",panel:"#050505",text:"#FFFFFF",muted:"#B8B8B8",accent:"#D4AF37",accentText:"#050505",radius:"32px",itemRadius:"18px",buttonRadius:"99px",spacing:"16px",linkLayout:"compact",avatarPosition:"start",headerAlign:"start",coverStyle:"nfc-arcs",contactLayout:"grid",desktopLayout:"narrow"},
+  },
+  {
     slug: "personal-free-links",
     nameAr: "روابط شخصية",
     nameEn: "Personal Links",

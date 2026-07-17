@@ -1,6 +1,10 @@
-# POPWAM Tap
+# POP by POPWAM
 
-POPWAM Tap is an online-first smart NFC/QR card platform. A sticker or printed QR contains one permanent short URL:
+Production uses exactly two hosts: `https://pop.popwam.com` for the application, authentication, dashboard, administration and API; and `https://go.popwam.com` for the store, public cards, profiles, files, QR, NFC and vCard links.
+
+The Android app is version `0.0.12` with `applicationId` and namespace `com.popwam.pop`. Changing an already-published Android application from the former package to `com.popwam.pop` makes Google Play treat it as a new application unless `com.popwam.pop` was the package used for the original listing. Existing installs under another package are not silently upgraded.
+
+POP by POPWAM is an online-first smart NFC/QR card platform. A sticker or printed QR contains one permanent short URL:
 
 ```text
 https://go.popwam.com/{shortCode}
@@ -132,7 +136,7 @@ Recommended monorepo configuration:
 
 Alternative: set **Root Directory** to `apps/web`, enable access to files outside the root directory, and use `pnpm --filter @popwam/web build`. The repository-root setup is less surprising for workspace packages.
 
-For first testing, `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` can both be the Vercel URL. With custom domains later, use `https://app.popwam.com` for authentication and `https://go.popwam.com` for public token URLs.
+For first testing, `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` can both be the Vercel URL. With custom domains later, use `https://pop.popwam.com` for authentication and `https://go.popwam.com` for public token URLs.
 
 ## Routes
 
@@ -177,17 +181,17 @@ Use one Railway service built from the monorepo root. The production build comma
 
 Attach both custom domains to the same Railway service:
 
-- `app.popwam.com` — dashboard, admin, login, and Auth.js callbacks
+- `pop.popwam.com` — dashboard, admin, login, and Auth.js callbacks
 - `go.popwam.com` — public landing page, profiles, and NFC/short links
 
 Configure these exact application URLs:
 
 ```env
-NEXTAUTH_URL="https://app.popwam.com"
+NEXTAUTH_URL="https://pop.popwam.com"
 NEXT_PUBLIC_APP_URL="https://go.popwam.com"
 ```
 
-Register `https://app.popwam.com/api/auth/callback/google` as the authorized Google OAuth redirect URI. The middleware matcher protects only `/dashboard/**` and `/admin/**`; it does not intercept the public root, short codes, legacy `/t/**`, profiles, manifest, service worker, or offline page. Point both DNS names to the targets Railway shows in the service Custom Domains panel.
+Register `https://pop.popwam.com/api/auth/callback/google` as the authorized Google OAuth redirect URI. The middleware matcher protects only `/dashboard/**` and `/admin/**`; it does not intercept the public root, short codes, legacy `/t/**`, profiles, manifest, service worker, or offline page. Point both DNS names to the targets Railway shows in the service Custom Domains panel.
 
 After deployment, run `pnpm db:repair` once. It safely repairs missing profiles, personal organizations, memberships, profile destinations, and FREE plans without duplicating existing records.
 

@@ -1,13 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import {canonicalHostFor,hostWithoutPort} from "@/lib/domains";
 
 export async function middleware(request: NextRequest) {
-  const host = (request.headers.get("host") || "").split(":")[0];
+  const rawHost = request.headers.get("host") || "";
+  const host = hostWithoutPort(rawHost);
   const path = request.nextUrl.pathname;
-
-  if (host === "go.popwam.com" && (path === "/login" || path.startsWith("/dashboard") || path.startsWith("/admin"))) {
+  const canonicalHost=canonicalHostFor(host,path);
+  if(canonicalHost){
     const url = request.nextUrl.clone();
-    url.hostname = "app.popwam.com";
+    url.hostname = canonicalHost;
     url.protocol = "https:";
     url.port = "";
     return NextResponse.redirect(url);
@@ -32,4 +34,4 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/login", "/dashboard/:path*", "/admin/:path*"] };
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/|brand/|templates/).*)"] };

@@ -1,4 +1,4 @@
-# POPWAM Tap online testing checklist
+# POP by POPWAM online testing checklist
 
 Run `pnpm install`, `pnpm db:generate`, `pnpm test`, and `pnpm build` before deployment. Apply committed migrations with `pnpm db:deploy`; never use `prisma db push` in production. Existing installations should then run the idempotent `pnpm db:repair`.
 
@@ -6,7 +6,7 @@ Before testing, deploy migrations, run `pnpm seed`, and confirm `NEXTAUTH_URL` a
 
 ## Availability and authentication
 
-- [ ] Open `/health`; confirm `{ "ok": true, "app": "POPWAM Tap" }`.
+- [ ] Open `/health`; confirm `{ "ok": true, "app": "POP by POPWAM" }`.
 - [ ] Open `/login` and sign in with the seeded admin credentials.
 - [ ] Confirm `/admin`, `/admin/users`, and `/admin/tags` load.
 - [ ] Sign out and sign in with the seeded demo-user credentials.

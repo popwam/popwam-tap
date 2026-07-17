@@ -1,0 +1,2 @@
+import {describe,expect,it} from "vitest";import {canSetProductStatus,maskedSerial} from "./product-status";
+describe("owned product state",()=>{it.each(["PAUSED","LOST","STOLEN"])("permits audited %s state",status=>expect(canSetProductStatus(status)).toBe(true));it("does not expose the full serial by default",()=>{expect(maskedSerial("POP-000000042")).toBe("••••••••••042");expect(maskedSerial("POP-000000042")).not.toContain("000000042");});});

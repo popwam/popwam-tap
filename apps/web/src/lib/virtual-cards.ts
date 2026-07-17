@@ -20,7 +20,7 @@ export function profileTypeForVirtualCard(type: VirtualCardTypeValue) {
   return type === "BUSINESS" ? "ORGANIZATION" as const : "PERSONAL" as const;
 }
 
-export const PLAN_RANK: Record<string, number> = { free: 0, personal: 1, pro: 2, business: 3 };
+export const PLAN_RANK: Record<string, number> = { free:0,default:0,personal:1,plus:2,pro:3,business:4,"pro-business":5,proBusiness:5 };
 
 export function templateAllowed(planSlug: string, minimumPlan: string) {
   return (PLAN_RANK[planSlug.toLowerCase()] ?? -1) >= (PLAN_RANK[minimumPlan.toLowerCase()] ?? Number.POSITIVE_INFINITY);

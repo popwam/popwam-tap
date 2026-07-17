@@ -22,9 +22,11 @@ for (const name of ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "OTP_PEPPER"]) str
 const secrets = [value("NEXTAUTH_SECRET"), value("MOBILE_TOKEN_SECRET"), value("OTP_PEPPER")].filter(Boolean);
 if (new Set(secrets).size !== secrets.length) errors.push("NEXTAUTH_SECRET, MOBILE_TOKEN_SECRET and OTP_PEPPER must be distinct");
 
-httpsUrl("NEXTAUTH_URL", "app.popwam.com");
+httpsUrl("NEXTAUTH_URL", "pop.popwam.com");
 httpsUrl("NEXT_PUBLIC_APP_URL", "go.popwam.com");
-if (value("APP_HOST") !== "app.popwam.com") errors.push("APP_HOST must be app.popwam.com");
+httpsUrl("APP_URL", "pop.popwam.com");
+httpsUrl("PUBLIC_URL", "go.popwam.com");
+if (value("APP_HOST") !== "pop.popwam.com") errors.push("APP_HOST must be pop.popwam.com");
 if (value("PUBLIC_HOST") !== "go.popwam.com") errors.push("PUBLIC_HOST must be go.popwam.com");
 
 const smsProvider = value("SMS_PROVIDER").toLowerCase();
@@ -56,7 +58,7 @@ if (otpExpose && !staging) errors.push("OTP_EXPOSE_IN_RESPONSE=true is forbidden
 
 for (const name of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) required(name);
 httpsUrl("R2_ENDPOINT");
-httpsUrl("R2_PUBLIC_BASE_URL", "media.popwam.com");
+httpsUrl("R2_PUBLIC_BASE_URL", "go.popwam.com");
 
 const googleId = value("GOOGLE_CLIENT_ID"); const googleSecret = value("GOOGLE_CLIENT_SECRET");
 if (Boolean(googleId) !== Boolean(googleSecret)) errors.push("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must either both be set or both be empty");
