@@ -2,6 +2,7 @@ package com.popwam.pop.ui
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.nfc.Tag
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -19,11 +20,14 @@ import com.popwam.pop.data.api.WalletCapabilitiesDto
 import com.popwam.pop.data.api.VerifyNfcResponse
 import com.popwam.pop.data.auth.SessionRepository
 import com.popwam.pop.data.repository.PopwamRepository
+import com.popwam.pop.data.repository.AndroidUploadPolicy
 import com.popwam.pop.nfc.NfcResult
 import com.popwam.pop.nfc.NfcTagManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.ByteArrayOutputStream
 
 data class AuthUiState(
     val authenticated: Boolean = false,
@@ -95,6 +99,8 @@ data class MainUiState(
     val nfcUri: String? = null,
     val nfcVerification: VerifyNfcResponse? = null,
     val loading: Boolean = false,
+    val uploadProgress: Int? = null,
+    val uploadedUrl: String? = null,
     val message: String? = null,
     val error: String? = null,
 )
@@ -111,13 +117,14 @@ class MainViewModel(
         reload()
     }
 
-    fun reload() = viewModelScope.launch {
-        working {
+    fun reload() {
+        if (_state.value.loading) return
+        viewModelScope.launch { working {
             val cards = repo.cards()
             val profiles = repo.profiles()
             val templates = repo.templates()
             _state.value = _state.value.copy(cards = cards.cards, profiles = profiles.profiles, templates = templates.templates, planSlug = templates.planSlug, wallet = profiles.wallet)
-        }
+        } }
     }
 
     fun card(id: String) = viewModelScope.launch {
@@ -300,19 +307,23 @@ class MainViewModel(
         working {
             val resolver = context.contentResolver
             val mime = resolver.getType(uri) ?: "application/octet-stream"
-            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "upload"
-            val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
-                ?: throw IllegalArgumentException("FILE_READ_FAILED")
-            val result = if (file) {
-                repo.uploadFile(profileId, "", "", name, mime, bytes)
-            } else {
-                repo.uploadMedia(profileId, kind, name, mime, bytes)
-            }
-            if (result.ok) {
-                _state.value = _state.value.copy(message = "UPLOAD_COMPLETE")
-                reload()
-            } else {
-                fail(result.error)
+            var name = uri.lastPathSegment?.substringAfterLast('/') ?: "upload"
+            var size = -1L
+            resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE), null, null, null)?.use { cursor -> if(cursor.moveToFirst()){cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf{it>=0}?.let{name=cursor.getString(it)};cursor.getColumnIndex(OpenableColumns.SIZE).takeIf{it>=0}?.let{size=cursor.getLong(it)}} }
+            AndroidUploadPolicy.validate(mime,size.coerceAtLeast(0),file)?.let { fail(it);return@working }
+            val max = if(file) AndroidUploadPolicy.MAX_FILE_BYTES else AndroidUploadPolicy.MAX_IMAGE_BYTES
+            _state.value=_state.value.copy(uploadProgress=0,uploadedUrl=null)
+            val bytes = resolver.openInputStream(uri)?.use { input ->
+                val output=ByteArrayOutputStream();val buffer=ByteArray(64*1024);var total=0L
+                while(true){val read=input.read(buffer);if(read<0)break;total+=read;if(total>max)throw IllegalArgumentException("UPLOAD_TOO_LARGE");output.write(buffer,0,read);if(size>0)_state.value=_state.value.copy(uploadProgress=((total*100/size).coerceIn(0,99)).toInt())};output.toByteArray()
+            } ?: throw IllegalArgumentException("FILE_READ_FAILED")
+            try {
+                val result = if (file) repo.uploadFile(profileId, "", "", name, mime, bytes) else repo.uploadMedia(profileId, kind, name, mime, bytes)
+                if (result.ok) { _state.value = _state.value.copy(message = "UPLOAD_COMPLETE",uploadProgress=100,uploadedUrl=result.url);reload() } else fail(result.error)
+            } catch (error: HttpException) {
+                fail(when(error.code()){401->"AUTH_EXPIRED";403->"UPLOAD_FORBIDDEN";413->"UPLOAD_TOO_LARGE";415->"UPLOAD_TYPE_NOT_ALLOWED";else->"UPLOAD_FAILED_${error.code()}"})
+            } finally {
+                _state.value=_state.value.copy(uploadProgress=null)
             }
         }
     }
@@ -353,8 +364,8 @@ class MainViewModel(
         _state.value = _state.value.copy(loading = true, error = null)
         try {
             block()
-        } catch (_: Exception) {
-            fail("REQUEST_FAILED")
+        } catch (error: Exception) {
+            fail(error.message?.takeIf { it in setOf("UPLOAD_TOO_LARGE","UPLOAD_TYPE_NOT_ALLOWED","FILE_READ_FAILED") } ?: "REQUEST_FAILED")
         } finally {
             _state.value = _state.value.copy(loading = false)
         }

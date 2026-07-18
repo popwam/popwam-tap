@@ -1,6 +1,6 @@
 package com.popwam.pop.data.api
 
-data class ApiResult(val ok:Boolean=false,val error:String?=null)
+data class ApiResult(val ok:Boolean=false,val error:String?=null,val url:String?=null)
 data class UserDto(val id:String="",val name:String?=null,val phone:String?=null,val email:String="",val role:String="USER",val locale:String?=null)
 data class OtpSendRequest(val phone:String,val locale:String,val deviceName:String="Android")
 data class OtpSendResponse(val ok:Boolean=false,val challengeId:String="",val maskedPhone:String="",val expiresIn:Int=0,val developmentCode:String?=null,val error:String?=null)
