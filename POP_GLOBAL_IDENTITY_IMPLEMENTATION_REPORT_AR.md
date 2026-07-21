@@ -46,7 +46,7 @@
 
 - `GET /api/otp/channels`, `POST /api/otp/send`, وmobile OTP مع country/channel.
 - `POST /api/passkeys/register/options|verify` و`authenticate/options|verify`, وGET/DELETE management.
-- `GET /api/integrations`, connect/callback/sync/disconnect/importable-fields.
+- `GET /api/integrations`، و`/:provider/connect|callback` للمزود، و`/accounts/:id/sync|importable-fields` و`DELETE /accounts/:id` للحساب المرتبط. هذا الفصل يمنع تعارض أسماء dynamic segments في Next.js App Router.
 - `POST /api/cards/:cardId/import-connected-account`.
 - `POST|DELETE /api/mobile/push-tokens`.
 
