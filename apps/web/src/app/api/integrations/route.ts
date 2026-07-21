@@ -1,0 +1,4 @@
+import {prisma} from "@popwam/db";
+import {getApiUser,unauthorized} from "@/lib/api-auth";
+import {providerConfigs,providerStatus} from "@/lib/connected-accounts";
+export async function GET(){const user=await getApiUser();if(!user)return unauthorized();const accounts=await prisma.connectedAccount.findMany({where:{userId:user.id},select:{id:true,provider:true,status:true,displayName:true,username:true,avatarUrl:true,profileUrl:true,followersCount:true,followersUpdatedAt:true,lastSyncedAt:true,lastErrorCode:true},orderBy:{createdAt:"desc"}});return Response.json({providers:Object.values(providerConfigs).map(config=>({key:config.key,provider:config.db,...providerStatus(config.key)})),accounts:accounts.map(item=>({...item,followersCount:item.followersCount?.toString()||null}))},{headers:{"cache-control":"no-store"}})}

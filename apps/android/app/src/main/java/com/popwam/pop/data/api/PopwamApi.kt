@@ -5,6 +5,7 @@ import okhttp3.RequestBody
 import retrofit2.http.*
 
 interface AuthApi {
+    @GET("api/otp/channels") suspend fun otpChannels(@Query("countryIso2") countryIso2:String):OtpChannelsResponse
     @POST("api/mobile/auth/otp/send") suspend fun sendOtp(@Body body:OtpSendRequest):OtpSendResponse
     @POST("api/mobile/auth/otp/verify") suspend fun verifyOtp(@Body body:OtpVerifyRequest):AuthResponse
     @POST("api/mobile/auth/refresh") suspend fun refresh(@Body body:RefreshRequest):AuthResponse

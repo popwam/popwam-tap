@@ -36,15 +36,18 @@ data class AuthUiState(
     val developmentCode: String? = null,
     val loading: Boolean = false,
     val error: String? = null,
+    val channels: List<String> = emptyList(),
 )
 
 class AuthViewModel(private val sessions: SessionRepository) : ViewModel() {
     private val _state = MutableStateFlow(AuthUiState(authenticated = sessions.authenticated))
     val state = _state.asStateFlow()
 
-    fun send(phone: String, locale: String) = viewModelScope.launch {
+    fun channels(countryIso2:String)=viewModelScope.launch { runCatching { sessions.otpChannels(countryIso2) }.onSuccess { result -> _state.value=_state.value.copy(channels=result.channels) } }
+
+    fun send(phone: String, countryIso2: String, channel: String, locale: String) = viewModelScope.launch {
         working {
-            val result = sessions.sendOtp(phone, locale)
+            val result = sessions.sendOtp(phone, countryIso2, channel, locale)
             _state.value = if (result.ok) {
                 _state.value.copy(
                     challengeId = result.challengeId,

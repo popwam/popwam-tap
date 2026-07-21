@@ -23,6 +23,8 @@ export function DashboardShell({ children,user,locale,labels,languageLabel }: { 
     ["/dashboard/transfers",locale==="ar"?"نقل الكروت":"Transfers",CreditCard],
     ["/dashboard/friends",locale==="ar"?"الأصدقاء":"Friends",Heart],
     ["/dashboard/chats",locale==="ar"?"المحادثات":"Chats",MessageCircle],
+    ["/dashboard/integrations",locale==="ar"?"الحسابات المتصلة":"Connected Accounts",Link2],
+    ["/dashboard/security/passkeys",locale==="ar"?"مفاتيح المرور":"Passkeys",Shield],
     ["/ideas",locale==="ar"?"الأفكار والتصويت":"Ideas & voting",Lightbulb],
     ["/dashboard/settings",labels.settings,Settings],
   ] as const;
@@ -40,6 +42,7 @@ export function DashboardShell({ children,user,locale,labels,languageLabel }: { 
     ["/admin/inventory/items",locale==="ar"?"المنتجات":"Products",ShoppingBag],
     ["/admin/profiles",locale==="ar"?"الملفات الافتراضية":"Virtual profiles",UserRound],
     ["/admin/link-platforms",locale==="ar"?"منصات الروابط":"Link platforms",Link2],
+    ["/admin/integrations",locale==="ar"?"التكاملات":"Integrations",Link2],
     ["/admin/links",locale==="ar"?"الروابط حسب المستخدم":"Links by user",Link2],
     ["/admin/templates",locale==="ar"?"القوالب":"Templates",Palette],
     ["/admin/plans",labels.plans,Layers3],

@@ -16,6 +16,6 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     if (account?.status === "ACTIVE" && requested?.startsWith("/admin") && isAdminRole(account.role)) redirect("/admin");
     redirect("/dashboard");
   }
-  const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET); const { locale, dictionary } = await getI18n();
-  return <main className="flex min-h-screen flex-col items-center justify-center px-4 py-12"><Suspense><LoginForm googleEnabled={googleEnabled} locale={locale} copy={dictionary.auth}/></Suspense><p className="mt-6 text-xs text-slate-500">POP by POPWAM · 0.0.12</p></main>;
+  const { locale, dictionary } = await getI18n();
+  return <main className="flex min-h-screen flex-col items-center justify-center px-4 py-12"><Suspense><LoginForm locale={locale} copy={dictionary.auth}/></Suspense><p className="mt-6 text-xs text-slate-500">POP by POPWAM · 0.0.12</p></main>;
 }

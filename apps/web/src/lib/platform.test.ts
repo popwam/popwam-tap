@@ -76,6 +76,6 @@ describe("physical card activation architecture", () => {
 });
 
 describe("phone OTP and dynamic contacts",()=>{
-  it("normalizes Egyptian mobiles and international E.164",()=>{expect(normalizePhone("010 1234 5678")).toEqual({valid:true,e164:"+201012345678"});expect(normalizePhone("201012345678")).toEqual({valid:true,e164:"+201012345678"});expect(normalizePhone("+201012345678")).toEqual({valid:true,e164:"+201012345678"});expect(normalizePhone("+37360000000")).toEqual({valid:true,e164:"+37360000000"});expect(normalizePhone("123").valid).toBe(false)});
+  it("normalizes Egyptian mobiles and international E.164",()=>{expect(normalizePhone("010 1234 5678")).toMatchObject({valid:true,e164:"+201012345678"});expect(normalizePhone("201012345678")).toMatchObject({valid:true,e164:"+201012345678"});expect(normalizePhone("+201012345678")).toMatchObject({valid:true,e164:"+201012345678"});expect(normalizePhone("+37360000000")).toMatchObject({valid:true,e164:"+37360000000"});expect(normalizePhone("123").valid).toBe(false)});
   it("generates UTF-8-safe vCard text with escaped values",()=>{const value=createVCard({kind:"individual",displayName:"ممدوح، POPWAM",firstName:"ممدوح",phones:["+201000000000"],notes:"line 1\nline 2"});expect(value).toContain("BEGIN:VCARD\r\nVERSION:4.0");expect(value).toContain("FN:ممدوح، POPWAM");expect(value).toContain("NOTE:line 1\\nline 2");expect(escapeVCard("a;b,c")).toBe("a\\;b\\,c");expect(safeVCardFilename("Mamdouh / POPWAM")).toBe("Mamdouh-POPWAM.vcf")});
 });

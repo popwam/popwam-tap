@@ -18,11 +18,13 @@
     "repair": "tsx prisma/repair.ts",
     "backfill:tap-upgrade": "tsx prisma/backfill-tap-upgrade.ts",
     "backfill:pop-upgrade": "tsx prisma/backfill-pop-upgrade.ts",
+    "backfill:global-phones": "tsx prisma/backfill-global-phones.ts",
     "admin:ensure": "tsx prisma/ensure-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.1",
-    "bcryptjs": "^3.0.2"
+    "bcryptjs": "^3.0.2",
+    "libphonenumber-js": "^1.13.9"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

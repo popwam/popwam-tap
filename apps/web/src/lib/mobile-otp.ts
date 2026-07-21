@@ -6,12 +6,12 @@ import { getSmsProvider, type SmsDelivery } from "@/lib/sms";
 import { getSmsRuntimeSettings } from "@/lib/sms/runtime";
 import { isOtpUsable, otpHourlyLimitReached, otpPolicyFromEnv, otpRetryAfter } from "@/lib/otp-policy";
 import { getOtpTestDelivery } from "@/lib/otp-test-mode";
-import { deliverOtpCode } from "@/lib/otp-delivery";
+import { deliverWithFallback, parseCountryRules, SmsOtpProviderAdapter, WhatsAppOtpProvider, type PhoneOtpChannel } from "@/lib/phone-otp";
 import { ensureUserDefaultsInTransaction } from "@/lib/ensure-user";
 import { issueMobileSession } from "@/lib/mobile-auth";
 
-export async function sendMobileOtp(rawPhone: string, locale: "ar" | "en") {
-  const normalized = normalizePhone(rawPhone);
+export async function sendMobileOtp(rawPhone: string, locale: "ar" | "en", countryIso2?: string, channel?: PhoneOtpChannel) {
+  const normalized = normalizePhone(rawPhone, countryIso2);
   if (!normalized.valid) return { ok: false as const, status: 400, error: "PHONE_INVALID" };
   const now = new Date(); const policy = otpPolicyFromEnv();
   const latest = await prisma.otpChallenge.findFirst({ where: { phone: normalized.e164 }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
@@ -19,9 +19,13 @@ export async function sendMobileOtp(rawPhone: string, locale: "ar" | "en") {
   const phoneHash = hashPhone(normalized.e164);
   const recentSendCount = await prisma.otpSendLog.count({ where: { phoneHash, createdAt: { gte: new Date(now.getTime() - 60 * 60_000) } } });
   if (otpHourlyLimitReached(recentSendCount, policy.hourlySendLimit)) return { ok: false as const, status: 429, error: "OTP_LIMIT_REACHED" };
-  const testDelivery = getOtpTestDelivery(normalized.e164); const code = testDelivery.code || createOtpCode();const runtime=await getSmsRuntimeSettings(); const provider = testDelivery.testDelivery||!runtime.enabled ? null : getSmsProvider(runtime); const providerName = testDelivery.testDelivery ? "test-allowlist" : provider?.name||"disabled";
-  const challenge = await prisma.otpChallenge.create({ data: { phone: normalized.e164, purpose: OtpPurpose.LOGIN, otpHash: hashOtp(normalized.e164, code), expiresAt: new Date(now.getTime() + policy.expiryMinutes * 60_000), maxAttempts: policy.maxAttempts, provider: providerName } });
-  const delivery: SmsDelivery = await deliverOtpCode({ testDelivery: testDelivery.testDelivery, provider, otp: { to: normalized.e164, code, expiresMinutes: policy.expiryMinutes, locale } });
+  const testDelivery = getOtpTestDelivery(normalized.e164); const code = testDelivery.code || createOtpCode();const runtime=await getSmsRuntimeSettings(); const smsProvider = testDelivery.testDelivery||!runtime.enabled ? null : getSmsProvider(runtime);
+  const providers = [...(smsProvider ? [new SmsOtpProviderAdapter(smsProvider, parseCountryRules(runtime.countryRules, smsProvider.name))] : []), new WhatsAppOtpProvider()];
+  const delivery: SmsDelivery & { channel: PhoneOtpChannel } = testDelivery.testDelivery
+    ? { status: "SENT", provider: "test-allowlist", channel: channel || "sms", responseCode: "TEST_BYPASS" }
+    : await deliverWithFallback({ phoneE164: normalized.e164, countryIso2: normalized.countryIso2, code, expiresMinutes: policy.expiryMinutes, locale }, providers, channel);
+  const providerName = delivery.provider;
+  const challenge = await prisma.otpChallenge.create({ data: { phone: normalized.e164, purpose: OtpPurpose.LOGIN, otpHash: hashOtp(normalized.e164, code), expiresAt: new Date(now.getTime() + policy.expiryMinutes * 60_000), maxAttempts: policy.maxAttempts, provider: providerName, channel: delivery.channel.toUpperCase() as "SMS" | "WHATSAPP" } });
   await prisma.$transaction([
     prisma.otpChallenge.update({ where: { id: challenge.id }, data: { deliveryStatus: delivery.status, providerMessageId: delivery.messageId } }),
     prisma.otpSendLog.create({ data: { phoneHash, purpose: OtpPurpose.LOGIN, status: delivery.status, provider: providerName, responseCode: delivery.responseCode, messageId: delivery.messageId, cost: delivery.cost } }),
@@ -36,9 +40,9 @@ export async function verifyMobileOtp(challengeId: string, code: string, deviceN
     const challenge = await tx.otpChallenge.findUnique({ where: { id: challengeId } });
     if (!challenge || challenge.purpose !== "LOGIN" || challenge.deliveryStatus !== "SENT" || isOtpUsable(challenge) !== "VALID") return null;
     if (!otpMatches(challenge.phone, code, challenge.otpHash)) { await tx.otpChallenge.update({ where: { id: challenge.id }, data: { attempts: { increment: 1 } } }); return null; }
-    let user = await tx.user.findUnique({ where: { phone: challenge.phone } });
+    let user = await tx.user.findFirst({ where: { OR: [{ phoneE164: challenge.phone }, { phone: challenge.phone }] } });
     if (user && user.status !== "ACTIVE") return null;
-    if (!user) { const suffix = hashPhone(challenge.phone).slice(0, 24); user = await tx.user.create({ data: { email: `phone-${suffix}@otp.popwam.invalid`, phone: challenge.phone, phoneVerifiedAt: new Date(), name: challenge.phone } }); }
+    if (!user) { const suffix = hashPhone(challenge.phone).slice(0, 24); const parsed=normalizePhone(challenge.phone);if(!parsed.valid)return null; user = await tx.user.create({ data: { email: `phone-${suffix}@otp.popwam.invalid`, phone: challenge.phone, phoneE164:parsed.e164,phoneCountryIso2:parsed.countryIso2,phoneCallingCode:parsed.callingCode, phoneVerifiedAt: new Date(), name: challenge.phone } }); }
     await ensureUserDefaultsInTransaction(tx, user.id);
     await tx.otpChallenge.update({ where: { id: challenge.id }, data: { consumedAt: new Date(), deliveryStatus: "VERIFIED" } });
     await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), phoneVerifiedAt: user.phoneVerifiedAt || new Date() } });

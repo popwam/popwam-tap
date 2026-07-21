@@ -101,6 +101,71 @@ enum OtpDeliveryStatus {
   EXPIRED
 }
 
+enum PhoneOtpChannel {
+  SMS
+  WHATSAPP
+}
+
+enum ConnectedAccountProvider {
+  META
+  FACEBOOK
+  INSTAGRAM
+  THREADS
+  WHATSAPP_BUSINESS
+  TIKTOK
+  GOOGLE
+  LINKEDIN
+  GITHUB
+  GITLAB
+  YOUTUBE
+  SPOTIFY
+  TWITCH
+  PINTEREST
+  DISCORD
+  REDDIT
+  MICROSOFT
+}
+
+enum ConnectedAccountStatus {
+  CONNECTED
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+enum ImportedFieldSyncMode {
+  MANUAL
+  AUTO
+}
+
+enum PasskeyChallengeType {
+  REGISTER
+  AUTHENTICATE
+}
+
+enum ProfessionType {
+  PERSONAL
+  BUSINESS_OWNER
+  COMPANY
+  DEVELOPER
+  DESIGNER
+  CREATOR
+  MARKETER
+  REAL_ESTATE
+  DOCTOR
+  LAWYER
+  MUSICIAN
+  PHOTOGRAPHER
+  FREELANCER
+  RESTAURANT
+  SHOP
+}
+
+enum BackupProviderType {
+  POP_CLOUD
+  GOOGLE_DRIVE
+}
+
 enum ActivationClaimStatus {
   PENDING_OTP
   VERIFIED
@@ -351,7 +416,13 @@ model User {
   image                    String?
   passwordHash             String?
   phone                    String?                  @unique
+  phoneE164                String?                  @unique
+  phoneCountryIso2         String?
+  phoneCallingCode         String?
   phoneVerifiedAt          DateTime?
+  profession               ProfessionType           @default(PERSONAL)
+  customProfession         String?
+  backupProvider           BackupProviderType       @default(POP_CLOUD)
   role                     SystemRole               @default(USER)
   status                   AccountStatus            @default(ACTIVE)
   locale                   String?
@@ -413,6 +484,12 @@ model User {
   nearbyPreference         NearbyPreference?
   deviceSessions           DeviceSession[]
   productStatusHistory     ProductStatusHistory[]   @relation("ProductStatusActor")
+  passkeys                 PasskeyCredential[]
+  passkeyChallenges        PasskeyChallenge[]
+  connectedAccounts        ConnectedAccount[]
+  oauthStates              OAuthConnectionState[]
+  devicePushTokens         DevicePushToken[]
+  platformSuggestions      PlatformSuggestion[]
 }
 
 model Plan {
@@ -575,6 +652,8 @@ model Profile {
   displayName          String
   displayLabel         String?
   type                 ProfileType      @default(PERSONAL)
+  profession           ProfessionType   @default(PERSONAL)
+  customProfession     String?
   primaryLanguage      String           @default("ar")
   firstName            String?
   lastName             String?
@@ -1083,6 +1162,7 @@ model OtpChallenge {
   consumedAt        DateTime?
   deliveryStatus    OtpDeliveryStatus       @default(PENDING)
   provider          String
+  channel           PhoneOtpChannel         @default(SMS)
   providerMessageId String?
   requestIpHash     String?
   lastSentAt        DateTime                @default(now())
@@ -1258,6 +1338,7 @@ model VirtualCard {
   walletPasses        WalletPass[]
   cards               Card[]
   contentPublications ContentPublication[]
+  importedFields      CardImportedField[]
 
   @@index([userId, status])
   @@index([organizationId])
@@ -1265,32 +1346,157 @@ model VirtualCard {
 }
 
 model LinkPlatform {
-  id                String        @id @default(cuid())
+  id                String                    @id @default(cuid())
   nameAr            String
   nameEn            String
-  slug              String        @unique
+  slug              String                    @unique
   iconKey           String
   customIconUrl     String?
   placeholder       String
   validationPattern String?
   validationRules   Json?
   category          String
-  inputType         String        @default("FULL_URL")
+  supportsOAuth     Boolean                   @default(false)
+  oauthProvider     ConnectedAccountProvider?
+  inputType         String                    @default("FULL_URL")
   urlTemplate       String?
   androidAppUrl     String?
   iosAppUrl         String?
   webFallback       String?
   helpAr            String?
   helpEn            String?
-  isActive          Boolean       @default(true)
-  sortOrder         Int           @default(0)
-  allowCustomLabel  Boolean       @default(false)
-  allowCustomIcon   Boolean       @default(false)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  isActive          Boolean                   @default(true)
+  sortOrder         Int                       @default(0)
+  allowCustomLabel  Boolean                   @default(false)
+  allowCustomIcon   Boolean                   @default(false)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
   destinations      Destination[]
+  suggestions       PlatformSuggestion[]
 
   @@index([isActive, sortOrder])
+}
+
+model PasskeyCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  transports   String[]  @default([])
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  name         String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+}
+
+model PasskeyChallenge {
+  id            String               @id @default(cuid())
+  userId        String?
+  challengeHash String               @unique
+  type          PasskeyChallengeType
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime             @default(now())
+  user          User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, expiresAt])
+  @@index([expiresAt])
+}
+
+model ConnectedAccount {
+  id                    String                   @id @default(cuid())
+  userId                String
+  provider              ConnectedAccountProvider
+  providerAccountId     String
+  status                ConnectedAccountStatus   @default(CONNECTED)
+  displayName           String?
+  username              String?
+  avatarUrl             String?
+  profileUrl            String?
+  accountType           String?
+  metadata              Json?
+  followersCount        BigInt?
+  followersUpdatedAt    DateTime?
+  accessTokenEncrypted  Bytes?
+  refreshTokenEncrypted Bytes?
+  tokenExpiresAt        DateTime?
+  scopes                String[]                 @default([])
+  lastSyncedAt          DateTime?
+  lastErrorCode         String?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  disconnectedAt        DateTime?
+  user                  User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  importedFields        CardImportedField[]
+
+  @@unique([provider, providerAccountId])
+  @@index([userId, provider, status])
+}
+
+model OAuthConnectionState {
+  id           String                   @id @default(cuid())
+  userId       String
+  provider     ConnectedAccountProvider
+  stateHash    String                   @unique
+  codeVerifier String?
+  returnPath   String                   @default("/dashboard/integrations")
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  createdAt    DateTime                 @default(now())
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, expiresAt])
+  @@index([expiresAt])
+}
+
+model CardImportedField {
+  id                 String                @id @default(cuid())
+  virtualCardId      String
+  connectedAccountId String
+  fieldType          String
+  importedValue      Json
+  importedAt         DateTime              @default(now())
+  lastSyncedAt       DateTime?
+  syncMode           ImportedFieldSyncMode @default(MANUAL)
+  virtualCard        VirtualCard           @relation(fields: [virtualCardId], references: [id], onDelete: Cascade)
+  connectedAccount   ConnectedAccount      @relation(fields: [connectedAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([virtualCardId, connectedAccountId, fieldType])
+  @@index([connectedAccountId])
+}
+
+model DevicePushToken {
+  id             String    @id @default(cuid())
+  userId         String
+  platform       String
+  tokenHash      String    @unique
+  tokenEncrypted Bytes
+  createdAt      DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  revokedAt      DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, platform, revokedAt])
+}
+
+model PlatformSuggestion {
+  id         String         @id @default(cuid())
+  userId     String?
+  profession ProfessionType
+  platformId String
+  sortOrder  Int            @default(0)
+  createdAt  DateTime       @default(now())
+  user       User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform   LinkPlatform   @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profession, platformId])
+  @@index([profession, sortOrder])
 }
 
 model ProductCategory {

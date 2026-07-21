@@ -1,0 +1,6 @@
+import {generateRegistrationOptions} from "@simplewebauthn/server";
+import {prisma} from "@popwam/db";
+import {getApiUser,csrfRejected,isSameOriginMutation,unauthorized} from "@/lib/api-auth";
+import {passkeyChallengeHash,passkeyConfig} from "@/lib/passkeys";
+
+export async function POST(request:Request){if(!isSameOriginMutation(request))return csrfRejected();const user=await getApiUser();if(!user)return unauthorized();const config=passkeyConfig();const existing=await prisma.passkeyCredential.findMany({where:{userId:user.id,revokedAt:null},select:{credentialId:true,transports:true}});const options=await generateRegistrationOptions({rpName:config.rpName,rpID:config.rpID,userID:Buffer.from(user.id),userName:user.name||user.email,userDisplayName:user.name||"POP user",attestationType:"none",authenticatorSelection:{residentKey:"preferred",userVerification:"required"},excludeCredentials:existing.map(item=>({id:item.credentialId,transports:item.transports as never}))});await prisma.passkeyChallenge.create({data:{userId:user.id,type:"REGISTER",challengeHash:passkeyChallengeHash(options.challenge),expiresAt:new Date(Date.now()+5*60_000)}});return Response.json(options,{headers:{"cache-control":"no-store"}})}

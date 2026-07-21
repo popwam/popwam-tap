@@ -1,6 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@popwam/db";
 import bcrypt from "bcryptjs";
@@ -35,14 +34,6 @@ const providers: NextAuthOptions["providers"] = [
   }),
 ];
 
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  providers.push(GoogleProvider({
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    allowDangerousEmailAccountLinking: false,
-  }));
-}
-
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
@@ -54,8 +45,7 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) { if (user.id) await ensureUserDefaults(user.id); },
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
-      if(account?.provider==="google"&&profile&&"email_verified" in profile&&profile.email_verified!==true)return false;
+    async signIn({ user }) {
       if (!user.id) return false;
       const dbAccount = await prisma.user.findUnique({ where: { id: user.id }, select: { status: true } });
       if (dbAccount?.status !== "ACTIVE") return false;

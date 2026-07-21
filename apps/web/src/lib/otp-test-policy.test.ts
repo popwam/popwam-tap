@@ -65,7 +65,7 @@ describe("strict OTP testing mode", () => {
 
   it("matches an Egyptian input only after server-side normalization", () => {
     const normalized = normalizePhone(`010${"0".repeat(8)}`);
-    expect(normalized).toEqual({ valid: true, e164: PHONE_A });
+    expect(normalized).toMatchObject({ valid: true, e164: PHONE_A, countryIso2: "EG", callingCode: "+20" });
     expect(normalized.valid && decideOtpTestDelivery(normalized.e164, base, () => "111111").testDelivery).toBe(true);
   });
 

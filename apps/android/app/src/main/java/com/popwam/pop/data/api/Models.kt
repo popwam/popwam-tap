@@ -2,8 +2,9 @@ package com.popwam.pop.data.api
 
 data class ApiResult(val ok:Boolean=false,val error:String?=null,val url:String?=null)
 data class UserDto(val id:String="",val name:String?=null,val phone:String?=null,val email:String="",val role:String="USER",val locale:String?=null)
-data class OtpSendRequest(val phone:String,val locale:String,val deviceName:String="Android")
+data class OtpSendRequest(val phone:String,val countryIso2:String,val channel:String,val locale:String,val deviceName:String="Android")
 data class OtpSendResponse(val ok:Boolean=false,val challengeId:String="",val maskedPhone:String="",val expiresIn:Int=0,val developmentCode:String?=null,val error:String?=null)
+data class OtpChannelsResponse(val channels:List<String> = emptyList(),val primary:String="sms")
 data class OtpVerifyRequest(val challengeId:String,val code:String,val deviceName:String)
 data class AuthResponse(val ok:Boolean=false,val accessToken:String="",val refreshToken:String="",val accessExpiresIn:Int=0,val refreshExpiresIn:Int=0,val tokenType:String="Bearer",val user:UserDto?=null,val error:String?=null)
 data class RefreshRequest(val refreshToken:String,val deviceName:String)

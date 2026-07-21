@@ -117,6 +117,8 @@ fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogo
                 composable("program/{id}") { entry -> state.programmingCards.firstOrNull { it.id == entry.arguments?.getString("id") }?.let { LegacyProgramming(it, state, vm) } }
                 composable("hce") { LegacyHce(state.cards) }
                 composable("settings") { LegacySettings(onLogout) }
+                composable("integrations") { SecurePortal(R.string.connected_accounts,"dashboard/integrations",R.string.connected_accounts_help) }
+                composable("passkeys") { SecurePortal(R.string.passkeys,"dashboard/security/passkeys",R.string.passkeys_help) }
             }
         }
     }
@@ -247,6 +249,8 @@ private fun PopMenu(onLogout:()->Unit,navigate:(String)->Unit,howItWorks:()->Uni
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
         item{Text(stringResource(R.string.nav_menu),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)}
         item{MenuRow(Icons.Default.AccountCircle,stringResource(R.string.settings)){navigate("settings")}}
+        item{MenuRow(Icons.Default.Link,stringResource(R.string.connected_accounts)){navigate("integrations")}}
+        item{MenuRow(Icons.Default.Key,stringResource(R.string.passkeys)){navigate("passkeys")}}
         item{MenuRow(Icons.Default.People,stringResource(R.string.friends),null)}
         item{MenuRow(Icons.Default.PersonAdd,stringResource(R.string.nearby_users),null)}
         item{MenuRow(Icons.Default.Chat,stringResource(R.string.chats),null)}
@@ -259,6 +263,8 @@ private fun PopMenu(onLogout:()->Unit,navigate:(String)->Unit,howItWorks:()->Uni
         item{OutlinedButton(onLogout,Modifier.fillMaxWidth()){Icon(Icons.Default.Logout,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.logout))}}
     }
 }
+
+@Composable private fun SecurePortal(title:Int,path:String,help:Int){val context=LocalContext.current;Box(Modifier.fillMaxSize().padding(20.dp),contentAlignment=Alignment.Center){Surface(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp),border=androidx.compose.foundation.BorderStroke(1.dp,Color(0xFFEDEDED))){Column(Modifier.padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(16.dp)){Icon(Icons.Default.Security,null,tint=Color(0xFFD4AF37));Text(stringResource(title),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold);Text(stringResource(help),color=Color(0xFF6E6E6E));Button({openWeb(context,path)},Modifier.fillMaxWidth()){Icon(Icons.Default.OpenInBrowser,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.open_secure_portal))}}}}}
 
 @Composable private fun MenuRow(icon:androidx.compose.ui.graphics.vector.ImageVector,label:String,click:(()->Unit)?){val modifier=if(click!=null)Modifier.fillMaxWidth().clickable(onClick=click) else Modifier.fillMaxWidth();Row(modifier.padding(vertical=13.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,tint=Color(0xFFD4AF37));Spacer(Modifier.width(14.dp));Text(label,Modifier.weight(1f));if(click!=null)Icon(Icons.Default.ChevronRight,null,tint=Color(0xFF999999))}}
 

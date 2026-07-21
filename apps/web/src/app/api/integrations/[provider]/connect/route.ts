@@ -1,0 +1,5 @@
+import {createHash,randomBytes} from "node:crypto";
+import {prisma} from "@popwam/db";
+import {createOAuthRequest,isProviderKey,providerConfigs} from "@/lib/connected-accounts";
+import {csrfRejected,getApiUser,isSameOriginMutation,unauthorized} from "@/lib/api-auth";
+export async function POST(request:Request,{params}:{params:Promise<{provider:string}>}){if(!isSameOriginMutation(request))return csrfRejected();const user=await getApiUser();if(!user)return unauthorized();const {provider}=await params;if(!isProviderKey(provider))return Response.json({error:"PROVIDER_UNKNOWN"},{status:404});try{const state=randomBytes(32).toString("base64url");const oauth=createOAuthRequest(provider,state);await prisma.oAuthConnectionState.create({data:{userId:user.id,provider:providerConfigs[provider].db,stateHash:createHash("sha256").update(state).digest("base64url"),codeVerifier:oauth.verifier,expiresAt:new Date(Date.now()+10*60_000)}});return Response.json({authorizeUrl:oauth.authorizeUrl},{headers:{"cache-control":"no-store"}})}catch{return Response.json({error:"PROVIDER_DISABLED_OR_MISSING_CONFIGURATION"},{status:503})}}

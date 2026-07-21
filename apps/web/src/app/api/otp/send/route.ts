@@ -7,7 +7,7 @@ import { getSmsProvider, type SmsDelivery } from "@/lib/sms";
 import { getSmsRuntimeSettings } from "@/lib/sms/runtime";
 import { otpHourlyLimitReached, otpPolicyFromEnv, otpRetryAfter } from "@/lib/otp-policy";
 import { getOtpTestDelivery } from "@/lib/otp-test-mode";
-import { deliverOtpCode } from "@/lib/otp-delivery";
+import { deliverWithFallback, parseCountryRules, SmsOtpProviderAdapter, WhatsAppOtpProvider, type PhoneOtpChannel } from "@/lib/phone-otp";
 import { ACTIVATION_COOKIE, OTP_COOKIE, secureCookie } from "@/lib/activation-session";
 import { hashActivationToken } from "@/lib/card-tokens";
 
@@ -18,7 +18,7 @@ function requestIp(request: Request) {
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
-  const normalized = normalizePhone(String(body.phone || ""));
+  const normalized = normalizePhone(String(body.phone || ""), typeof body.countryIso2 === "string" ? body.countryIso2 : undefined);
   if (!normalized.valid) return NextResponse.json({ ok: false, error: normalized.error }, { status: 400 });
   const purpose = body.purpose === "ACTIVATION" ? OtpPurpose.ACTIVATION : OtpPurpose.LOGIN;
   let claimSessionId: string | null = null;
@@ -45,14 +45,16 @@ export async function POST(request: Request) {
 
   const testDelivery = getOtpTestDelivery(normalized.e164);
   const code = testDelivery.code || createOtpCode();
-  const runtime=await getSmsRuntimeSettings();const provider = testDelivery.testDelivery||!runtime.enabled ? null : getSmsProvider(runtime);
-  const providerName = testDelivery.testDelivery ? "test-allowlist" : provider?.name||"disabled";
+  const runtime=await getSmsRuntimeSettings();const smsProvider = testDelivery.testDelivery||!runtime.enabled ? null : getSmsProvider(runtime);
+  const providers=[...(smsProvider?[new SmsOtpProviderAdapter(smsProvider,parseCountryRules(runtime.countryRules,smsProvider.name))]:[]),new WhatsAppOtpProvider()];
+  const requested:PhoneOtpChannel|undefined=body.channel==="whatsapp"?"whatsapp":body.channel==="sms"?"sms":undefined;
+  const delivery:SmsDelivery&{channel:PhoneOtpChannel}=testDelivery.testDelivery?{status:"SENT",provider:"test-allowlist",channel:requested||"sms",responseCode:"TEST_BYPASS"}:await deliverWithFallback({phoneE164:normalized.e164,countryIso2:normalized.countryIso2,code,expiresMinutes:policy.expiryMinutes,locale:body.locale==="ar"?"ar":"en"},providers,requested);
+  const providerName = delivery.provider;
   const challenge = await prisma.otpChallenge.create({ data: {
     phone: normalized.e164, purpose, claimSessionId, otpHash: hashOtp(normalized.e164, code),
     expiresAt: new Date(now.getTime() + policy.expiryMinutes * 60_000), maxAttempts: policy.maxAttempts,
-    provider: providerName, requestIpHash: hashRequestIp(requestIp(request)),
+    provider: providerName, channel:delivery.channel.toUpperCase() as "SMS"|"WHATSAPP", requestIpHash: hashRequestIp(requestIp(request)),
   } });
-  const delivery: SmsDelivery = await deliverOtpCode({ testDelivery: testDelivery.testDelivery, provider, otp: { to: normalized.e164, code, expiresMinutes: policy.expiryMinutes, locale: body.locale === "en" ? "en" : "ar" } });
   await prisma.$transaction([
     prisma.otpChallenge.update({ where: { id: challenge.id }, data: { deliveryStatus: delivery.status, providerMessageId: delivery.messageId } }),
     prisma.otpSendLog.create({ data: { phoneHash, purpose, status: delivery.status, provider: providerName, responseCode: delivery.responseCode, messageId: delivery.messageId, cost: delivery.cost } }),
