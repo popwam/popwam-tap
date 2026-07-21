@@ -37,6 +37,9 @@ httpsUrl("PUBLIC_URL", "go.popwam.com");
 const metaEnabled = value("META_ENABLED").toLowerCase() === "true";
 if (metaEnabled) for (const name of ["META_APP_ID", "META_APP_SECRET", "META_REDIRECT_URI", "INTEGRATION_TOKEN_ENCRYPTION_KEY"]) required(name);
 if (metaEnabled || value("META_REDIRECT_URI")) exactUrl("META_REDIRECT_URI", "https://pop.popwam.com/api/integrations/meta/callback");
+const metaCapabilities = value("META_OAUTH_CAPABILITIES").split(",").map(capability => capability.trim()).filter(Boolean);
+const allowedMetaCapabilities = new Set(["facebook_pages", "instagram", "threads", "whatsapp_business"]);
+if (metaCapabilities.some(capability => !allowedMetaCapabilities.has(capability))) errors.push("META_OAUTH_CAPABILITIES contains an unknown capability");
 if (value("APP_HOST") !== "pop.popwam.com") errors.push("APP_HOST must be pop.popwam.com");
 if (value("PUBLIC_HOST") !== "go.popwam.com") errors.push("PUBLIC_HOST must be go.popwam.com");
 
