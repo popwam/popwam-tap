@@ -7,6 +7,13 @@ const httpsUrl = (name, expectedHost) => {
     if (url.protocol !== "https:" || (expectedHost && url.hostname !== expectedHost)) errors.push(`${name} must use https://${expectedHost || "..."}`);
   } catch { errors.push(`${name} must be a valid HTTPS URL`); }
 };
+const exactUrl = (name, expected) => {
+  try {
+    const actual = new URL(value(name));
+    const wanted = new URL(expected);
+    if (actual.origin !== wanted.origin || actual.pathname.replace(/\/$/, "") !== wanted.pathname.replace(/\/$/, "") || actual.search || actual.hash) errors.push(`${name} must be exactly ${expected}`);
+  } catch { errors.push(`${name} must be exactly ${expected}`); }
+};
 const strongSecret = name => {
   const secret = value(name);
   if (secret.length < 32 || /CHANGE|EXAMPLE|PLACEHOLDER/i.test(secret)) errors.push(`${name} must be a non-placeholder secret of at least 32 characters`);
@@ -22,10 +29,14 @@ for (const name of ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "OTP_PEPPER"]) str
 const secrets = [value("NEXTAUTH_SECRET"), value("MOBILE_TOKEN_SECRET"), value("OTP_PEPPER")].filter(Boolean);
 if (new Set(secrets).size !== secrets.length) errors.push("NEXTAUTH_SECRET, MOBILE_TOKEN_SECRET and OTP_PEPPER must be distinct");
 
-httpsUrl("NEXTAUTH_URL", "pop.popwam.com");
+exactUrl("NEXTAUTH_URL", "https://pop.popwam.com");
 httpsUrl("NEXT_PUBLIC_APP_URL", "go.popwam.com");
-httpsUrl("APP_URL", "pop.popwam.com");
+exactUrl("APP_URL", "https://pop.popwam.com");
+if (value("NEXT_PUBLIC_WEB_APP_URL")) exactUrl("NEXT_PUBLIC_WEB_APP_URL", "https://pop.popwam.com");
 httpsUrl("PUBLIC_URL", "go.popwam.com");
+const metaEnabled = value("META_ENABLED").toLowerCase() === "true";
+if (metaEnabled) for (const name of ["META_APP_ID", "META_APP_SECRET", "META_REDIRECT_URI", "INTEGRATION_TOKEN_ENCRYPTION_KEY"]) required(name);
+if (metaEnabled || value("META_REDIRECT_URI")) exactUrl("META_REDIRECT_URI", "https://pop.popwam.com/api/integrations/meta/callback");
 if (value("APP_HOST") !== "pop.popwam.com") errors.push("APP_HOST must be pop.popwam.com");
 if (value("PUBLIC_HOST") !== "go.popwam.com") errors.push("PUBLIC_HOST must be go.popwam.com");
 

@@ -53,8 +53,20 @@ export function getPublicAppUrl() {
   return (process.env.PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
 }
 
+export function getApplicationOrigin(env:NodeJS.ProcessEnv=process.env) {
+  const production=env.NODE_ENV==="production";
+  const fallback=production?PRODUCTION_APP_URL:DEFAULT_PUBLIC_APP_URL;
+  const candidate=env.APP_URL||env.NEXTAUTH_URL||env.NEXT_PUBLIC_WEB_APP_URL||fallback;
+  try {
+    const origin=new URL(candidate).origin;
+    return production&&origin!==PRODUCTION_APP_URL?PRODUCTION_APP_URL:origin;
+  } catch {
+    return fallback;
+  }
+}
+
 export function getWebAppUrl() {
-  return (process.env.APP_URL || process.env.NEXT_PUBLIC_WEB_APP_URL || process.env.NEXTAUTH_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
+  return getApplicationOrigin();
 }
 
 export function getTagUrl(token: string) {
