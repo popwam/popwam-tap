@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { defaultIconKeys, normalizeShortCode, validateShortCode } from "@popwam/shared";
 import { validateFileUpload, validateImageUpload } from "@popwam/storage";
 import { decideTagResolution } from "./tag-resolution";
-import { countsTowardLinkLimit, mergeEntitlements } from "./plans";
+import { countsTowardLinkLimit, mergeEntitlements, quotaRemaining, storageWithinLimit } from "./plans";
 import { buildPlatformUrl, platformOpenTarget } from "./link-platforms";
 import { normalizeEmail, isUniqueConstraintError, runAtomicUserCreation } from "./user-validation";
 import { resolveProfileFieldUrl, visibleProfileFields } from "./profile-fields";
@@ -30,6 +30,9 @@ describe("plans and limits", () => {
   const plan = { maxLinks:5,maxTags:1,allowFileUploads:false,allowThemes:false };
   it("applies per-user overrides first", () => expect(mergeEntitlements(plan,{ maxLinks:12,maxTags:null,allowFileUploads:true })).toMatchObject({ maxLinks:12,maxTags:1,allowFileUploads:true }));
   it("inherits null overrides", () => expect(mergeEntitlements(plan,{ maxLinks:null })).toMatchObject({ maxLinks:5 }));
+  it("resets quota overrides by inheriting null values", () => expect(mergeEntitlements({ maxLinks:5,maxStorageBytes:50n },{ maxLinks:null,maxStorageBytes:null })).toMatchObject({ maxLinks:5,maxStorageBytes:50n }));
+  it("never reports negative remaining quota", () => { expect(quotaRemaining(4,10)).toBe(6n);expect(quotaRemaining(14,10)).toBe(0n); });
+  it("enforces incoming and replacement storage bytes", () => { expect(storageWithinLimit(80n,20n,100n)).toBe(true);expect(storageWithinLimit(80n,21n,100n)).toBe(false);expect(storageWithinLimit(80n,30n,100n,20n)).toBe(true); });
   it("excludes the public profile and core contact destinations from the link limit", () => { for (const type of ["PROFILE","PHONE","EMAIL","WEBSITE","WHATSAPP_PRIVATE","VCF"]) expect(countsTowardLinkLimit(type)).toBe(false); expect(countsTowardLinkLimit("INSTAGRAM")).toBe(true); expect(countsTowardLinkLimit("CUSTOM_URL")).toBe(true); });
 });
 

@@ -78,4 +78,14 @@
     <string name="firebase_exchange_error">Votre téléphone est vérifié, mais POP n’a pas pu ouvrir votre session. Réessayez.</string>
     <string name="firebase_identity_conflict">Cette identité téléphonique nécessite l’aide du support avant la connexion.</string>
     <string name="firebase_unavailable">La vérification téléphonique est temporairement indisponible. Réessayez.</string>
+    <string name="settings_usage">Utilisation et limites</string>
+    <string name="settings_usage_help">POP calcule l’utilisation sur le serveur selon votre forfait effectif et toute dérogation administrateur.</string>
+    <string name="settings_storage">Stockage</string>
+    <string name="settings_links">Liens</string>
+    <string name="settings_remaining">Restant</string>
+    <string name="settings_custom_override">Dérogation personnalisée du compte</string>
+    <string name="settings_latest_request">Dernière demande d’augmentation</string>
+    <string name="settings_request_storage">Demander plus de stockage</string>
+    <string name="settings_request_links">Demander plus de liens</string>
+    <string name="quota_request_submitted">Demande d’augmentation envoyée</string>
 </resources>

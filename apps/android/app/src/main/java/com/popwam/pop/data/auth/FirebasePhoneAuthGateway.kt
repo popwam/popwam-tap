@@ -86,7 +86,9 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
         resend:Boolean,
         callback:(FirebasePhoneEvent)->Unit,
     ) {
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.START_PHONE_VERIFICATION,if(resend)"resend" else "started")
         if(!BuildConfig.FIREBASE_RUNTIME_ENABLED) {
+            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.APP_VERIFICATION,"configuration")
             callback(FirebasePhoneEvent.Failed(FirebasePhoneFailure.CONFIGURATION))
             return
         }
@@ -94,15 +96,22 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
         val currentGeneration=generation
         val callbacks=object:PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
             override fun onVerificationCompleted(credential:PhoneAuthCredential) {
-                if(currentGeneration==generation) authenticate(credential,true,callback)
+                if(currentGeneration==generation) {
+                    AuthRuntimeDiagnostics.mark(AuthRuntimeStage.APP_VERIFICATION,"automatic")
+                    authenticate(credential,true,callback)
+                }
             }
             override fun onVerificationFailed(error:com.google.firebase.FirebaseException) {
-                if(currentGeneration==generation) callback(FirebasePhoneEvent.Failed(firebasePhoneFailure(error)))
+                if(currentGeneration==generation) {
+                    AuthRuntimeDiagnostics.mark(AuthRuntimeStage.APP_VERIFICATION,"failed")
+                    callback(FirebasePhoneEvent.Failed(firebasePhoneFailure(error)))
+                }
             }
             override fun onCodeSent(id:String, token:PhoneAuthProvider.ForceResendingToken) {
                 if(currentGeneration!=generation)return
                 verificationId=id
                 resendToken=token
+                AuthRuntimeDiagnostics.mark(AuthRuntimeStage.CODE_SENT,"success")
                 callback(FirebasePhoneEvent.CodeSent(id))
             }
             override fun onCodeAutoRetrievalTimeOut(id:String) {
@@ -124,6 +133,7 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
             }
             builder.setForceResendingToken(token)
         }
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.APP_VERIFICATION,"requested")
         PhoneAuthProvider.verifyPhoneNumber(builder.build())
     }
 
@@ -134,6 +144,7 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
             return
         }
         val credential=runCatching { PhoneAuthProvider.getCredential(id,code) }.getOrElse {
+            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.CREDENTIAL_VERIFIED,"invalid")
             callback(FirebasePhoneEvent.Failed(firebasePhoneFailure(it,true)))
             return
         }
@@ -145,11 +156,14 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
         automatic:Boolean,
         callback:(FirebasePhoneEvent)->Unit,
     ) {
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.CREDENTIAL_VERIFIED,if(automatic)"automatic" else "manual")
         FirebaseAuth.getInstance().signInWithCredential(credential).addOnCompleteListener { signIn ->
             if(!signIn.isSuccessful) {
+                AuthRuntimeDiagnostics.mark(AuthRuntimeStage.FIREBASE_SIGN_IN,"failed")
                 callback(FirebasePhoneEvent.Failed(firebasePhoneFailure(signIn.exception ?: IllegalStateException(),!automatic)))
                 return@addOnCompleteListener
             }
+            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.FIREBASE_SIGN_IN,"success")
             val user=signIn.result?.user
             if(user==null) {
                 callback(FirebasePhoneEvent.Failed(FirebasePhoneFailure.UNAVAILABLE))
@@ -157,8 +171,13 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
             }
             user.getIdToken(true).addOnCompleteListener { tokenTask ->
                 val token=tokenTask.result?.token
-                if(tokenTask.isSuccessful&&!token.isNullOrBlank()) callback(FirebasePhoneEvent.Verified(token,automatic))
-                else callback(FirebasePhoneEvent.Failed(firebasePhoneFailure(tokenTask.exception ?: IllegalStateException())))
+                if(tokenTask.isSuccessful&&!token.isNullOrBlank()) {
+                    AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ID_TOKEN_FETCH,"success")
+                    callback(FirebasePhoneEvent.Verified(token,automatic))
+                } else {
+                    AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ID_TOKEN_FETCH,"failed")
+                    callback(FirebasePhoneEvent.Failed(firebasePhoneFailure(tokenTask.exception ?: IllegalStateException())))
+                }
             }
         }
     }

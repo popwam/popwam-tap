@@ -566,4 +566,14 @@
     <string name="firebase_exchange_error">تم التحقق من هاتفك، لكن تعذر بدء جلسة POP. حاول مجددًا.</string>
     <string name="firebase_identity_conflict">تحتاج هوية الهاتف المتحقق منها إلى دعم الحساب قبل تسجيل الدخول.</string>
     <string name="firebase_unavailable">التحقق الهاتفي غير متاح مؤقتًا. حاول مجددًا.</string>
+    <string name="settings_usage">الاستخدام والحدود</string>
+    <string name="settings_usage_help">يحسب POP الاستخدام على الخادم وفق باقتك الفعلية وأي تخصيص يحدده المسؤول.</string>
+    <string name="settings_storage">مساحة التخزين</string>
+    <string name="settings_links">الروابط</string>
+    <string name="settings_remaining">المتبقي</string>
+    <string name="settings_custom_override">تخصيص خاص بالحساب</string>
+    <string name="settings_latest_request">أحدث طلب زيادة</string>
+    <string name="settings_request_storage">طلب مساحة تخزين إضافية</string>
+    <string name="settings_request_links">طلب روابط إضافية</string>
+    <string name="quota_request_submitted">تم إرسال طلب الزيادة</string>
 </resources>

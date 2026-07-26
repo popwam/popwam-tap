@@ -10,7 +10,7 @@ class FirstLaunchAndroidContractTest {
 
     @Test fun `startup is pre auth gated and no longer jumps to login on a timer`() {
         val app=source("src/main/java/com/popwam/pop/ui/PopwamApp.kt")
-        assertTrue(app.contains("resolvePreAuthStage(preAuthState,authState.authenticated)"))
+        assertTrue(app.contains("resolvePreAuthStage(preAuthState,authState.authenticated,availableLanguages)"))
         assertTrue(app.contains("PreAuthStage.LANGUAGE"))
         assertTrue(app.contains("PreAuthStage.APPEARANCE"))
         assertTrue(app.contains("PreAuthStage.INTRO"))
@@ -71,5 +71,22 @@ class FirstLaunchAndroidContractTest {
         assertTrue(locales.contains("android:name=\"ar\""))
         assertTrue(locales.contains("android:name=\"en\""))
         assertTrue(locales.contains("android:name=\"fr\""))
+    }
+
+    @Test fun `server localization authority and cold splash gate startup`() {
+        val activity=source("src/main/java/com/popwam/pop/MainActivity.kt")
+        val authority=source("src/main/java/com/popwam/pop/data/localization/LocalizationAuthorityStore.kt")
+        val launch=source("src/main/java/com/popwam/pop/ui/RuntimeLaunchViewModel.kt")
+        assertTrue(activity.contains("container.localization.refresh()"))
+        assertTrue(authority.contains("api.localizationBootstrap()"))
+        assertTrue(authority.contains("listOf(LocalizationLocaleDto())"))
+        assertTrue(launch.contains("POP_COLD_SPLASH_MILLIS=3_000L"))
+    }
+
+    @Test fun `typography is centrally script aware`() {
+        val theme=source("src/main/java/com/popwam/pop/ui/theme/Theme.kt")
+        assertTrue(theme.contains("if(arabic)Cairo else ABeeZee"))
+        assertTrue(theme.contains("R.font.cairo"))
+        assertTrue(theme.contains("R.font.abeezee"))
     }
 }

@@ -27,11 +27,21 @@ export class FirebaseIdentityError extends Error {
   }
 }
 
+export function normalizeFirebasePrivateKey(value: string | null | undefined) {
+  return value?.trim().replace(/\\n/g, "\n") || "";
+}
+
+export function validFirebasePrivateKey(value: string | null | undefined) {
+  return /^-----BEGIN (?:RSA )?PRIVATE KEY-----\n[\s\S]+\n-----END (?:RSA )?PRIVATE KEY-----$/.test(
+    normalizeFirebasePrivateKey(value),
+  );
+}
+
 function adminCredentials() {
   const projectId = process.env.FCM_PROJECT_ID?.trim();
   const clientEmail = process.env.FCM_CLIENT_EMAIL?.trim();
-  const privateKey = process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  return projectId && clientEmail && privateKey ? { projectId, clientEmail, privateKey } : null;
+  const privateKey = normalizeFirebasePrivateKey(process.env.FCM_PRIVATE_KEY);
+  return projectId && clientEmail && validFirebasePrivateKey(privateKey) ? { projectId, clientEmail, privateKey } : null;
 }
 
 export function getFirebaseAdminApp(): App {

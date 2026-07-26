@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { CreditCard, Gauge, Heart, Layers3, Lightbulb, Link2, LogOut, MessageCircle, MessageSquareText, Nfc, Package, Palette, ScrollText, Settings, Shield, ShoppingBag, UserRound, Users, WalletCards } from "lucide-react";
+import { CreditCard, Gauge, Heart, Languages, Layers3, Lightbulb, Link2, LogOut, MessageCircle, MessageSquareText, Nfc, Package, Palette, ScrollText, Settings, Shield, ShoppingBag, UserRound, Users, WalletCards } from "lucide-react";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ProfileAvatar } from "@/components/profile-avatar";
 
@@ -25,6 +25,7 @@ export function DashboardShell({ children,user,locale,labels,languageLabel }: { 
     ["/admin/users",labels.users,Users],
     ["/admin/customers",labels.customers,Users],
     ["/admin/subscriptions",locale==="ar"?"طلبات الاشتراك":"Subscription requests",Layers3],
+    ["/admin/quota-requests",locale==="ar"?"طلبات زيادة الحدود":"Quota requests",Gauge],
     ["/admin/orders",labels.orders,WalletCards],
     ["/admin/inventory/items",locale==="ar"?"المنتجات":"Products",ShoppingBag],
     ["/admin/profiles",locale==="ar"?"الملفات الافتراضية":"Virtual profiles",UserRound],
@@ -33,6 +34,7 @@ export function DashboardShell({ children,user,locale,labels,languageLabel }: { 
     ["/admin/links",locale==="ar"?"الروابط حسب المستخدم":"Links by user",Link2],
     ["/admin/templates",locale==="ar"?"القوالب":"Templates",Palette],
     ["/admin/plans",labels.plans,Layers3],
+    ["/admin/localization",locale==="ar"?"اللغات والترجمة":"Languages",Languages],
     ["/admin/wallet",locale==="ar"?"إعداد المحفظة":"Wallet setup",WalletCards],
     ["/admin/transfers",locale==="ar"?"عمليات النقل":"Transfers",CreditCard],
     ["/admin/feature-requests",locale==="ar"?"طلبات الميزات":"Feature requests",Lightbulb],

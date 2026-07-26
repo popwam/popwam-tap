@@ -6,6 +6,7 @@ import com.google.gson.JsonObject
 import retrofit2.http.*
 
 interface AuthApi {
+    @GET("api/localization/bootstrap") suspend fun localizationBootstrap():LocalizationBootstrapResponse
     @POST("api/mobile/auth/firebase/phone/exchange") suspend fun exchangeFirebasePhone(
         @Header("X-Firebase-Id-Token") firebaseIdToken:String,
         @Body body:FirebasePhoneExchangeRequest,
@@ -17,6 +18,8 @@ interface AuthApi {
 }
 
 interface PopwamApi {
+    @GET("api/settings/quota") suspend fun quotaUsage():QuotaUsageResponse
+    @POST("api/settings/quota") suspend fun requestQuotaIncrease(@Body body:QuotaIncreaseRequest):QuotaIncreaseResponse
     @POST("api/mobile/push-tokens") suspend fun registerPushToken(@Body body:PushTokenRequest):ApiResult
     @GET("api/legal/required") suspend fun requiredLegal(@Query("locale") locale:String):LegalRequiredResponse
     @POST("api/legal/required") suspend fun acceptLegal(@Body body:LegalConsentRequest):ApiResult

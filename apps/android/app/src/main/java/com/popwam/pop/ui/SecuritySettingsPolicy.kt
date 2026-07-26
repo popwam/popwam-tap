@@ -1,6 +1,6 @@
 package com.popwam.pop.ui
 
-internal val nativeSettingsSections=setOf("root","appearance","notifications","privacy","permissions","security","devices","sessions","passkeys","account","help")
+internal val nativeSettingsSections=setOf("root","appearance","notifications","privacy","permissions","security","devices","sessions","passkeys","usage","account","help")
 
 internal fun settingsAnalyticsEvent(section:String)=when(section){
     "devices"->"devices_viewed"

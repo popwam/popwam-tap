@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@popwam/db";
 import { createStorageKey, deleteObject, isStorageEnabled, uploadPublicFile, validateFileUpload } from "@popwam/storage";
 import { getMobileUser, mobileUnauthorized } from "@/lib/mobile-auth";
-import { assertWithinLimitLocked, getUserEntitlements } from "@/lib/plans";
+import { assertStorageWithinLimitLocked, assertWithinLimitLocked, getUserEntitlements } from "@/lib/plans";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getMobileUser(request); if (!user) return mobileUnauthorized();
@@ -23,8 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       await assertWithinLimitLocked(tx, user.id, "links");
       if (!locked.allowFileUploads) throw new Error("FILE_UPLOAD_NOT_ALLOWED");
       if (!await tx.profile.findFirst({ where: { id, userId: user.id }, select: { id: true } })) throw new Error("PROFILE_NOT_FOUND");
-      const storage = await tx.uploadedFile.aggregate({ where: { uploaderUserId: user.id }, _sum: { sizeBytes: true } });
-      if ((storage._sum.sizeBytes || 0n) + BigInt(file.size) > BigInt(locked.maxStorageBytes)) throw new Error("STORAGE_LIMIT_REACHED");
+      await assertStorageWithinLimitLocked(tx, user.id, BigInt(file.size));
       const titleAr = String(data.get("titleAr") || "").trim() || null; const titleEn = String(data.get("titleEn") || "").trim() || null;
       const sortOrder = await tx.uploadedFile.count({ where: { profileId: id } });
       const created = await tx.uploadedFile.create({ data: { profileId: id, uploaderUserId: user.id, storageKey: key, publicUrl: uploaded.url, originalFilename: file.name, originalName: file.name, mimeType: file.type, sizeBytes: file.size, title: titleAr || titleEn, displayTitleAr: titleAr, displayTitleEn: titleEn, sortOrder } });

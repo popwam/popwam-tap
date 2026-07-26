@@ -4,12 +4,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PreAuthExperiencePolicyTest {
-    @Test fun `fresh install starts with language`() {
-        assertEquals(PreAuthStage.LANGUAGE,resolvePreAuthStage(PreAuthSnapshot(),authenticated=false))
+    @Test fun `English only fresh install skips language`() {
+        assertEquals(PreAuthStage.APPEARANCE,resolvePreAuthStage(PreAuthSnapshot(),authenticated=false,availableLanguages=setOf("en")))
+    }
+
+    @Test fun `multiple published languages start with language`() {
+        assertEquals(PreAuthStage.LANGUAGE,resolvePreAuthStage(PreAuthSnapshot(),authenticated=false,availableLanguages=setOf("en","ar")))
     }
 
     @Test fun `language leads to appearance`() {
-        assertEquals(PreAuthStage.APPEARANCE,resolvePreAuthStage(PreAuthSnapshot(language="ar"),authenticated=false))
+        assertEquals(PreAuthStage.APPEARANCE,resolvePreAuthStage(PreAuthSnapshot(language="ar"),authenticated=false,availableLanguages=setOf("en","ar")))
     }
 
     @Test fun `appearance leads to intro`() {

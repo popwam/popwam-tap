@@ -671,6 +671,17 @@ enum FeatureRequestStatus {
   REJECTED
 }
 
+enum QuotaResource {
+  MAX_STORAGE_BYTES
+  MAX_LINKS
+}
+
+enum QuotaRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id                       String                   @id @default(cuid())
   username                 String?                  @unique
@@ -746,6 +757,8 @@ model User {
   featureRequests          FeatureRequest[]
   featureVotes             FeatureVote[]
   featureComments          FeatureComment[]
+  quotaIncreaseRequests    QuotaIncreaseRequest[]   @relation("QuotaRequestUser")
+  reviewedQuotaRequests    QuotaIncreaseRequest[]   @relation("QuotaRequestReviewer")
   contentEntries           ContentEntry[]
   followsCreated           Follow[]                 @relation("FollowFollower")
   followsReceived          Follow[]                 @relation("FollowFollowing")
@@ -1667,6 +1680,26 @@ model FeatureComment {
   author           User           @relation(fields: [authorId], references: [id], onDelete: Restrict)
 
   @@index([featureRequestId, createdAt])
+}
+
+model QuotaIncreaseRequest {
+  id             String             @id @default(cuid())
+  userId         String
+  resource       QuotaResource
+  requestedValue BigInt
+  status         QuotaRequestStatus @default(PENDING)
+  reason         String?
+  adminNote      String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  user           User               @relation("QuotaRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy     User?              @relation("QuotaRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, resource, status, createdAt])
+  @@index([status, createdAt])
+  @@index([reviewedById])
 }
 
 model Destination {

@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { FirebaseIdentityError, verifyFirebaseIdToken, verifyFirebasePhoneIdToken } from "./admin";
+import {
+  FirebaseIdentityError,
+  normalizeFirebasePrivateKey,
+  validFirebasePrivateKey,
+  verifyFirebaseIdToken,
+  verifyFirebasePhoneIdToken,
+} from "./admin";
 import { safeFirebaseAnalyticsProperties } from "./analytics";
 import {
   isRetryableFirebasePhoneResolutionError,
@@ -10,6 +16,15 @@ import {
 } from "./phone-policy";
 
 describe("Firebase server token verification", () => {
+  it("normalizes Railway escaped PEM newlines without exposing key material", () => {
+    const escaped = "-----BEGIN PRIVATE KEY-----\\nexample-body\\n-----END PRIVATE KEY-----";
+    const normalized = normalizeFirebasePrivateKey(escaped);
+    expect(normalized).toContain("\n");
+    expect(normalized).not.toContain("\\n");
+    expect(validFirebasePrivateKey(escaped)).toBe(true);
+    expect(validFirebasePrivateKey("not-a-private-key")).toBe(false);
+  });
+
   it("accepts only a valid mocked verification result and derives its UID from claims", async () => {
     await expect(verifyFirebaseIdToken("header.payload.signature", async () => ({ uid: "firebase-uid", auth_time: 10, iat: 20, firebase: { sign_in_provider: "anonymous" } }))).resolves.toEqual({ uid: "firebase-uid", signInProvider: "anonymous", authTime: 10, issuedAt: 20 });
   });

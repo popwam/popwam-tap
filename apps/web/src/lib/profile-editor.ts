@@ -5,7 +5,7 @@ import {
   ProfileModuleVisibility,
   prisma,
 } from "@popwam/db";
-import { getUserEntitlements } from "./plans";
+import { assertWithinLimitLocked, getUserEntitlements } from "./plans";
 import { buildOwnerPreviewProjection } from "./profile-preview";
 import {
   evaluateProfileReadiness,
@@ -469,6 +469,7 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
           auditTarget = id;
           auditOperation = "profile.link.updated";
         } else {
+          await assertWithinLimitLocked(tx, profile.userId, "links");
           const sortOrder = await tx.destination.count({ where: { profileId } });
           const created = await tx.destination.create({ data: { userId: profile.userId, organizationId: profile.organizationId, profileId, title, titleAr, titleEn, type: destinationType, url: normalized.url, isVisible, sortOrder: sortOrder * 10 } });
           auditTarget = created.id;

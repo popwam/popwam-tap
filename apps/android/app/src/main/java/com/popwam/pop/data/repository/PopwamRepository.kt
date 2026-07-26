@@ -45,6 +45,8 @@ class PopwamRepository(private val api:PopwamApi){
     suspend fun updateSettingsPreference(key:String,value:String)=api.updateSettingsPreferences(com.google.gson.JsonObject().apply{addProperty(key,value)})
     suspend fun updatePrivacyPreference(key:String,value:Boolean)=api.updateSettingsPreferences(com.google.gson.JsonObject().apply{addProperty(key,value)})
     suspend fun notificationPreferences()=api.notificationPreferences()
+    suspend fun quotaUsage()=api.quotaUsage()
+    suspend fun requestQuotaIncrease(resource:String,requestedValue:String)=api.requestQuotaIncrease(QuotaIncreaseRequest(resource,requestedValue))
     suspend fun updateNotificationPreference(key:String,value:Boolean)=api.updateNotificationPreferences(com.google.gson.JsonObject().apply{addProperty(key,value)})
     suspend fun friendsSettings(locale:String)=api.friendsSettings(locale)
     suspend fun updateFriendsSettings(body:FriendsSettingsPatchRequest)=api.updateFriendsSettings(body)

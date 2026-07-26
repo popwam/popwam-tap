@@ -23,11 +23,13 @@ import com.popwam.pop.ui.MainFactory
 import com.popwam.pop.ui.MainViewModel
 import com.popwam.pop.ui.PreAuthStore
 import com.popwam.pop.ui.PopwamApp
+import com.popwam.pop.ui.RuntimeLaunchViewModel
 import com.popwam.pop.ui.theme.PopwamTheme
 import com.popwam.pop.ui.theme.AppearanceStore
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -55,6 +57,10 @@ class MainActivity : AppCompatActivity() {
             val preAuthStore=remember{PreAuthStore(applicationContext)}
             val appearance by appearanceStore.state.collectAsStateWithLifecycle()
             val preAuth by preAuthStore.state.collectAsStateWithLifecycle()
+            val localization by app.container.localization.state.collectAsStateWithLifecycle()
+            val launch:RuntimeLaunchViewModel=viewModel()
+            val coldLaunchReady by launch.ready.collectAsStateWithLifecycle()
+            LaunchedEffect(launch) { launch.begin { app.container.localization.refresh() } }
             val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
             val authState by auth.state.collectAsStateWithLifecycle()
             val main: MainViewModel = viewModel(
@@ -62,7 +68,7 @@ class MainActivity : AppCompatActivity() {
             )
             val firstLaunchTheme = if (!authState.authenticated && preAuth.appearance == null) "LIGHT" else appearance.theme
             PopwamTheme(firstLaunchTheme,appearance.font) {
-                PopwamApp(auth, main, NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,preAuthStore)
+                PopwamApp(auth, main, NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,preAuthStore,localization,coldLaunchReady)
             }
         }
     }

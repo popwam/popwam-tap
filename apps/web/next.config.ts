@@ -17,6 +17,13 @@ const nextConfig: NextConfig = {
       { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), browsing-topics=()" },
     ];
     return [
+      {
+        source: "/.well-known/assetlinks.json",
+        headers: [
+          { key: "Content-Type", value: "application/json; charset=utf-8" },
+          { key: "Cache-Control", value: "public, max-age=300, must-revalidate" },
+        ],
+      },
       { source: "/:path*", headers: securityHeaders },
       { source: "/dashboard/nearby", headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), browsing-topics=()" }] },
       { source: "/dashboard/:path*", headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }] },

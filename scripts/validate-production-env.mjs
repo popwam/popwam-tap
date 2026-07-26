@@ -43,10 +43,20 @@ const allowedMetaCapabilities = new Set(["facebook_pages", "instagram", "threads
 if (metaCapabilities.some(capability => !allowedMetaCapabilities.has(capability))) errors.push("META_OAUTH_CAPABILITIES contains an unknown capability");
 if (value("APP_HOST") !== "pop.popwam.com") errors.push("APP_HOST must be pop.popwam.com");
 if (value("PUBLIC_HOST") !== "go.popwam.com") errors.push("PUBLIC_HOST must be go.popwam.com");
+if (value("PASSKEY_RP_ID") !== "pop.popwam.com") errors.push("PASSKEY_RP_ID must be pop.popwam.com");
+exactUrl("PASSKEY_ORIGIN", "https://pop.popwam.com");
+const passkeyAndroidOrigins = value("PASSKEY_ANDROID_ORIGINS").split(",").map(origin => origin.trim()).filter(Boolean);
+if (!passkeyAndroidOrigins.length || passkeyAndroidOrigins.some(origin => !/^android:apk-key-hash:[A-Za-z0-9_-]{20,}$/.test(origin))) {
+  errors.push("PASSKEY_ANDROID_ORIGINS must contain reviewed android:apk-key-hash origins");
+}
 
 const firebaseWebConfig = ["NEXT_PUBLIC_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET", "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", "NEXT_PUBLIC_FIREBASE_APP_ID"];
 const firebaseAdminConfig = ["FCM_PROJECT_ID", "FCM_CLIENT_EMAIL", "FCM_PRIVATE_KEY"];
 for (const name of firebaseAdminConfig) required(name);
+const firebasePrivateKey = value("FCM_PRIVATE_KEY").replace(/\\n/g, "\n");
+if (firebasePrivateKey && !/^-----BEGIN (?:RSA )?PRIVATE KEY-----\n[\s\S]+\n-----END (?:RSA )?PRIVATE KEY-----$/.test(firebasePrivateKey)) {
+  errors.push("FCM_PRIVATE_KEY must be a PEM private key; Railway literal \\\\n line breaks are supported");
+}
 if (firebaseWebConfig.some(name => value(name))) for (const name of firebaseWebConfig) required(name);
 if (value("FCM_ENABLED") && !["true", "false"].includes(value("FCM_ENABLED").toLowerCase())) errors.push("FCM_ENABLED must be true or false");
 if (value("FCM_ENABLED").toLowerCase() === "true") for (const name of firebaseAdminConfig) required(name);

@@ -7,7 +7,7 @@ import org.junit.Test
 
 class SecuritySettingsPolicyTest {
     @Test fun `settings navigation includes all native Phase H sections`() {
-        assertTrue(nativeSettingsSections.containsAll(setOf("appearance","notifications","privacy","permissions","security","devices","sessions","passkeys","account")))
+        assertTrue(nativeSettingsSections.containsAll(setOf("appearance","notifications","privacy","permissions","security","devices","sessions","passkeys","usage","account")))
     }
 
     @Test fun `analytics routes are privacy safe category events`() {

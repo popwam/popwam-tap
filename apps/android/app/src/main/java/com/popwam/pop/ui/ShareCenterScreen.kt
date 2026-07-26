@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.nfc.NfcAdapter
 import android.net.Uri
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -49,7 +48,7 @@ private fun shareText(context:Context,url:String){
 private fun copyText(context:Context,url:String){
     (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
         .setPrimaryClip(ClipData.newPlainText(context.getString(R.string.share_link),url))
-    Toast.makeText(context,R.string.share_copied,Toast.LENGTH_SHORT).show()
+    showPopTransientToast(context,R.string.share_copied)
 }
 
 private fun qrBitmap(value:String,size:Int=760):Bitmap{

@@ -5,6 +5,7 @@ export const FEATURE_KEYS = ["allowCustomSlug", "customSlugAllowed", "allowTheme
 export const CATALOG_KEYS = ["availableProfileTypes", "availableThemes"] as const;
 export type LimitKey = (typeof LIMIT_KEYS)[number];
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
+export const PLATFORM_DEFAULT_PLAN_SLUG = "free";
 
 const CORE_CONTACT_DESTINATION_TYPE_LIST: DestinationType[] = ["PROFILE", "PHONE", "EMAIL", "WEBSITE", "WHATSAPP_BUSINESS", "WHATSAPP_PRIVATE", "VCF"];
 const CORE_CONTACT_DESTINATION_TYPES = new Set<string>(CORE_CONTACT_DESTINATION_TYPE_LIST);
@@ -22,21 +23,22 @@ export async function getUserEntitlements(userId: string) {
     prisma.userPlan.findFirst({ where: { userId, status: "ACTIVE", OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] }, orderBy: { startsAt: "desc" }, include: { plan: true } }),
     prisma.userLimitOverride.findUnique({ where: { userId } }),
   ]);
-  const plan = subscription?.plan || await prisma.plan.findUnique({ where: { slug: "free" } });
+  const plan = subscription?.plan || await prisma.plan.findUnique({ where: { slug: PLATFORM_DEFAULT_PLAN_SLUG } });
   if (!plan) throw new Error("PLAN_NOT_CONFIGURED");
   return { subscription, override, plan, effective: mergeEntitlements(plan, override) };
 }
 
 export async function getUserUsage(userId: string) {
-  const [profiles, virtualCards, links, customFields, tags, cards, uploads, storage] = await Promise.all([
+  const [profiles, virtualCards, links, customFields, tags, cards, uploads, storage, mediaStorage] = await Promise.all([
     prisma.profile.count({ where: { userId } }),
     prisma.virtualCard.count({ where: { userId, status: { not: "ARCHIVED" } } }),
     prisma.destination.count({ where: { userId, ...EXTRA_LINK_FILTER } }),
     prisma.profileField.count({ where: { userId } }), prisma.tag.count({ where: { ownerId: userId } }), prisma.card.count({ where: { ownerId: userId } }),
     prisma.uploadedFile.count({ where: { uploaderUserId: userId } }),
     prisma.uploadedFile.aggregate({ where: { uploaderUserId: userId }, _sum: { sizeBytes: true } }),
+    prisma.profileMediaAsset.aggregate({ where: { userId, state: { not: "DELETED" }, deletedAt: null }, _sum: { sizeBytes: true } }),
   ]);
-  return { profiles, virtualCards, links, customFields, tags, cards, uploads, files: uploads, storageBytes: storage._sum.sizeBytes || 0n };
+  return { profiles, virtualCards, links, customFields, tags, cards, uploads, files: uploads, storageBytes: (storage._sum.sizeBytes || 0n) + (mediaStorage._sum.sizeBytes || 0n) };
 }
 
 export async function assertWithinLimit(userId: string, resource: LimitedResource, increment = 1) {
@@ -59,7 +61,7 @@ export async function assertWithinLimitLocked(tx: Prisma.TransactionClient, user
     tx.userPlan.findFirst({ where: { userId, status: "ACTIVE", OR: [{ endsAt: null }, { endsAt: { gt: now } }] }, orderBy: { startsAt: "desc" }, include: { plan: true } }),
     tx.userLimitOverride.findUnique({ where: { userId } }),
   ]);
-  const plan = subscription?.plan || await tx.plan.findUnique({ where: { slug: "free" } });
+  const plan = subscription?.plan || await tx.plan.findUnique({ where: { slug: PLATFORM_DEFAULT_PLAN_SLUG } });
   if (!plan) throw new Error("PLAN_NOT_CONFIGURED");
   const effective = mergeEntitlements(plan, override);
   const used = resource === "profiles" ? await tx.profile.count({ where: { userId } })
@@ -72,4 +74,49 @@ export async function assertWithinLimitLocked(tx: Prisma.TransactionClient, user
   const key = ({ profiles: "maxProfiles", virtualCards: "maxVirtualCards", links: "maxLinks", customFields: "maxCustomFields", tags: "maxTags", cards: "maxCards", uploads: "maxUploads", files: "maxFiles" } as const)[resource];
   if (used + increment > Number(effective[key])) throw new Error(`LIMIT_REACHED:${resource}`);
   return { effective, used, plan };
+}
+
+export async function assertStorageWithinLimitLocked(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  incomingBytes: bigint,
+  replacingBytes = 0n,
+) {
+  await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`);
+  const now = new Date();
+  const [subscription, override, fileStorage, mediaStorage] = await Promise.all([
+    tx.userPlan.findFirst({ where: { userId, status: "ACTIVE", OR: [{ endsAt: null }, { endsAt: { gt: now } }] }, orderBy: { startsAt: "desc" }, include: { plan: true } }),
+    tx.userLimitOverride.findUnique({ where: { userId } }),
+    tx.uploadedFile.aggregate({ where: { uploaderUserId: userId }, _sum: { sizeBytes: true } }),
+    tx.profileMediaAsset.aggregate({ where: { userId, state: { not: "DELETED" }, deletedAt: null }, _sum: { sizeBytes: true } }),
+  ]);
+  const plan = subscription?.plan || await tx.plan.findUnique({ where: { slug: PLATFORM_DEFAULT_PLAN_SLUG } });
+  if (!plan) throw new Error("PLAN_NOT_CONFIGURED");
+  const effective = mergeEntitlements(plan, override);
+  const usedBytes = (fileStorage._sum.sizeBytes || 0n) + (mediaStorage._sum.sizeBytes || 0n);
+  const projected = projectedStorageBytes(usedBytes, incomingBytes, replacingBytes);
+  if (!storageWithinLimit(usedBytes, incomingBytes, BigInt(effective.maxStorageBytes), replacingBytes)) throw new Error("STORAGE_LIMIT_REACHED");
+  return { effective, usedBytes, projected, plan };
+}
+
+export function quotaRemaining(used: bigint | number, limit: bigint | number) {
+  const usedValue = BigInt(used);
+  const limitValue = BigInt(limit);
+  return limitValue > usedValue ? limitValue - usedValue : 0n;
+}
+
+export function projectedStorageBytes(usedBytes: bigint, incomingBytes: bigint, replacingBytes = 0n) {
+  return usedBytes - (replacingBytes < usedBytes ? replacingBytes : usedBytes) + incomingBytes;
+}
+
+export function storageWithinLimit(usedBytes: bigint, incomingBytes: bigint, limitBytes: bigint, replacingBytes = 0n) {
+  return projectedStorageBytes(usedBytes, incomingBytes, replacingBytes) <= limitBytes;
+}
+
+export function formatStorageBytes(value: bigint | number) {
+  const bytes = BigInt(value);
+  const gib = 1024n * 1024n * 1024n;
+  const mib = 1024n * 1024n;
+  if (bytes >= gib && bytes % gib === 0n) return `${bytes / gib} GB`;
+  return `${bytes / mib} MB`;
 }

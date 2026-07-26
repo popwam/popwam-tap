@@ -63,6 +63,7 @@ fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogo
         "PRODUCT_STATUS_UPDATED"->stringResource(R.string.share_status_updated)
         "PRODUCT_ACTIVATED"->stringResource(R.string.share_product_activated)
         "REPORT_RECEIVED"->stringResource(R.string.friends_report_received)
+        "QUOTA_REQUESTED"->stringResource(R.string.quota_request_submitted)
         "SEARCH_QUERY_INVALID"->stringResource(R.string.friends_search_minimum)
         "REQUEST_FAILED"->stringResource(R.string.generic_error)
         "FRIENDS_POLICY_REQUIRED","FRIENDS_POLICY_UNAVAILABLE","FRIENDS_REQUEST_FAILED","RELATIONSHIP_UNAVAILABLE","REQUEST_UNAVAILABLE","FRIEND_REQUEST_LIMITED","FRIEND_REQUEST_COOLDOWN","FRIENDSHIP_REQUIRED","REPORT_INVALID","REPORT_LIMITED","BLOCK_UNAVAILABLE"->stringResource(R.string.friends_action_failed)
@@ -71,7 +72,11 @@ fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogo
     }
     LaunchedEffect(phaseGFeedback) {
         val message = phaseGFeedback
-        if (!message.isNullOrBlank()) { snackbar.showSnackbar(message); vm.clearFeedback() }
+        if (!message.isNullOrBlank()) {
+            if(state.error.isNullOrBlank())snackbar.showPopTransient(message)
+            else snackbar.showSnackbar(message,duration=SnackbarDuration.Indefinite)
+            vm.clearFeedback()
+        }
     }
     PopDynamicBackground(when { currentRoute?.startsWith("virtual-card/")==true -> PopBackdrop.DETAILS; currentRoute=="home" -> PopBackdrop.HOME; else -> PopBackdrop.NEUTRAL }) {
     Scaffold(

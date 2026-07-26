@@ -11,6 +11,42 @@ data class RefreshRequest(val refreshToken:String,val deviceName:String)
 data class LogoutRequest(val refreshToken:String)
 data class PasskeyAuthVerifyRequest(val assertion:JsonObject,val deviceName:String)
 data class PushTokenRequest(val token:String,val platform:String="ANDROID")
+data class LocalizationLocaleDto(
+    val code:String="en",
+    val name:String="English",
+    val nativeName:String="English",
+    val rtl:Boolean=false,
+    val translations:Map<String,String> = emptyMap(),
+)
+data class LocalizationBootstrapResponse(
+    val ok:Boolean=false,
+    val defaultLocale:String="en",
+    val translationVersion:Int=0,
+    val availableLocales:List<LocalizationLocaleDto> = emptyList(),
+    val error:String?=null,
+)
+data class QuotaRequestDto(
+    val id:String="",
+    val resource:String="",
+    val requestedValue:String="0",
+    val status:String="PENDING",
+    val adminNote:String?=null,
+    val createdAt:String="",
+    val reviewedAt:String?=null,
+)
+data class StorageQuotaDto(val usedBytes:String="0",val limitBytes:String="0",val remainingBytes:String="0",val overridden:Boolean=false)
+data class LinkQuotaDto(val used:Int=0,val limit:Int=0,val remaining:Int=0,val overridden:Boolean=false)
+data class QuotaPlanDto(val slug:String="free",val source:String="PLATFORM_DEFAULT")
+data class QuotaUsageResponse(
+    val ok:Boolean=false,
+    val plan:QuotaPlanDto=QuotaPlanDto(),
+    val storage:StorageQuotaDto=StorageQuotaDto(),
+    val links:LinkQuotaDto=LinkQuotaDto(),
+    val requests:List<QuotaRequestDto> = emptyList(),
+    val error:String?=null,
+)
+data class QuotaIncreaseRequest(val resource:String,val requestedValue:String,val reason:String?=null)
+data class QuotaIncreaseResponse(val ok:Boolean=false,val request:QuotaRequestDto?=null,val idempotent:Boolean=false,val error:String?=null)
 data class LegalDocumentDto(val id:String="",val documentType:String="",val version:String="",val title:String="",val path:String="")
 data class LegalRequiredResponse(val ok:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val documents:List<LegalDocumentDto> = emptyList(),val error:String?=null)
 data class LegalConsentRequest(val accepted:Boolean=true,val locale:String)

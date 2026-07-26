@@ -60,10 +60,10 @@ private fun popwamTypography(font:FontFamily)=Typography(
 )
 
 @Composable
-fun PopwamTheme(themeMode:String="SYSTEM",fontMode:String="DEFAULT",content: @Composable () -> Unit) {
+fun PopwamTheme(themeMode:String="SYSTEM",@Suppress("UNUSED_PARAMETER") fontMode:String="DEFAULT",content: @Composable () -> Unit) {
     val arabic = LocalConfiguration.current.locales[0].language == "ar"
     val dark=when(themeMode){"DARK"->true;"LIGHT"->false;else->isSystemInDarkTheme()}
-    val font=when(fontMode){"CAIRO"->Cairo;"ABEEZEE"->ABeeZee;else->if(arabic)Cairo else ABeeZee}
+    val font=if(arabic)Cairo else ABeeZee
     MaterialTheme(
         colorScheme = if(dark) Dark else Light,
         typography = popwamTypography(font),

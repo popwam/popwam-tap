@@ -72,13 +72,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
 import androidx.core.content.edit
 import com.popwam.pop.R
+import com.popwam.pop.data.api.LocalizationLocaleDto
 import com.popwam.pop.ui.theme.PopwamTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 const val CURRENT_POP_INTRO_VERSION = 1
-val supportedPopLanguages = setOf("ar", "en", "fr")
 val supportedPopAppearances = setOf("SYSTEM", "LIGHT", "DARK")
 
 enum class PreAuthStage { LANGUAGE, APPEARANCE, INTRO, AUTH }
@@ -94,10 +94,11 @@ data class PreAuthSnapshot(
 fun resolvePreAuthStage(
     state: PreAuthSnapshot,
     authenticated: Boolean,
+    availableLanguages: Set<String> = setOf("en"),
     introVersion: Int = CURRENT_POP_INTRO_VERSION,
 ): PreAuthStage = when {
     authenticated -> PreAuthStage.AUTH
-    state.language !in supportedPopLanguages -> PreAuthStage.LANGUAGE
+    availableLanguages.size > 1 && state.language !in availableLanguages -> PreAuthStage.LANGUAGE
     state.appearance !in supportedPopAppearances -> PreAuthStage.APPEARANCE
     state.introVersionSeen < introVersion -> PreAuthStage.INTRO
     else -> PreAuthStage.AUTH
@@ -115,10 +116,21 @@ class PreAuthStore(context: Context) {
     private val _state = MutableStateFlow(read())
     val state = _state.asStateFlow()
 
-    fun selectLanguage(language: String) {
-        if (language !in supportedPopLanguages) return
+    fun selectLanguage(language: String, availableLanguages:Set<String>) {
+        if (language !in availableLanguages) return
         preferences.edit { putString(KEY_LANGUAGE, language) }
         _state.value = _state.value.copy(language = language)
+    }
+
+    fun reconcileLanguage(availableLanguages:Set<String>,defaultLocale:String) {
+        val current=_state.value.language
+        val resolved=current?.takeIf { it in availableLanguages }
+            ?: defaultLocale.takeIf { it in availableLanguages }
+            ?: "en"
+        if(availableLanguages.size==1 || current!=null&&current !in availableLanguages) {
+            preferences.edit { putString(KEY_LANGUAGE,resolved) }
+            _state.value=_state.value.copy(language=resolved)
+        }
     }
 
     fun clearLanguage() {
@@ -148,7 +160,7 @@ class PreAuthStore(context: Context) {
      * It never creates or authorizes a POP session.
      */
     fun adoptAuthenticatedInstallation(language: String, appearance: String) {
-        val safeLanguage = language.takeIf { it in supportedPopLanguages } ?: "en"
+        val safeLanguage = language.takeIf { it in LocalePolicy.availableLocales() } ?: LocalePolicy.resolve(null,"")
         val safeAppearance = appearance.takeIf { it in supportedPopAppearances } ?: "SYSTEM"
         val adopted = PreAuthSnapshot(safeLanguage, safeAppearance, CURRENT_POP_INTRO_VERSION)
         preferences.edit {
@@ -160,7 +172,7 @@ class PreAuthStore(context: Context) {
     }
 
     private fun read() = PreAuthSnapshot(
-        language = preferences.getString(KEY_LANGUAGE, null)?.takeIf { it in supportedPopLanguages },
+        language = preferences.getString(KEY_LANGUAGE, null)?.takeIf { it.matches(Regex("^[a-z]{2}(?:-[a-z0-9]{2,8})?$")) },
         appearance = preferences.getString(KEY_APPEARANCE, null)?.takeIf { it in supportedPopAppearances },
         introVersionSeen = preferences.getInt(KEY_INTRO_VERSION, 0).coerceAtLeast(0),
     )
@@ -174,10 +186,10 @@ class PreAuthStore(context: Context) {
         fun persistedLanguage(context: Context): String? =
             context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
                 .getString(KEY_LANGUAGE, null)
-                ?.takeIf { it in supportedPopLanguages }
+                ?.takeIf { it.matches(Regex("^[a-z]{2}(?:-[a-z0-9]{2,8})?$")) }
 
         fun persistLaterLanguageChoice(context: Context, language: String) {
-            if (language !in supportedPopLanguages) return
+            if (!language.matches(Regex("^[a-z]{2}(?:-[a-z0-9]{2,8})?$"))) return
             context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
                 .edit { putString(KEY_LANGUAGE, language) }
         }
@@ -190,27 +202,18 @@ class PreAuthStore(context: Context) {
 }
 
 fun applyPopLanguage(language: String) {
-    if (language !in supportedPopLanguages) return
+    if (language !in LocalePolicy.availableLocales()) return
     AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language))
 }
 
-private data class LanguageChoice(val code: String, val nativeName: Int)
-
 @Composable
-fun LanguageSelectionScreen(onSelect: (String) -> Unit) {
+fun LanguageSelectionScreen(languages:List<LocalizationLocaleDto>,onSelect: (String) -> Unit) {
     PopSystemBars(false)
-    val languages = remember {
-        listOf(
-            LanguageChoice("ar", R.string.language_choice_ar),
-            LanguageChoice("en", R.string.language_choice_en),
-            LanguageChoice("fr", R.string.language_choice_fr),
-        )
-    }
     PreAuthBackdrop {
         LazyColumn(
             modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 22.dp),
-            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp,Alignment.CenterVertically),
         ) {
             item { PopPreAuthBrand() }
             item { Spacer(Modifier.height(14.dp)) }
@@ -249,7 +252,7 @@ fun LanguageSelectionScreen(onSelect: (String) -> Unit) {
                             }
                             Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(stringResource(language.nativeName), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(language.nativeName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             }
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = MaterialTheme.colorScheme.primary)
                         }
@@ -280,8 +283,8 @@ fun AppearanceSelectionScreen(
         PreAuthBackdrop {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 22.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp,Alignment.CenterVertically),
             ) {
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {

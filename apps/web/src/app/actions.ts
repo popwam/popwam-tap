@@ -305,11 +305,12 @@ export type PlanActionState={ok:boolean;code?:string;id?:string};
 export async function saveAdminPlan(_previous:PlanActionState,data:FormData):Promise<PlanActionState>{
   const admin=await requireAdmin();const id=optional(data,"id");const slug=text(data,"slug").toLowerCase();const nameEn=text(data,"nameEn");const nameAr=text(data,"nameAr");
   if(!/^[a-z0-9-]{2,48}$/.test(slug)||!nameEn||!nameAr)return{ok:false,code:"PLAN_INVALID_TEXT"};
-  const numericKeys=["maxProfiles","maxVirtualCards","maxLinks","maxCustomFields","maxCards","maxFiles","maxStorageBytes","sortOrder"] as const;const values:Record<string,number|bigint>={};
-  for(const key of numericKeys){const raw=text(data,key);if(!/^\d+$/.test(raw))return{ok:false,code:"PLAN_INVALID_LIMIT"};values[key]=key==="maxStorageBytes"?BigInt(raw):Number(raw);}
+  const numericKeys=["maxProfiles","maxVirtualCards","maxLinks","maxCustomFields","maxCards","maxFiles","sortOrder"] as const;const values:Record<string,number|bigint>={};
+  for(const key of numericKeys){const raw=text(data,key);if(!/^\d+$/.test(raw))return{ok:false,code:"PLAN_INVALID_LIMIT"};values[key]=Number(raw);}
+  const storageMegabytes=text(data,"maxStorageMegabytes");if(!/^\d+$/.test(storageMegabytes))return{ok:false,code:"PLAN_INVALID_LIMIT"};const maxStorageBytes=BigInt(storageMegabytes)*1024n*1024n;
   let availableProfileTypes:Prisma.InputJsonValue;let availableThemes:Prisma.InputJsonValue;try{availableProfileTypes=JSON.parse(text(data,"availableProfileTypes"));availableThemes=JSON.parse(text(data,"availableThemes"));if(!Array.isArray(availableProfileTypes)||!Array.isArray(availableThemes))throw new Error();}catch{return{ok:false,code:"PLAN_INVALID_TEXT"};}
   const customSlugAllowed=data.get("customSlugAllowed")==="on";const analyticsAllowed=data.get("analyticsAllowed")==="on";const maxCards=Number(values.maxCards);const maxFiles=Number(values.maxFiles);
-  const payload={name:nameEn,nameEn,nameAr,slug,description:optional(data,"descriptionEn"),descriptionEn:optional(data,"descriptionEn"),descriptionAr:optional(data,"descriptionAr"),isActive:data.get("isActive")==="on",sortOrder:Number(values.sortOrder),maxProfiles:Number(values.maxProfiles),maxVirtualCards:Number(values.maxVirtualCards),maxLinks:Number(values.maxLinks),maxCustomFields:Number(values.maxCustomFields),maxCards,maxTags:maxCards,maxFiles,maxUploads:maxFiles,maxStorageBytes:BigInt(values.maxStorageBytes),customSlugAllowed,allowCustomSlug:customSlugAllowed,allowThemes:data.get("allowThemes")==="on",allowCustomTheme:data.get("allowCustomTheme")==="on",analyticsAllowed,allowAnalytics:analyticsAllowed,allowFileUploads:data.get("allowFileUploads")==="on",allowCustomIcons:data.get("allowCustomIcons")==="on",allowBusinessCards:data.get("allowBusinessCards")==="on",allowWalletPasses:data.get("allowWalletPasses")==="on",allowCustomLinks:data.get("allowCustomLinks")==="on",allowInstallableProfiles:data.get("allowInstallableProfiles")==="on",availableProfileTypes,availableThemes};
+  const payload={name:nameEn,nameEn,nameAr,slug,description:optional(data,"descriptionEn"),descriptionEn:optional(data,"descriptionEn"),descriptionAr:optional(data,"descriptionAr"),isActive:data.get("isActive")==="on",sortOrder:Number(values.sortOrder),maxProfiles:Number(values.maxProfiles),maxVirtualCards:Number(values.maxVirtualCards),maxLinks:Number(values.maxLinks),maxCustomFields:Number(values.maxCustomFields),maxCards,maxTags:maxCards,maxFiles,maxUploads:maxFiles,maxStorageBytes,customSlugAllowed,allowCustomSlug:customSlugAllowed,allowThemes:data.get("allowThemes")==="on",allowCustomTheme:data.get("allowCustomTheme")==="on",analyticsAllowed,allowAnalytics:analyticsAllowed,allowFileUploads:data.get("allowFileUploads")==="on",allowCustomIcons:data.get("allowCustomIcons")==="on",allowBusinessCards:data.get("allowBusinessCards")==="on",allowWalletPasses:data.get("allowWalletPasses")==="on",allowCustomLinks:data.get("allowCustomLinks")==="on",allowInstallableProfiles:data.get("allowInstallableProfiles")==="on",availableProfileTypes,availableThemes};
   try{const plan=id?await prisma.plan.update({where:{id},data:payload}):await prisma.plan.create({data:payload});await audit(admin.id,id?"admin.plan.update":"admin.plan.create",plan.id);revalidatePath("/admin/plans");revalidatePath(`/admin/plans/${plan.id}`);return{ok:true,id:plan.id};}catch(error){if(isUniqueConstraintError(error))return{ok:false,code:"PLAN_SLUG_IN_USE"};console.error("plan save failed",{operation:id?"plan.update":"plan.create",adminId:admin.id});return{ok:false,code:"PLAN_SAVE_FAILED"};}
 }
 
@@ -319,13 +320,31 @@ export async function deleteAdminPlan(data:FormData){const admin=await requireAd
 
 export async function updateUserLimits(data: FormData) {
   const admin = await requireAdmin(); const userId = text(data, "userId");
+  const storageMegabytes = text(data, "maxStorageMegabytes");
+  if (storageMegabytes && !/^\d+$/.test(storageMegabytes)) throw new Error("USER_STORAGE_LIMIT_INVALID");
+  const maxStorageBytes = storageMegabytes
+    ? BigInt(storageMegabytes) * 1024n * 1024n
+    : text(data, "maxStorageBytes") && /^\d+$/.test(text(data, "maxStorageBytes"))
+      ? BigInt(text(data, "maxStorageBytes"))
+      : null;
   await prisma.userLimitOverride.upsert({ where: { userId }, create: { userId }, update: {}, });
   await prisma.userLimitOverride.update({ where: { userId }, data: {
     maxProfiles: nullableNumber(data, "maxProfiles"), maxVirtualCards: nullableNumber(data, "maxVirtualCards"), maxLinks: nullableNumber(data, "maxLinks"), maxCustomFields: nullableNumber(data, "maxCustomFields"), maxCards: nullableNumber(data, "maxCards"), maxTags: nullableNumber(data, "maxCards"), maxFiles: nullableNumber(data, "maxFiles"), maxUploads: nullableNumber(data, "maxFiles"),
-    maxStorageBytes: text(data, "maxStorageBytes") ? BigInt(text(data, "maxStorageBytes")) : null,
+    maxStorageBytes,
     customSlugAllowed: optionalBoolean(data, "customSlugAllowed"), allowCustomSlug: optionalBoolean(data, "customSlugAllowed"), allowThemes: optionalBoolean(data, "allowThemes"), allowCustomTheme: optionalBoolean(data, "allowCustomTheme"), analyticsAllowed: optionalBoolean(data, "analyticsAllowed"), allowAnalytics: optionalBoolean(data, "analyticsAllowed"), allowFileUploads: optionalBoolean(data, "allowFileUploads"), allowCustomIcons: optionalBoolean(data, "allowCustomIcons"), allowBusinessCards: optionalBoolean(data, "allowBusinessCards"), allowWalletPasses: optionalBoolean(data, "allowWalletPasses"), allowCustomLinks: optionalBoolean(data, "allowCustomLinks"), allowInstallableProfiles: optionalBoolean(data, "allowInstallableProfiles"),
   }});
   await audit(admin.id, "admin.user.limits", userId); revalidatePath(`/admin/users/${userId}`);
+}
+
+export async function resetUserQuotaOverrides(data: FormData) {
+  const admin = await requireAdmin(); const userId = text(data, "userId");
+  await prisma.userLimitOverride.upsert({
+    where: { userId },
+    create: { userId, maxLinks: null, maxStorageBytes: null },
+    update: { maxLinks: null, maxStorageBytes: null },
+  });
+  await audit(admin.id, "admin.user.quota_overrides.reset", userId);
+  revalidatePath(`/admin/users/${userId}`);
 }
 
 function optionalBoolean(data: FormData, key: string) { const value = text(data, key); return value === "" ? null : value === "true"; }

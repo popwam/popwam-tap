@@ -2,6 +2,9 @@ package com.popwam.pop.ui
 
 import android.content.Context
 import android.provider.Settings
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.compose.animation.core.RepeatMode
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.animateFloat
@@ -36,6 +39,23 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.popwam.pop.R
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+
+const val POP_TRANSIENT_FEEDBACK_MILLIS=3_000L
+
+suspend fun SnackbarHostState.showPopTransient(message:String)=coroutineScope {
+    val showing=launch { showSnackbar(message,duration=SnackbarDuration.Indefinite) }
+    delay(POP_TRANSIENT_FEEDBACK_MILLIS)
+    currentSnackbarData?.dismiss()
+    showing.join()
+}
+
+fun showPopTransientToast(context:Context,message:Int) {
+    val toast=Toast.makeText(context,message,Toast.LENGTH_LONG)
+    toast.show()
+    Handler(Looper.getMainLooper()).postDelayed(toast::cancel,POP_TRANSIENT_FEEDBACK_MILLIS)
+}
 
 enum class PopBackdrop { WELCOME, HOME, DETAILS, EMPTY, NEUTRAL }
 

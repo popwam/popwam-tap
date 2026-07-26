@@ -566,4 +566,14 @@
     <string name="firebase_exchange_error">Your phone was verified, but POP could not start your session. Try again.</string>
     <string name="firebase_identity_conflict">This verified phone identity needs account support before it can sign in.</string>
     <string name="firebase_unavailable">Phone verification is temporarily unavailable. Try again.</string>
+    <string name="settings_usage">Usage and limits</string>
+    <string name="settings_usage_help">Usage is calculated by POP on the server from your effective plan and any administrator override.</string>
+    <string name="settings_storage">Storage</string>
+    <string name="settings_links">Links</string>
+    <string name="settings_remaining">Remaining</string>
+    <string name="settings_custom_override">Custom account override</string>
+    <string name="settings_latest_request">Latest increase request</string>
+    <string name="settings_request_storage">Request more storage</string>
+    <string name="settings_request_links">Request more links</string>
+    <string name="quota_request_submitted">Increase request submitted</string>
 </resources>

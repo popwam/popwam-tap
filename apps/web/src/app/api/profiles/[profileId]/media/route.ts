@@ -2,6 +2,7 @@ import { prisma, type ProfileMediaPurpose } from "@popwam/db";
 import { createDraftStorageKey, deleteDraftObject, detectImageContentType, isDraftStorageEnabled, uploadDraftImage, validateImageUpload } from "@popwam/storage";
 import { csrfRejected, getCurrentPopUser, isTrustedPopMutation, unauthorized } from "@/lib/api-auth";
 import { managedProfileWhere } from "@/lib/profile-publishing";
+import { assertStorageWithinLimitLocked } from "@/lib/plans";
 
 const purposes = new Set<ProfileMediaPurpose>(["AVATAR", "COVER", "LOGO", "GALLERY", "ONBOARDING_IMAGE"]);
 
@@ -44,6 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
   await uploadDraftImage(bytes, { key, contentType: detected });
   try {
     const asset = await prisma.$transaction(async (tx) => {
+      await assertStorageWithinLimitLocked(tx, user.id, BigInt(file.size));
       if (expectedDraftRevision !== null) {
         const current = await tx.profile.findFirst({ where: { ...managedProfileWhere(user.id, profileId), draftRevision: expectedDraftRevision }, select: { id: true } });
         if (!current) throw new Error("STALE_DRAFT");
@@ -56,11 +58,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
       const updated = await tx.profile.updateMany({ where: { id: profileId, ...(expectedDraftRevision === null ? {} : { draftRevision: expectedDraftRevision }) }, data: { draftRevision: { increment: 1 } } });
       if (!updated.count) throw new Error("STALE_DRAFT");
       return created;
-    });
+    }, { isolationLevel: "Serializable" });
     return Response.json({ ok: true, asset: { ...asset, previewUrl: `/api/profiles/${profileId}/media/${asset.id}` } }, { status: 201 });
   } catch (error) {
     await deleteDraftObject(key).catch(() => undefined);
-    const code = error instanceof Error && error.message === "STALE_DRAFT" ? "STALE_DRAFT" : "MEDIA_RECORD_FAILED";
-    return Response.json({ ok: false, error: code }, { status: code === "STALE_DRAFT" ? 409 : 500 });
+    const code = error instanceof Error && ["STALE_DRAFT","STORAGE_LIMIT_REACHED"].includes(error.message) ? error.message : "MEDIA_RECORD_FAILED";
+    return Response.json({ ok: false, error: code }, { status: code === "STALE_DRAFT" ? 409 : code === "STORAGE_LIMIT_REACHED" ? 403 : 500 });
   }
 }

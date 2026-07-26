@@ -50,12 +50,15 @@ import com.popwam.pop.data.api.BlockedUserDto
 import com.popwam.pop.data.api.NearbyResultDto
 import com.popwam.pop.data.api.NearbySessionDto
 import com.popwam.pop.data.api.NearbySettingsResponse
+import com.popwam.pop.data.api.QuotaUsageResponse
 import com.popwam.pop.data.auth.SessionRepository
 import com.popwam.pop.data.auth.PopAnalytics
 import com.popwam.pop.data.auth.FirebasePhoneAuthGateway
 import com.popwam.pop.data.auth.FirebasePhoneEvent
 import com.popwam.pop.data.auth.FirebasePhoneFailure
 import com.popwam.pop.data.auth.PhoneIdentity
+import com.popwam.pop.data.auth.AuthRuntimeDiagnostics
+import com.popwam.pop.data.auth.AuthRuntimeStage
 import com.popwam.pop.data.repository.AuthSetupRepository
 import com.popwam.pop.data.repository.PopwamRepository
 import com.popwam.pop.data.repository.AndroidUploadPolicy
@@ -215,13 +218,18 @@ class AuthViewModel(
 
     fun refreshSetup(locale:String) = viewModelScope.launch {
         if (!sessions.authenticated) return@launch
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,"started")
         _state.value = _state.value.copy(setupStage = AuthSetupStage.AUTHENTICATED_CHECKING, error = null)
         runCatching { setup.status(locale) }.onSuccess { status ->
             val stage=resolveAuthSetupStage(true,status)
             val routedStage=if(stage==AuthSetupStage.READY)AuthSetupStage.AUTHENTICATED_CHECKING else stage
             _state.value = _state.value.copy(setupStatus = status, legalDocuments = status.requiredDocuments, setupStage = routedStage, error = null)
+            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,stage.name.lowercase())
             if(stage==AuthSetupStage.READY)refreshDynamicOnboarding(locale)
-        }.onFailure { _state.value = _state.value.copy(error = "SETUP_STATUS_UNAVAILABLE", setupStage = AuthSetupStage.AUTHENTICATED_CHECKING) }
+        }.onFailure {
+            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,"failed")
+            _state.value = _state.value.copy(error = "SETUP_STATUS_UNAVAILABLE", setupStage = AuthSetupStage.AUTHENTICATED_CHECKING)
+        }
     }
 
     private fun refreshDynamicOnboarding(locale:String)=viewModelScope.launch {
@@ -392,6 +400,7 @@ data class MainUiState(
     val securityDevices: List<SecurityDeviceDto> = emptyList(),
     val securitySessions: List<SecuritySessionDto> = emptyList(),
     val securityPasskeys: List<SecurityPasskeyDto> = emptyList(),
+    val quotaUsage: QuotaUsageResponse? = null,
     val friendsSettings: FriendsSettingsResponse? = null,
     val friendsStage: FriendsStage = FriendsStage.LOADING,
     val friends: List<FriendDto> = emptyList(),
@@ -443,6 +452,7 @@ class MainViewModel(
             val devices=repo.securityDevices()
             val sessions=repo.securitySessions()
             val passkeys=repo.securityPasskeys()
+            val quota=repo.quotaUsage()
             _state.value=_state.value.copy(
                 settingsPreferences=preferences,
                 notificationPreferences=notifications.preferences,
@@ -450,8 +460,9 @@ class MainViewModel(
                 securityDevices=devices.devices,
                 securitySessions=sessions.sessions,
                 securityPasskeys=passkeys.passkeys,
+                quotaUsage=quota,
             )
-            if(!preferences.ok||!notifications.ok||!overview.ok||!devices.ok||!sessions.ok||!passkeys.ok)fail("SECURITY_SETTINGS_UNAVAILABLE")
+            if(!preferences.ok||!notifications.ok||!overview.ok||!devices.ok||!sessions.ok||!passkeys.ok||!quota.ok)fail("SECURITY_SETTINGS_UNAVAILABLE")
         }
     }
 
@@ -486,6 +497,15 @@ class MainViewModel(
                 _state.value=_state.value.copy(notificationPreferences=result.preferences)
                 analytics.track("notification_preference_changed",mapOf("platform" to "android","setting_category" to key,"outcome" to "success"))
             }else fail(result.error)
+        }
+    }
+
+    fun requestQuotaIncrease(resource:String,requestedValue:String)=viewModelScope.launch {
+        working {
+            val result=repo.requestQuotaIncrease(resource,requestedValue)
+            if(result.ok) {
+                _state.value=_state.value.copy(quotaUsage=repo.quotaUsage(),message="QUOTA_REQUESTED")
+            } else fail(result.error)
         }
     }
 

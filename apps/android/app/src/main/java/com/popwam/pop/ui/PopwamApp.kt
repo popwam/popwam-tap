@@ -61,6 +61,7 @@ import com.popwam.pop.R
 import com.popwam.pop.data.api.*
 import com.popwam.pop.data.auth.PhoneIdentity
 import com.popwam.pop.data.auth.PasskeyCoordinator
+import com.popwam.pop.data.localization.LocalizationAuthoritySnapshot
 import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.nfc.NfcCoordinator
 import com.popwam.pop.ui.theme.AppearanceStore
@@ -76,6 +77,8 @@ import com.google.gson.JsonParser
     initialRoute:String="home",
     appearanceStore:AppearanceStore,
     preAuthStore:PreAuthStore,
+    localization:LocalizationAuthoritySnapshot,
+    coldLaunchReady:Boolean,
 ){
     val authState by auth.state.collectAsStateWithLifecycle()
     val preAuthState by preAuthStore.state.collectAsStateWithLifecycle()
@@ -83,13 +86,18 @@ import com.google.gson.JsonParser
     var destination by rememberSaveable { mutableStateOf(UnauthenticatedDestination.PHONE_AUTH.name) }
     var pendingRoute by rememberSaveable { mutableStateOf(initialRoute) }
     var pendingActivation by rememberSaveable { mutableStateOf("") }
+    if(!coldLaunchReady){SplashScreen();return}
+    val availableLanguages=localization.availableLocales.map { it.code }.toSet()
+    LaunchedEffect(localization.translationVersion,localization.defaultLocale) {
+        preAuthStore.reconcileLanguage(availableLanguages,localization.defaultLocale)
+    }
     LaunchedEffect(authState.authenticated) {
         if(authState.authenticated)preAuthStore.adoptAuthenticatedInstallation(currentLocale(),appearance.theme)
     }
-    when(resolvePreAuthStage(preAuthState,authState.authenticated)){
+    when(resolvePreAuthStage(preAuthState,authState.authenticated,availableLanguages)){
         PreAuthStage.LANGUAGE -> {
-            LanguageSelectionScreen { language ->
-                preAuthStore.selectLanguage(language)
+            LanguageSelectionScreen(localization.availableLocales) { language ->
+                preAuthStore.selectLanguage(language,availableLanguages)
                 applyPopLanguage(language)
             }
             return
@@ -143,7 +151,7 @@ fun currentLocale():String{
     return LocalePolicy.resolve(selected.substringBefore('-'),selected)
 }
 
-@Composable private fun SplashScreen(){PopSystemBars(true);PopDynamicBackground(PopBackdrop.DETAILS){Box(Modifier.fillMaxSize().safeDrawingPadding(),contentAlignment=Alignment.Center){Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)){Icon(painterResource(R.drawable.ic_launcher_foreground),"POP",Modifier.size(108.dp),tint=Color.Unspecified);Text(stringResource(R.string.app_name),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=Color.White);CircularProgressIndicator(Modifier.size(28.dp),strokeWidth=2.dp,color=Color(0xFFD4AF37))}}}}
+@Composable private fun SplashScreen(){PopSystemBars(MaterialTheme.colorScheme.background.red < .2f);Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background){Box(Modifier.fillMaxSize().safeDrawingPadding(),contentAlignment=Alignment.Center){Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)){Icon(painterResource(R.drawable.ic_launcher_foreground),"POP",Modifier.size(108.dp),tint=Color.Unspecified);Text(stringResource(R.string.app_name),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black);CircularProgressIndicator(Modifier.size(28.dp),strokeWidth=2.dp,color=MaterialTheme.colorScheme.primary)}}}}
 
 @Composable private fun WelcomeScreen(activate:()->Unit,scan:()->Unit,login:()->Unit){
     val context=LocalContext.current;val online=rememberOnline();var details by rememberSaveable{mutableStateOf(false)}
@@ -167,7 +175,9 @@ fun currentLocale():String{
 
 @Composable private fun rememberOnline():Boolean{val context=LocalContext.current;val manager=remember{context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager};var online by remember{mutableStateOf(manager.getNetworkCapabilities(manager.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)==true)};DisposableEffect(manager){val callback=object:ConnectivityManager.NetworkCallback(){override fun onAvailable(network:Network){online=true};override fun onLost(network:Network){online=manager.activeNetwork!=null}};manager.registerNetworkCallback(NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),callback);onDispose{runCatching{manager.unregisterNetworkCallback(callback)}}};return online}
 fun toggleLanguage(context:Context?=null){
-    val next=when(currentLocale()){"ar"->"en";"en"->"fr";else->"ar"}
+    val available=LocalePolicy.availableLocales()
+    val currentIndex=available.indexOf(currentLocale()).coerceAtLeast(0)
+    val next=available[(currentIndex+1)%available.size]
     context?.let{PreAuthStore.persistLaterLanguageChoice(it,next)}
     applyPopLanguage(next)
 }

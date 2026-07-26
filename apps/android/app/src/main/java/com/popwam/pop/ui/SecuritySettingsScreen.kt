@@ -60,10 +60,9 @@ fun SecuritySettingsScreen(
     var phoneCode by rememberSaveable{mutableStateOf("")}
     var accountMessage by rememberSaveable{mutableStateOf("")}
     LaunchedEffect(Unit){vm.loadSecuritySettings();vm.settingsViewed(section)}
-    LaunchedEffect(state.settingsPreferences?.theme,state.settingsPreferences?.font){
+    LaunchedEffect(state.settingsPreferences?.theme){
         state.settingsPreferences?.let {
             appearanceStore.setTheme(it.theme)
-            appearanceStore.setFont(it.font)
         }
     }
 
@@ -76,6 +75,7 @@ fun SecuritySettingsScreen(
         "devices"->R.string.settings_devices
         "sessions"->R.string.settings_sessions
         "passkeys"->R.string.settings_passkeys
+        "usage"->R.string.settings_usage
         "account"->R.string.settings_account
         "help"->R.string.settings_help_legal
         else->R.string.settings_center_title
@@ -108,34 +108,21 @@ fun SecuritySettingsScreen(
                         Triple("permissions",R.string.settings_permissions,Icons.Default.AdminPanelSettings),
                     ),navigate)}
                     item{SettingsGroup(R.string.settings_account_group,listOf(
+                        Triple("usage",R.string.settings_usage,Icons.Default.DataUsage),
                         Triple("account",R.string.settings_account,Icons.Default.AccountCircle),
                         Triple("help",R.string.settings_help_legal,Icons.Default.HelpOutline),
                     ),navigate)}
                 }
                 "appearance"->{
                     item{ChoiceSetting(R.string.theme,appearance.theme,listOf("SYSTEM" to R.string.settings_system,"LIGHT" to R.string.settings_light,"DARK" to R.string.settings_dark)){appearanceStore.setTheme(it);vm.updateAppearancePreference("theme",it)}}
-                    item{ChoiceSetting(R.string.language,when(currentLocale()){"ar"->"ARABIC";"fr"->"FRENCH";else->"ENGLISH"},listOf("SYSTEM" to R.string.settings_system,"ENGLISH" to R.string.english,"ARABIC" to R.string.arabic,"FRENCH" to R.string.french)){
+                    item{ChoiceSetting(R.string.language,currentLocale(),LocalePolicy.availableLocales().mapNotNull { code -> when(code){"en"->code to R.string.english;"ar"->code to R.string.arabic;"fr"->code to R.string.french;else->null} }){
                         when(it){
-                            "SYSTEM"->{
-                                PreAuthStore.clearLaterLanguageChoice(context)
-                                vm.updateAppearancePreference("language","SYSTEM")
-                                AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
-                            }
-                            "ENGLISH","ARABIC"->{
-                                val language=if(it=="ARABIC")"ar" else "en"
-                                PreAuthStore.persistLaterLanguageChoice(context,language)
-                                vm.updateAppearancePreference("language",it)
-                                applyPopLanguage(language)
-                            }
-                            "FRENCH"->{
-                                // The Phase H server enum predates French. Keep the supported
-                                // Android locale local until that shared preference contract changes.
-                                PreAuthStore.persistLaterLanguageChoice(context,"fr")
-                                applyPopLanguage("fr")
-                            }
+                            "en","ar"->vm.updateAppearancePreference("language",if(it=="ar")"ARABIC" else "ENGLISH")
                         }
+                        PreAuthStore.persistLaterLanguageChoice(context,it)
+                        applyPopLanguage(it)
                     }}
-                    item{ChoiceSetting(R.string.settings_font,appearance.font,listOf("DEFAULT" to R.string.settings_product_default,"CAIRO" to R.string.arabic,"ABEEZEE" to R.string.english)){appearanceStore.setFont(it);vm.updateAppearancePreference("font",it)}}
+                    item{Text(stringResource(R.string.settings_font),fontWeight=FontWeight.Bold);Text(if(LocalePolicy.isRtl(currentLocale()))"Cairo" else "ABeeZee",color=MaterialTheme.colorScheme.onSurfaceVariant)}
                     item{Text(stringResource(R.string.settings_accessibility_scale),color=MaterialTheme.colorScheme.onSurfaceVariant)}
                 }
                 "notifications"->{
@@ -206,6 +193,16 @@ fun SecuritySettingsScreen(
                     }}}
                     if(state.securityPasskeys.isEmpty())item{Text(stringResource(R.string.settings_no_passkeys))}
                 }
+                "usage"->state.quotaUsage?.let{quota->
+                    item{Text(stringResource(R.string.settings_usage_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    item{QuotaCard(stringResource(R.string.settings_storage),formatQuotaBytes(quota.storage.usedBytes),formatQuotaBytes(quota.storage.limitBytes),formatQuotaBytes(quota.storage.remainingBytes),quota.storage.overridden)}
+                    item{QuotaCard(stringResource(R.string.settings_links),quota.links.used.toString(),quota.links.limit.toString(),quota.links.remaining.toString(),quota.links.overridden)}
+                    quota.requests.firstOrNull()?.let{request->item{InfoCard(stringResource(R.string.settings_latest_request),request.status)}}
+                    if(quota.requests.none{it.status=="PENDING"}) {
+                        item{OutlinedButton({val limit=quota.storage.limitBytes.toLongOrNull()?:0L;vm.requestQuotaIncrease("MAX_STORAGE_BYTES",maxOf(limit*2,50L*1024L*1024L).toString())},Modifier.fillMaxWidth().heightIn(min=48.dp)){Text(stringResource(R.string.settings_request_storage))}}
+                        item{OutlinedButton({vm.requestQuotaIncrease("MAX_LINKS",maxOf(quota.links.limit*2,10).toString())},Modifier.fillMaxWidth().heightIn(min=48.dp)){Text(stringResource(R.string.settings_request_links))}}
+                    }
+                }
                 "account"->{
                     item{InfoCard(stringResource(R.string.settings_recovery_phone),stringResource(if(state.securityOverview?.recovery?.phoneVerified==true)R.string.settings_configured else R.string.settings_not_configured))}
                     item{Text(stringResource(R.string.settings_account_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
@@ -239,6 +236,8 @@ fun SecuritySettingsScreen(
 @Composable private fun ChoiceSetting(title:Int,value:String,choices:List<Pair<String,Int>>,change:(String)->Unit)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text(stringResource(title),fontWeight=FontWeight.Bold);choices.forEach{(key,label)->Row(Modifier.fillMaxWidth().clickable{change(key)}.padding(vertical=9.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(value==key,{change(key)});Text(stringResource(label))}}}}
 @Composable private fun ToggleSetting(label:Int,checked:Boolean,change:(Boolean)->Unit)=Card(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().clickable{change(!checked)}.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Text(stringResource(label),Modifier.weight(1f));Switch(checked,change)}}
 @Composable private fun InfoCard(label:String,value:String)=Card(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(label,fontWeight=FontWeight.Bold);Spacer(Modifier.width(12.dp));Text(value,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
+@Composable private fun QuotaCard(label:String,used:String,limit:String,remaining:String,overridden:Boolean)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(label,fontWeight=FontWeight.Black);Text("$used / $limit");Text("${stringResource(R.string.settings_remaining)}: $remaining",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);if(overridden)Text(stringResource(R.string.settings_custom_override),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}}
+private fun formatQuotaBytes(raw:String):String{val bytes=raw.toLongOrNull()?.coerceAtLeast(0)?:0L;val gib=1024L*1024L*1024L;val mib=1024L*1024L;return if(bytes>=gib&&bytes%gib==0L)"${bytes/gib} GB" else "${bytes/mib} MB"}
 @Composable private fun SecuritySummary(label:Int,value:String,click:()->Unit)=Card(Modifier.fillMaxWidth().clickable(onClick=click)){Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically){Text(stringResource(label),Modifier.weight(1f),fontWeight=FontWeight.Bold);Text(value);Icon(Icons.Default.ChevronRight,null)}}
 @Composable private fun DeviceCard(label:String,platform:String,last:String,auth:String,current:Boolean,push:Boolean)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Row{Text(label,Modifier.weight(1f),fontWeight=FontWeight.Bold);if(current)AssistChip({}, {Text(stringResource(R.string.settings_current))})};Text(platform);Text("${stringResource(R.string.settings_last_active)}: $last",style=MaterialTheme.typography.bodySmall);Text("${stringResource(R.string.settings_auth_method)}: $auth",style=MaterialTheme.typography.bodySmall);Text(stringResource(if(push)R.string.settings_push_enabled else R.string.settings_push_disabled),style=MaterialTheme.typography.bodySmall)}}
 @Composable private fun SessionCard(session:SecuritySessionDto,revoke:()->Unit)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Row{Text(session.label,Modifier.weight(1f),fontWeight=FontWeight.Bold);if(session.current)AssistChip({}, {Text(stringResource(R.string.settings_current))})};Text("${session.authority} · ${session.appName}");Text("${stringResource(R.string.settings_last_active)}: ${session.lastActiveAt}",style=MaterialTheme.typography.bodySmall);Text("${stringResource(R.string.settings_auth_method)}: ${session.authMethod}",style=MaterialTheme.typography.bodySmall);OutlinedButton(revoke){Text(stringResource(R.string.settings_sign_out_session))}}}

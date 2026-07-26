@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@popwam/db";
 import { createStorageKey, deleteObject, isStorageEnabled, uploadPublicFile, validateFileUpload } from "@popwam/storage";
 import { csrfRejected, getApiUser, isSameOriginMutation, unauthorized } from "@/lib/api-auth";
-import { assertWithinLimitLocked, getUserEntitlements } from "@/lib/plans";
+import { assertStorageWithinLimitLocked, assertWithinLimitLocked, getUserEntitlements } from "@/lib/plans";
 
 function planFailure(error: unknown) {
   const code = error instanceof Error ? error.message : "";
@@ -34,8 +34,7 @@ export async function POST(request: Request) {
       await assertWithinLimitLocked(tx, user.id, "links");
       if (!locked.allowFileUploads) throw new Error("LIMIT_REACHED:files");
       if (!await tx.profile.findFirst({ where: { id: profileId, userId: user.id }, select: { id: true } })) throw new Error("PROFILE_NOT_FOUND");
-      const storage = await tx.uploadedFile.aggregate({ where: { uploaderUserId: user.id }, _sum: { sizeBytes: true } });
-      if ((storage._sum.sizeBytes || 0n) + BigInt(file.size) > BigInt(locked.maxStorageBytes)) throw new Error("STORAGE_LIMIT_REACHED");
+      await assertStorageWithinLimitLocked(tx, user.id, BigInt(file.size));
       const titleAr = String(data.get("displayTitleAr") || "").trim() || null; const titleEn = String(data.get("displayTitleEn") || "").trim() || null;
       const sortOrder = await tx.uploadedFile.count({ where: { profileId } });
       const created = await tx.uploadedFile.create({ data: { profileId, uploaderUserId: user.id, storageKey: key!, publicUrl: uploaded.url, originalFilename: file.name, originalName: file.name, mimeType: file.type, sizeBytes: file.size, title: titleAr || titleEn, displayTitleAr: titleAr, displayTitleEn: titleEn, sortOrder } });
@@ -79,8 +78,7 @@ export async function PUT(request: Request) {
     const uploaded = await uploadPublicFile(new Uint8Array(await file.arrayBuffer()), { key: newKey, contentType: file.type, cacheControl: "public, max-age=3600" });
     await prisma.$transaction(async tx => {
       const { effective } = await assertWithinLimitLocked(tx, user.id, "files", 0);
-      const storage = await tx.uploadedFile.aggregate({ where: { uploaderUserId: user.id }, _sum: { sizeBytes: true } });
-      if ((storage._sum.sizeBytes || 0n) - current.sizeBytes + BigInt(file.size) > BigInt(effective.maxStorageBytes)) throw new Error("STORAGE_LIMIT_REACHED");
+      await assertStorageWithinLimitLocked(tx, user.id, BigInt(file.size), current.sizeBytes);
       const updated = await tx.uploadedFile.updateMany({ where: { id, uploaderUserId: user.id, storageKey: current.storageKey }, data: { storageKey: newKey!, publicUrl: uploaded.url, originalFilename: file.name, originalName: file.name, mimeType: file.type, sizeBytes: file.size } });
       if (updated.count !== 1) throw new Error("FILE_STATE_CHANGED");
       await tx.destination.updateMany({ where: { userId: user.id, type: "FILE", url: current.publicUrl }, data: { url: uploaded.url } });
