@@ -1,0 +1,290 @@
+package com.popwam.pop.ui
+
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
+import com.google.gson.JsonParser
+import com.popwam.pop.R
+import com.popwam.pop.data.auth.PasskeyCoordinator
+import com.popwam.pop.data.api.SecuritySessionDto
+import com.popwam.pop.ui.theme.AppearanceStore
+import kotlinx.coroutines.launch
+
+private data class StepUpAction(val purpose:String,val action:suspend (String)->Unit)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SecuritySettingsScreen(
+    section:String,
+    state:MainUiState,
+    vm:MainViewModel,
+    appearanceStore:AppearanceStore,
+    navigate:(String)->Unit,
+    back:()->Unit,
+    logout:()->Unit,
+) {
+    val context=LocalContext.current
+    val scope=rememberCoroutineScope()
+    val appearance by appearanceStore.state.collectAsState()
+    var stepUp by remember{mutableStateOf<StepUpAction?>(null)}
+    var confirm by remember{mutableStateOf<Pair<Int,()->Unit>?>(null)}
+    var passkeyFailure by remember{mutableStateOf(false)}
+    var phone by rememberSaveable{mutableStateOf("")}
+    var phoneChallenge by rememberSaveable{mutableStateOf("")}
+    var phoneCode by rememberSaveable{mutableStateOf("")}
+    var accountMessage by rememberSaveable{mutableStateOf("")}
+    LaunchedEffect(Unit){vm.loadSecuritySettings();vm.settingsViewed(section)}
+    LaunchedEffect(state.settingsPreferences?.theme,state.settingsPreferences?.font){
+        state.settingsPreferences?.let {
+            appearanceStore.setTheme(it.theme)
+            appearanceStore.setFont(it.font)
+        }
+    }
+
+    val title=when(section){
+        "appearance"->R.string.settings_appearance
+        "notifications"->R.string.settings_notifications
+        "privacy"->R.string.settings_privacy
+        "permissions"->R.string.settings_permissions
+        "security"->R.string.settings_security
+        "devices"->R.string.settings_devices
+        "sessions"->R.string.settings_sessions
+        "passkeys"->R.string.settings_passkeys
+        "account"->R.string.settings_account
+        "help"->R.string.settings_help_legal
+        else->R.string.settings_center_title
+    }
+    val phoneChangedCopy=stringResource(R.string.settings_phone_changed)
+    val deletionRequestedCopy=stringResource(R.string.settings_deletion_requested)
+    Scaffold(
+        topBar={TopAppBar(title={Text(stringResource(title),fontWeight=FontWeight.Black)},navigationIcon={IconButton(back){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))}})},
+    ){padding->
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding).padding(horizontal=18.dp),
+            contentPadding=PaddingValues(bottom=32.dp),
+            verticalArrangement=Arrangement.spacedBy(12.dp),
+        ){
+            if(state.loading&&state.settingsPreferences==null)item{LinearProgressIndicator(Modifier.fillMaxWidth());Text(stringResource(R.string.settings_loading))}
+            state.error?.takeIf{it.contains("SECURITY")||it.contains("SETTINGS")}?.let{item{Text(stringResource(R.string.generic_error),color=MaterialTheme.colorScheme.error);TextButton(vm::loadSecuritySettings){Text(stringResource(R.string.settings_retry))}}}
+            when(section){
+                "root"->{
+                    item{Text(stringResource(R.string.settings_center_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    item{SettingsGroup(R.string.settings_security_group,listOf(
+                        Triple("security",R.string.settings_security,Icons.Default.Security),
+                        Triple("devices",R.string.settings_devices,Icons.Default.Devices),
+                        Triple("sessions",R.string.settings_sessions,Icons.Default.LockClock),
+                        Triple("passkeys",R.string.settings_passkeys,Icons.Default.Key),
+                    ),navigate)}
+                    item{SettingsGroup(R.string.settings_preferences_group,listOf(
+                        Triple("appearance",R.string.settings_appearance,Icons.Default.Palette),
+                        Triple("notifications",R.string.settings_notifications,Icons.Default.Notifications),
+                        Triple("privacy",R.string.settings_privacy,Icons.Default.PrivacyTip),
+                        Triple("permissions",R.string.settings_permissions,Icons.Default.AdminPanelSettings),
+                    ),navigate)}
+                    item{SettingsGroup(R.string.settings_account_group,listOf(
+                        Triple("account",R.string.settings_account,Icons.Default.AccountCircle),
+                        Triple("help",R.string.settings_help_legal,Icons.Default.HelpOutline),
+                    ),navigate)}
+                }
+                "appearance"->{
+                    item{ChoiceSetting(R.string.theme,appearance.theme,listOf("SYSTEM" to R.string.settings_system,"LIGHT" to R.string.settings_light,"DARK" to R.string.settings_dark)){appearanceStore.setTheme(it);vm.updateAppearancePreference("theme",it)}}
+                    item{ChoiceSetting(R.string.language,when(currentLocale()){"ar"->"ARABIC";"fr"->"FRENCH";else->"ENGLISH"},listOf("SYSTEM" to R.string.settings_system,"ENGLISH" to R.string.english,"ARABIC" to R.string.arabic,"FRENCH" to R.string.french)){
+                        when(it){
+                            "SYSTEM"->{
+                                PreAuthStore.clearLaterLanguageChoice(context)
+                                vm.updateAppearancePreference("language","SYSTEM")
+                                AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+                            }
+                            "ENGLISH","ARABIC"->{
+                                val language=if(it=="ARABIC")"ar" else "en"
+                                PreAuthStore.persistLaterLanguageChoice(context,language)
+                                vm.updateAppearancePreference("language",it)
+                                applyPopLanguage(language)
+                            }
+                            "FRENCH"->{
+                                // The Phase H server enum predates French. Keep the supported
+                                // Android locale local until that shared preference contract changes.
+                                PreAuthStore.persistLaterLanguageChoice(context,"fr")
+                                applyPopLanguage("fr")
+                            }
+                        }
+                    }}
+                    item{ChoiceSetting(R.string.settings_font,appearance.font,listOf("DEFAULT" to R.string.settings_product_default,"CAIRO" to R.string.arabic,"ABEEZEE" to R.string.english)){appearanceStore.setFont(it);vm.updateAppearancePreference("font",it)}}
+                    item{Text(stringResource(R.string.settings_accessibility_scale),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                }
+                "notifications"->{
+                    item{InfoCard(stringResource(R.string.settings_notification_permission),permissionText(notificationPermissionState(context)))}
+                    state.notificationPreferences?.let{preferences->
+                        item{ToggleSetting(R.string.settings_general_notifications,preferences.generalEnabled){vm.updateNotificationPreference("generalEnabled",it)}}
+                        item{ToggleSetting(R.string.settings_security_notifications,preferences.securityEnabled){vm.updateNotificationPreference("securityEnabled",it)}}
+                        item{ToggleSetting(R.string.settings_product_notifications,preferences.productsEnabled){vm.updateNotificationPreference("productsEnabled",it)}}
+                        item{ToggleSetting(R.string.settings_social_notifications,preferences.socialEnabled){vm.updateNotificationPreference("socialEnabled",it)}}
+                        item{ToggleSetting(R.string.settings_marketing_notifications,preferences.marketingEnabled){vm.updateNotificationPreference("marketingEnabled",it)}}
+                    }
+                    item{Text(stringResource(R.string.settings_notification_foundation),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                }
+                "privacy"->state.settingsPreferences?.let{preferences->
+                    item{ToggleSetting(R.string.settings_share_activity_identity,preferences.privacy.shareActivityIdentity){vm.updatePrivacyPreference("shareActivityIdentity",it)}}
+                    item{InfoCard(stringResource(R.string.settings_profile_visibility),preferences.privacy.profileVisibility)}
+                    item{InfoCard(stringResource(R.string.settings_blocked_users),preferences.privacy.blockedUsers.toString())}
+                    item{InfoCard(stringResource(R.string.nearby_users),if(preferences.privacy.nearby.enabled)stringResource(R.string.settings_nearby_enabled) else stringResource(R.string.settings_nearby_off))}
+                    item{OutlinedButton({navigate("nearby")},Modifier.fillMaxWidth().heightIn(min=48.dp)){Icon(Icons.Default.LocationOn,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.nearby_manage))}}
+                    item{Button({navigate("friends/privacy")},Modifier.fillMaxWidth().heightIn(min=48.dp)){Icon(Icons.Default.Groups,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.friends_manage_privacy))}}
+                    item{OutlinedButton({navigate("friends/blocked")},Modifier.fillMaxWidth().heightIn(min=48.dp)){Icon(Icons.Default.Block,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.friends_manage_blocked))}}
+                }
+                "permissions"->{
+                    item{PermissionRow(R.string.settings_camera,permissionState(context,Manifest.permission.CAMERA))}
+                    item{PermissionRow(R.string.settings_nfc,if(context.packageManager.hasSystemFeature(PackageManager.FEATURE_NFC))"ALLOWED" else "UNAVAILABLE")}
+                    item{PermissionRow(R.string.settings_location,permissionState(context,Manifest.permission.ACCESS_COARSE_LOCATION))}
+                    item{PermissionRow(R.string.settings_notifications,notificationPermissionState(context))}
+                    item{PermissionRow(R.string.settings_contacts,permissionState(context,Manifest.permission.READ_CONTACTS))}
+                    item{Text(stringResource(R.string.settings_permissions_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    item{Button({context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:${context.packageName}")))},Modifier.fillMaxWidth()){Text(stringResource(R.string.settings_open_system_settings))}}
+                }
+                "security"->state.securityOverview?.let{overview->
+                    item{SecuritySummary(R.string.settings_passkeys,if(overview.passkey.configured)"${overview.passkey.count} · ${stringResource(R.string.settings_configured)}" else stringResource(R.string.settings_not_configured)){navigate("passkeys")}}
+                    item{SecuritySummary(R.string.settings_active_devices,overview.devices.active.toString()){navigate("devices")}}
+                    item{SecuritySummary(R.string.settings_active_sessions,overview.sessions.active.toString()){navigate("sessions")}}
+                    item{SecuritySummary(R.string.settings_recovery_phone,stringResource(if(overview.recovery.phoneVerified)R.string.settings_configured else R.string.settings_not_configured)){navigate("account")}}
+                }
+                "devices"->{
+                    item{Text(stringResource(R.string.settings_device_authority_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    items(state.securityDevices,key={it.id}){device->DeviceCard(device.label,"${device.platform} · ${device.appName}",device.lastActiveAt,device.authMethod,device.current,device.pushEnabled)}
+                    if(state.securityDevices.isEmpty())item{EmptySettings()}
+                    item{Text(stringResource(R.string.settings_fcm_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                }
+                "sessions"->{
+                    item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        OutlinedButton({confirm=R.string.settings_confirm_others to {stepUp=StepUpAction("REVOKE_OTHER_SESSIONS"){vm.revokeOtherSecuritySessions(it)}}},Modifier.weight(1f)){Text(stringResource(R.string.settings_sign_out_others))}
+                        Button({confirm=R.string.settings_confirm_all to {stepUp=StepUpAction("SECURITY_SETTINGS"){vm.revokeAllSecuritySessions(it,logout)}}},Modifier.weight(1f),colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.settings_sign_out_everywhere))}
+                    }}
+                    items(state.securitySessions,key={it.id}){session->SessionCard(session){
+                        confirm=R.string.settings_confirm_revoke to {stepUp=StepUpAction("REVOKE_SESSION"){grant->vm.revokeSecuritySession(session.id,grant,logout)}}
+                    }}
+                    if(state.securitySessions.isEmpty())item{EmptySettings()}
+                }
+                "passkeys"->{
+                    item{Button({vm.passkeyManagementEnrollmentShown();stepUp=StepUpAction("ADD_PASSKEY"){grant->
+                        runCatching{
+                            val options=vm.passkeyRegistrationOptions(grant)
+                            val response=PasskeyCoordinator(context).register(context,options.toString())
+                            check(vm.verifyPasskeyRegistration(JsonParser.parseString(response).asJsonObject))
+                        }.onFailure{passkeyFailure=true}
+                    }},Modifier.fillMaxWidth()){Icon(Icons.Default.Key,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.settings_add_passkey))}}
+                    if(passkeyFailure)item{Text(stringResource(R.string.settings_passkey_failed),color=MaterialTheme.colorScheme.error)}
+                    items(state.securityPasskeys,key={it.id}){passkey->Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
+                        Text(passkey.name,fontWeight=FontWeight.Bold)
+                        Text("${stringResource(R.string.settings_created)}: ${passkey.createdAt}",style=MaterialTheme.typography.bodySmall)
+                        Text("${stringResource(R.string.settings_last_used)}: ${passkey.lastUsedAt ?: stringResource(R.string.never)}",style=MaterialTheme.typography.bodySmall)
+                        OutlinedButton({confirm=R.string.settings_remove_confirm to {stepUp=StepUpAction("REMOVE_PASSKEY"){vm.removeSecurityPasskey(passkey.id,it)}}}){Text(stringResource(R.string.settings_remove_passkey))}
+                    }}}
+                    if(state.securityPasskeys.isEmpty())item{Text(stringResource(R.string.settings_no_passkeys))}
+                }
+                "account"->{
+                    item{InfoCard(stringResource(R.string.settings_recovery_phone),stringResource(if(state.securityOverview?.recovery?.phoneVerified==true)R.string.settings_configured else R.string.settings_not_configured))}
+                    item{Text(stringResource(R.string.settings_account_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                        Text(stringResource(R.string.settings_change_phone),fontWeight=FontWeight.Black)
+                        if(phoneChallenge.isBlank()){
+                            OutlinedTextField(phone,{phone=it.take(32)},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.settings_new_phone))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone))
+                            Button({stepUp=StepUpAction("CHANGE_PHONE"){grant->val result=vm.startPhoneChange(phone,currentLocale(),grant);if(result.ok){phoneChallenge=result.challengeId;accountMessage=result.maskedPhone}else error(result.error ?: "PHONE_CHANGE_FAILED")}},Modifier.fillMaxWidth(),enabled=phone.isNotBlank()){Text(stringResource(R.string.settings_send_code))}
+                        }else{
+                            OutlinedTextField(phoneCode,{phoneCode=it.filter(Char::isDigit).take(6)},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.step_up_code))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword))
+                            Button({scope.launch{val result=runCatching{vm.verifyPhoneChange(phoneChallenge,phoneCode)}.getOrNull();if(result?.ok==true){accountMessage=phoneChangedCopy;phone="";phoneCode="";phoneChallenge="";vm.loadSecuritySettings()}}},Modifier.fillMaxWidth(),enabled=phoneCode.length==6){Text(stringResource(R.string.step_up_verify))}
+                        }
+                    }}}
+                    item{Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.errorContainer)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(stringResource(R.string.settings_delete_account),fontWeight=FontWeight.Black,color=MaterialTheme.colorScheme.onErrorContainer);Text(stringResource(R.string.settings_delete_help),color=MaterialTheme.colorScheme.onErrorContainer);Button({confirm=R.string.settings_delete_confirm to {stepUp=StepUpAction("DELETE_ACCOUNT"){grant->val result=vm.requestAccountDeletion(grant);if(result.ok)accountMessage=deletionRequestedCopy else error(result.error ?: "DELETE_REQUEST_FAILED")}}},colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.settings_delete_account))}}}}
+                    if(accountMessage.isNotBlank())item{Text(accountMessage,color=MaterialTheme.colorScheme.primary)}
+                    item{OutlinedButton(logout,Modifier.fillMaxWidth()){Icon(Icons.Default.Logout,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.logout))}}
+                }
+                "help"->{
+                    item{Button({openWeb(context,"ideas")},Modifier.fillMaxWidth()){Text(stringResource(R.string.settings_help))}}
+                    item{OutlinedButton({navigate("legal/terms")},Modifier.fillMaxWidth()){Text(stringResource(R.string.terms))}}
+                    item{OutlinedButton({navigate("legal/privacy")},Modifier.fillMaxWidth()){Text(stringResource(R.string.privacy))}}
+                }
+            }
+        }
+    }
+    confirm?.let{pending->AlertDialog(onDismissRequest={confirm=null},title={Text(stringResource(pending.first))},confirmButton={TextButton({confirm=null;pending.second()}){Text(stringResource(R.string.continue_label))}},dismissButton={TextButton({confirm=null}){Text(stringResource(R.string.cancel))}})}
+    stepUp?.let{pending->StepUpSheet(vm,pending.purpose,{stepUp=null},{grant->pending.action(grant);stepUp=null})}
+}
+
+@Composable private fun SettingsGroup(title:Int,rows:List<Triple<String,Int,androidx.compose.ui.graphics.vector.ImageVector>>,navigate:(String)->Unit)=Card(Modifier.fillMaxWidth()){Column{Text(stringResource(title),Modifier.padding(16.dp),fontWeight=FontWeight.Black);rows.forEach{(route,label,icon)->Row(Modifier.fillMaxWidth().clickable{navigate(route)}.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null);Spacer(Modifier.width(12.dp));Text(stringResource(label),Modifier.weight(1f));Icon(Icons.Default.ChevronRight,null)}}}}
+@Composable private fun ChoiceSetting(title:Int,value:String,choices:List<Pair<String,Int>>,change:(String)->Unit)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text(stringResource(title),fontWeight=FontWeight.Bold);choices.forEach{(key,label)->Row(Modifier.fillMaxWidth().clickable{change(key)}.padding(vertical=9.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(value==key,{change(key)});Text(stringResource(label))}}}}
+@Composable private fun ToggleSetting(label:Int,checked:Boolean,change:(Boolean)->Unit)=Card(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().clickable{change(!checked)}.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Text(stringResource(label),Modifier.weight(1f));Switch(checked,change)}}
+@Composable private fun InfoCard(label:String,value:String)=Card(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(label,fontWeight=FontWeight.Bold);Spacer(Modifier.width(12.dp));Text(value,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
+@Composable private fun SecuritySummary(label:Int,value:String,click:()->Unit)=Card(Modifier.fillMaxWidth().clickable(onClick=click)){Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically){Text(stringResource(label),Modifier.weight(1f),fontWeight=FontWeight.Bold);Text(value);Icon(Icons.Default.ChevronRight,null)}}
+@Composable private fun DeviceCard(label:String,platform:String,last:String,auth:String,current:Boolean,push:Boolean)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Row{Text(label,Modifier.weight(1f),fontWeight=FontWeight.Bold);if(current)AssistChip({}, {Text(stringResource(R.string.settings_current))})};Text(platform);Text("${stringResource(R.string.settings_last_active)}: $last",style=MaterialTheme.typography.bodySmall);Text("${stringResource(R.string.settings_auth_method)}: $auth",style=MaterialTheme.typography.bodySmall);Text(stringResource(if(push)R.string.settings_push_enabled else R.string.settings_push_disabled),style=MaterialTheme.typography.bodySmall)}}
+@Composable private fun SessionCard(session:SecuritySessionDto,revoke:()->Unit)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Row{Text(session.label,Modifier.weight(1f),fontWeight=FontWeight.Bold);if(session.current)AssistChip({}, {Text(stringResource(R.string.settings_current))})};Text("${session.authority} · ${session.appName}");Text("${stringResource(R.string.settings_last_active)}: ${session.lastActiveAt}",style=MaterialTheme.typography.bodySmall);Text("${stringResource(R.string.settings_auth_method)}: ${session.authMethod}",style=MaterialTheme.typography.bodySmall);OutlinedButton(revoke){Text(stringResource(R.string.settings_sign_out_session))}}}
+@Composable private fun EmptySettings()=Text(stringResource(R.string.settings_empty),Modifier.fillMaxWidth().padding(24.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)
+
+private fun declared(context:android.content.Context,permission:String)=context.packageManager.getPackageInfo(context.packageName,PackageManager.GET_PERMISSIONS).requestedPermissions?.contains(permission)==true
+private fun permissionState(context:android.content.Context,permission:String):String {
+    return devicePermissionState(
+        declared(context,permission),
+        ContextCompat.checkSelfPermission(context,permission)==PackageManager.PERMISSION_GRANTED,
+        context is Activity&&ActivityCompat.shouldShowRequestPermissionRationale(context,permission),
+    )
+}
+private fun notificationPermissionState(context:android.content.Context)=if(Build.VERSION.SDK_INT<33)"ALLOWED" else permissionState(context,Manifest.permission.POST_NOTIFICATIONS)
+@Composable private fun permissionText(value:String)=stringResource(when(value){"ALLOWED"->R.string.settings_allowed;"DENIED"->R.string.settings_denied;"NOT_REQUESTED"->R.string.settings_not_requested;else->R.string.settings_unavailable})
+@Composable private fun PermissionRow(label:Int,value:String)=InfoCard(stringResource(label),permissionText(value))
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable internal fun StepUpSheet(vm:MainViewModel,purpose:String,dismiss:()->Unit,verified:suspend (String)->Unit) {
+    val context=LocalContext.current
+    val scope=rememberCoroutineScope()
+    var methods by remember{mutableStateOf<List<String>>(emptyList())}
+    var challengeId by rememberSaveable{mutableStateOf("")}
+    var maskedPhone by rememberSaveable{mutableStateOf("")}
+    var code by rememberSaveable{mutableStateOf("")}
+    var loading by remember{mutableStateOf(true)}
+    var failed by remember{mutableStateOf(false)}
+    LaunchedEffect(purpose){runCatching{vm.stepUpOptions(purpose)}.onSuccess{methods=it.methods}.onFailure{failed=true};loading=false}
+    ModalBottomSheet(onDismissRequest=dismiss){Column(Modifier.fillMaxWidth().imePadding().padding(22.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+        Text(stringResource(R.string.step_up_title),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Black)
+        Text(stringResource(R.string.step_up_help),color=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(loading)CircularProgressIndicator()
+        if(failed)Text(stringResource(R.string.step_up_unavailable),color=MaterialTheme.colorScheme.error)
+        if(challengeId.isBlank()){
+            if("PASSKEY" in methods)Button({scope.launch{loading=true;runCatching{
+                val result=vm.stepUpOptions(purpose,"PASSKEY",currentLocale())
+                val assertion=PasskeyCoordinator(context).authenticate(context,result.options!!.toString())
+                val grant=vm.verifyPasskeyStepUp(purpose,JsonParser.parseString(assertion).asJsonObject).grantToken ?: error("STEP_UP_INVALID")
+                verified(grant)
+            }.onFailure{failed=true};loading=false}},Modifier.fillMaxWidth(),enabled=!loading){Text(stringResource(R.string.step_up_passkey))}
+            if("OTP" in methods)OutlinedButton({scope.launch{loading=true;runCatching{vm.stepUpOptions(purpose,"OTP",currentLocale())}.onSuccess{challengeId=it.challengeId.orEmpty();maskedPhone=it.maskedPhone.orEmpty()}.onFailure{failed=true};loading=false}},Modifier.fillMaxWidth(),enabled=!loading){Text(stringResource(R.string.step_up_phone))}
+        }else{
+            Text(stringResource(R.string.step_up_sent_to,maskedPhone))
+            OutlinedTextField(code,{code=it.filter(Char::isDigit).take(6)},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.step_up_code))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword))
+            Button({scope.launch{loading=true;runCatching{vm.verifyOtpStepUp(purpose,challengeId,code).grantToken ?: error("STEP_UP_INVALID")}.onSuccess{verified(it)}.onFailure{failed=true};loading=false}},Modifier.fillMaxWidth(),enabled=!loading&&code.length==6){Text(stringResource(R.string.step_up_verify))}
+        }
+        TextButton(dismiss,Modifier.fillMaxWidth()){Text(stringResource(R.string.cancel))}
+    }}
+}

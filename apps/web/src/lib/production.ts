@@ -1,5 +1,5 @@
 import { getPermanentCardUrl } from "@popwam/shared";
-import { createActivationCode, createOpaqueToken, hashActivationToken } from "./card-tokens";
+import { createActivationScratchSecret, createOpaqueToken, hashActivationScratchSecret, hashActivationToken } from "./card-tokens";
 
 export function cardTypeForInventoryItem(type: string) {
   if (type === "BLANK_STICKER") return "NFC_STICKER" as const;
@@ -18,20 +18,23 @@ export function createProductionRows(input: {
   startingSerialNumber: number;
   serialPrefix: string;
   publicSlugPrefix: string;
+  scratchHashCost?: number;
 }) {
   const width = Math.max(6, String(input.startingSerialNumber + input.quantity - 1).length);
   return Array.from({ length: input.quantity }, (_, index) => {
     const sequence = input.startingSerialNumber + index;
     const suffix = String(sequence).padStart(width, "0");
-    const activationCode = createActivationCode();
+    const scratchSecret = createActivationScratchSecret();
+    const disabledLegacyToken = createOpaqueToken();
     const publicSlug = `${input.publicSlugPrefix}${suffix}`;
     return {
       serialNumber: `${input.serialPrefix}${suffix}`,
       publicSlug,
       immutableToken: createOpaqueToken(24),
       permanentUrl: getPermanentCardUrl(publicSlug),
-      activationCode,
-      activationTokenHash: hashActivationToken(activationCode),
+      scratchSecret,
+      activationSecretHash: hashActivationScratchSecret(scratchSecret, undefined, input.scratchHashCost),
+      activationTokenHash: hashActivationToken(disabledLegacyToken),
     };
   });
 }

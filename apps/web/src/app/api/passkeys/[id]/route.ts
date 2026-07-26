@@ -1,3 +1,17 @@
-import {prisma} from "@popwam/db";
-import {csrfRejected,getApiUser,isSameOriginMutation,unauthorized} from "@/lib/api-auth";
-export async function DELETE(request:Request,{params}:{params:Promise<{id:string}>}){if(!isSameOriginMutation(request))return csrfRejected();const user=await getApiUser();if(!user)return unauthorized();const {id}=await params;const result=await prisma.passkeyCredential.updateMany({where:{id,userId:user.id,revokedAt:null},data:{revokedAt:new Date()}});return result.count?Response.json({ok:true}):Response.json({ok:false,error:"NOT_FOUND"},{status:404})}
+import { csrfRejected, getCurrentPopSessionContext, isTrustedPopMutation, unauthorized } from "@/lib/api-auth";
+import { removeSafePasskey } from "@/lib/security-passkeys";
+import { stepUpGrantFromRequest } from "@/lib/security-step-up";
+
+/** Compatibility alias for the Phase H passkey-management endpoint. */
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isTrustedPopMutation(request)) return csrfRejected();
+  const context = await getCurrentPopSessionContext(request);
+  if (!context) return unauthorized();
+  const { id } = await params;
+  try {
+    const result = await removeSafePasskey(context, id, stepUpGrantFromRequest(request));
+    return result.ok ? Response.json(result) : Response.json(result, { status: result.error === "NOT_FOUND" ? 404 : 409 });
+  } catch {
+    return Response.json({ ok: false, error: "STEP_UP_REQUIRED" }, { status: 428 });
+  }
+}

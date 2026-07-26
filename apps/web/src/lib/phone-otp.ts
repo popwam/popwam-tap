@@ -94,8 +94,7 @@ export async function deliverWithFallback(input: PhoneOtpInput, providers: Phone
   return last || { status: "FAILED", provider: "none", channel: primary, error: "CONFIGURATION" as const };
 }
 
-export function parseCountryRules(value: string, providerName: string) {
-  if (providerName !== "smsmisr") return null;
+export function parseCountryRules(value: string, _providerName?: string) {
   const countries = value.split(/[\s,]+/).map(item => item.trim().toUpperCase()).filter(item => /^[A-Z]{2}$/.test(item));
-  return new Set(countries.length ? countries : ["EG"]);
+  return countries.length ? new Set(countries) : null;
 }

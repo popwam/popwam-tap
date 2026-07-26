@@ -4,24 +4,36 @@ import { Prisma, prisma } from "@popwam/db";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { assertWithinLimitLocked } from "@/lib/plans";
+import { getCurrentWebPopSessionContext } from "@/lib/api-auth";
+import { consumeStepUpGrant } from "@/lib/security-step-up";
 
 const text = (data: FormData, key: string) => String(data.get(key) || "").trim();
 
 export async function requestTagTransfer(data: FormData) {
   const user = await requireUser();
+  const context = await getCurrentWebPopSessionContext();
+  if (!context || context.user.id !== user.id) throw new Error("AUTH_REQUIRED");
   const cardId = text(data, "cardId");
   const recipientUsername = text(data, "username").toLowerCase().replace(/^@/, "");
   if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(recipientUsername) || recipientUsername === user.username) throw new Error("TRANSFER_USERNAME_INVALID");
   const [card, recipient, pending] = await Promise.all([
-    prisma.card.findFirst({ where: { id: cardId, ownerId: user.id }, select: { id: true } }),
+    prisma.card.findFirst({ where: { id: cardId, ownerId: user.id, cardStatus: { in: ["ACTIVE", "PAUSED"] } }, select: { id: true } }),
     prisma.user.findUnique({ where: { username: recipientUsername }, select: { id: true, status: true } }),
     prisma.tagTransfer.findFirst({ where: { tagId: cardId, status: "PENDING", expiresAt: { gt: new Date() } }, select: { id: true } }),
   ]);
   if (!card) throw new Error("CARD_NOT_FOUND");
   if (pending) throw new Error("TRANSFER_ALREADY_PENDING");
   if (!recipient || recipient.status !== "ACTIVE") throw new Error("RECIPIENT_NOT_ACTIVE");
-  const transfer = await prisma.tagTransfer.create({ data: { tagId: card.id, fromUserId: user.id, toUserId: recipient.id, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } });
-  await prisma.auditLog.create({ data: { actorId: user.id, operation: "tag.transfer.request", targetId: transfer.id, metadata: { cardId } } });
+  await prisma.$transaction(async tx => {
+    await consumeStepUpGrant(tx, context, "PRODUCT_TRANSFER", text(data, "stepUpGrant"));
+    await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Card" WHERE "id" = ${cardId} FOR UPDATE`);
+    const currentCard = await tx.card.findFirst({ where: { id: cardId, ownerId: user.id, cardStatus: { in: ["ACTIVE", "PAUSED"] } }, select: { id: true } });
+    const currentPending = await tx.tagTransfer.findFirst({ where: { tagId: cardId, status: "PENDING", expiresAt: { gt: new Date() } }, select: { id: true } });
+    if (!currentCard) throw new Error("CARD_NOT_FOUND");
+    if (currentPending) throw new Error("TRANSFER_ALREADY_PENDING");
+    const transfer = await tx.tagTransfer.create({ data: { tagId: currentCard.id, fromUserId: user.id, toUserId: recipient.id, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } });
+    await tx.auditLog.create({ data: { actorId: user.id, operation: "security.product_transfer.requested", targetId: transfer.id, metadata: { outcome: "SUCCESS" } } });
+  }, { isolationLevel: "Serializable" });
   revalidatePath("/dashboard/transfers");
 }
 
@@ -29,6 +41,8 @@ export async function updateTransferUsername(data:FormData){const user=await req
 
 export async function respondToTagTransfer(data: FormData) {
   const user = await requireUser();
+  const context = await getCurrentWebPopSessionContext();
+  if (!context || context.user.id !== user.id) throw new Error("AUTH_REQUIRED");
   const transferId = text(data, "transferId");
   const response = text(data, "response");
   if (response !== "accept" && response !== "reject") throw new Error("TRANSFER_RESPONSE_INVALID");
@@ -46,12 +60,14 @@ export async function respondToTagTransfer(data: FormData) {
       await tx.auditLog.create({ data: { actorId: user.id, operation: "tag.transfer.reject", targetId: transfer.id } });
       return;
     }
+    await consumeStepUpGrant(tx, context, "PRODUCT_TRANSFER", text(data, "stepUpGrant"));
     await assertWithinLimitLocked(tx, user.id, "cards");
     if (transfer.tag.ownerId !== transfer.fromUserId) throw new Error("TRANSFER_OWNER_CHANGED");
+    if (transfer.tag.cardStatus !== "ACTIVE" && transfer.tag.cardStatus !== "PAUSED") throw new Error("TRANSFER_PRODUCT_STATE_INVALID");
     await tx.card.update({ where: { id: transfer.tagId }, data: { ownerId: user.id, organizationId: null, profileId: null, virtualCardId: null, activeDestinationId: null, assignmentStatus: "TRANSFERRED", cardStatus: "PAUSED", assignedAt: new Date() } });
     await tx.producedTag.updateMany({ where: { cardId: transfer.tagId }, data: { assignedUserId: user.id, status: "ASSIGNED" } });
     await tx.tagTransfer.update({ where: { id: transfer.id }, data: { status: "ACCEPTED", toUserId: user.id } });
-    await tx.auditLog.create({ data: { actorId: user.id, operation: "tag.transfer.accept", targetId: transfer.id, metadata: { cardId: transfer.tagId, fromUserId: transfer.fromUserId } } });
+    await tx.auditLog.create({ data: { actorId: user.id, operation: "security.product_transfer.accepted", targetId: transfer.id, metadata: { outcome: "SUCCESS" } } });
   }, { isolationLevel: "Serializable" });
   revalidatePath("/dashboard/transfers");
   revalidatePath("/dashboard/tags");

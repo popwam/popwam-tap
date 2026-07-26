@@ -1,2 +1,49 @@
-import Link from "next/link";import {prisma} from "@popwam/db";import {getPermanentCardUrl,getTagUrl} from "@popwam/shared";import {requireUser} from "@/lib/session";import {getI18n} from "@/lib/i18n";import {getUserEntitlements,getUserUsage} from "@/lib/plans";import {updateOwnedCard} from "@/app/business-actions";import {PageHeading} from "@/components/page-heading";import {Badge} from "@/components/badge";import {QrCard} from "@/components/qr-card";import {CopyUrl} from "@/components/copy-url";
-export default async function TagsPage(){const user=await requireUser();const {dictionary:d}=await getI18n();const [cards,legacy,destinations,{effective},usage]=await Promise.all([prisma.card.findMany({where:{ownerId:user.id},include:{activeDestination:true},orderBy:{createdAt:"desc"}}),prisma.tag.findMany({where:{ownerId:user.id},orderBy:{createdAt:"desc"}}),prisma.destination.findMany({where:{userId:user.id,isActive:true},orderBy:{title:"asc"}}),getUserEntitlements(user.id),getUserUsage(user.id)]);return <><PageHeading eyebrow="NFC + QR" title={d.nav.tags} description="الرابط الدائم نفسه قبل التفعيل وبعده، ويفتح وجهة واحدة مختارة فقط."/><p className="mb-5 text-sm text-slate-400">Cards: <strong className="text-white">{usage.cards} / {effective.maxCards}</strong></p><div className="space-y-5">{cards.map(card=>{const url=getPermanentCardUrl(card.publicSlug);return <article className="card grid gap-5 p-5 lg:grid-cols-[120px_1fr]" key={card.id}><QrCard value={url} name={card.serialNumber} compact/><div><div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-bold" dir="ltr">{card.serialNumber}</h2><div className="mt-2 flex gap-2"><Badge value={card.cardStatus}/><Badge value={card.assignmentStatus}/></div></div><Link className="btn-secondary" href={`/dashboard/tags/${card.id}`}>Details</Link></div><div className="mt-4 flex items-center gap-2 rounded-xl bg-black/25 p-3 text-xs"><code className="min-w-0 flex-1 truncate" dir="ltr">{url}</code><CopyUrl value={url}/></div><p className="mt-3 text-sm text-slate-400">{d.tag.currentOpens}: {card.activeDestination?.title||d.tag.unconfigured} · Opens: {card.openCount}</p><form action={updateOwnedCard} className="mt-4 grid gap-3 sm:grid-cols-3"><input type="hidden" name="cardId" value={card.id}/><select className="input" name="activeDestinationId" defaultValue={card.activeDestinationId||""}><option value="">{d.tag.unconfigured}</option>{destinations.map(x=><option value={x.id} key={x.id}>{x.title} · {x.type}</option>)}</select><select className="input" name="cardStatus" defaultValue={card.cardStatus}><option>ACTIVE</option><option>PAUSED</option><option>LOST</option></select><button className="btn-primary">{d.common.save}</button></form></div></article>})}</div>{legacy.length>0&&<section className="mt-8"><h2 className="mb-3 font-bold">Legacy records / السجلات القديمة</h2><div className="grid gap-3">{legacy.map(tag=><div className="card flex items-center justify-between p-4" key={tag.id}><div><strong>{tag.name}</strong><p className="text-xs text-slate-500" dir="ltr">{getTagUrl(tag.shortCode)}</p></div><Badge value={tag.status}/></div>)}</div></section>}{!cards.length&&!legacy.length&&<div className="card p-10 text-center text-slate-400">لا توجد بطاقات معيّنة / No cards assigned yet.</div>}</>}
+import Link from "next/link";
+import { prisma } from "@popwam/db";
+import { getPermanentCardUrl, getTagUrl } from "@popwam/shared";
+import { updateOwnedCard } from "@/app/business-actions";
+import { Badge } from "@/components/badge";
+import { CopyUrl } from "@/components/copy-url";
+import { PageHeading } from "@/components/page-heading";
+import { QrCard } from "@/components/qr-card";
+import { getI18n } from "@/lib/i18n";
+import { getUserEntitlements, getUserUsage } from "@/lib/plans";
+import { requireUser } from "@/lib/session";
+
+export default async function TagsPage() {
+  const user = await requireUser();
+  const { dictionary: d } = await getI18n();
+  const [cards, legacy, destinations, { effective }, usage] = await Promise.all([
+    prisma.card.findMany({ where: { ownerId: user.id }, include: { activeDestination: true }, orderBy: { createdAt: "desc" } }),
+    prisma.tag.findMany({ where: { ownerId: user.id }, orderBy: { createdAt: "desc" } }),
+    prisma.destination.findMany({ where: { userId: user.id, isActive: true }, orderBy: { title: "asc" } }),
+    getUserEntitlements(user.id),
+    getUserUsage(user.id),
+  ]);
+  return <>
+    <PageHeading eyebrow="NFC + QR" title={d.nav.tags} description={d.tag.permanentHelp}/>
+    <p className="mb-5 text-sm text-slate-400">Cards: <strong className="text-white">{usage.cards} / {effective.maxCards}</strong></p>
+    <div className="space-y-5">{cards.map(card => {
+      const url = getPermanentCardUrl(card.publicSlug);
+      return <article className="card grid gap-5 p-5 lg:grid-cols-[120px_1fr]" key={card.id}>
+        <QrCard value={url} name={card.serialNumber} compact/>
+        <div>
+          <div className="flex flex-wrap justify-between gap-3">
+            <div><h2 className="font-bold" dir="ltr">{card.serialNumber}</h2><div className="mt-2 flex gap-2"><Badge value={card.cardStatus}/><Badge value={card.assignmentStatus}/></div></div>
+            <Link className="btn-secondary" href={`/dashboard/tags/${card.id}`}>{d.common.edit}</Link>
+          </div>
+          <div className="mt-4 flex items-center gap-2 rounded-xl bg-black/25 p-3 text-xs"><code className="min-w-0 flex-1 truncate" dir="ltr">{url}</code><CopyUrl value={url}/></div>
+          <p className="mt-3 text-sm text-slate-400">{d.tag.currentOpens}: {card.activeDestination?.title || d.tag.unconfigured} · {card.openCount}</p>
+          {(card.cardStatus === "ACTIVE" || card.cardStatus === "PAUSED") && <form action={updateOwnedCard} className="mt-4 grid gap-3 sm:grid-cols-3">
+            <input type="hidden" name="cardId" value={card.id}/>
+            <select className="input" name="activeDestinationId" defaultValue={card.activeDestinationId || ""}><option value="">{d.tag.unconfigured}</option>{destinations.map(item => <option value={item.id} key={item.id}>{item.title} · {item.type}</option>)}</select>
+            <select className="input" name="cardStatus" defaultValue={card.cardStatus}><option>ACTIVE</option><option>PAUSED</option></select>
+            <button className="btn-primary">{d.common.save}</button>
+          </form>}
+        </div>
+      </article>;
+    })}</div>
+    {legacy.length > 0 && <section className="mt-8"><h2 className="mb-3 font-bold">Legacy records / السجلات القديمة</h2><div className="grid gap-3">{legacy.map(tag => <div className="card flex items-center justify-between p-4" key={tag.id}><div><strong>{tag.name}</strong><p className="text-xs text-slate-500" dir="ltr">{getTagUrl(tag.shortCode)}</p></div><Badge value={tag.status}/></div>)}</div></section>}
+    {!cards.length && !legacy.length && <div className="card p-10 text-center text-slate-400">{d.tag.empty}</div>}
+  </>;
+}

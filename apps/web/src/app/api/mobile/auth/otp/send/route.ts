@@ -1,2 +1,10 @@
-import {sendMobileOtp} from "@/lib/mobile-otp";
-export async function POST(request:Request){const body=await request.json().catch(()=>({}));const channel=body.channel==="whatsapp"?"whatsapp":body.channel==="sms"?"sms":undefined;const result=await sendMobileOtp(String(body.phone||""),body.locale==="ar"?"ar":"en",typeof body.countryIso2==="string"?body.countryIso2:undefined,channel);if(!result.ok)return Response.json({ok:false,error:result.error},{status:result.status,headers:{"cache-control":"no-store"}});return Response.json(result,{headers:{"cache-control":"no-store"}})}
+/**
+ * Compatibility tombstone. Android SMS initiation moved to Firebase Phone
+ * Auth; this endpoint must never send a second provider message.
+ */
+export async function POST() {
+  return Response.json(
+    { ok: false, error: "FIREBASE_PHONE_AUTH_REQUIRED" },
+    { status: 410, headers: { "cache-control": "no-store" } },
+  );
+}

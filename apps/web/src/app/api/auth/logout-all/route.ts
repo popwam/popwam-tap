@@ -1,2 +1,16 @@
-import {prisma} from "@popwam/db";import {getServerSession} from "next-auth";import {authOptions} from "@/lib/auth";
-export async function POST(){const session=await getServerSession(authOptions);if(!session?.user?.id)return Response.json({ok:false,error:"AUTH_REQUIRED"},{status:401});const now=new Date();await prisma.$transaction([prisma.session.deleteMany({where:{userId:session.user.id}}),prisma.mobileRefreshToken.updateMany({where:{userId:session.user.id,revokedAt:null},data:{revokedAt:now}}),prisma.auditLog.create({data:{actorId:session.user.id,operation:"session.logout_all",route:"/api/auth/logout-all"}})]);return Response.json({ok:true},{headers:{"cache-control":"no-store"}})}
+import { csrfRejected, getCurrentPopSessionContext, isTrustedPopMutation, unauthorized } from "@/lib/api-auth";
+import { revokeEverySession } from "@/lib/security-inventory";
+import { stepUpGrantFromRequest } from "@/lib/security-step-up";
+
+/** Compatibility alias. Full logout remains distinct from revoke-others and
+ * now carries the same purpose-bound assurance requirement. */
+export async function POST(request: Request) {
+  if (!isTrustedPopMutation(request)) return csrfRejected();
+  const context = await getCurrentPopSessionContext(request);
+  if (!context) return unauthorized();
+  try {
+    return Response.json({ ok: true, ...(await revokeEverySession(context, stepUpGrantFromRequest(request))) }, { headers: { "cache-control": "no-store" } });
+  } catch {
+    return Response.json({ ok: false, error: "STEP_UP_REQUIRED" }, { status: 428 });
+  }
+}

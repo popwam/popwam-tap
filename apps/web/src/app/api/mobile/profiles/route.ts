@@ -6,6 +6,7 @@ import { assertWithinLimitLocked, getUserEntitlements } from "@/lib/plans";
 import { normalizeAndValidate } from "@/lib/url";
 import { canCreateVirtualCard, profileTypeForVirtualCard, templateAllowed, VIRTUAL_CARD_TYPES, type VirtualCardTypeValue } from "@/lib/virtual-cards";
 import { googleWalletConfigured } from "@/lib/wallet";
+import { initializeDefaultModules } from "@/lib/profile-domain";
 
 const optional = (value: unknown) => String(value || "").trim() || null;
 
@@ -109,6 +110,12 @@ export async function POST(request: Request) {
       const type = profileTypeForVirtualCard(cardType);
       const profileData = {
         type,
+        profileKind: type === "ORGANIZATION" ? "BUSINESS" as const : "PERSONAL" as const,
+        lifecycle: "DRAFT" as const,
+        access: "PRIVATE" as const,
+        isPublic: false,
+        categoryId: template.categoryId,
+        templateId: template.id,
         displayName,
         displayLabel: optional(body.profileLabel) || cardName,
         displayNameAr: optional(body.displayNameAr),
@@ -132,12 +139,14 @@ export async function POST(request: Request) {
       };
       if (reusableBootstrap && bootstrap) {
         await tx.profile.update({ where: { id: bootstrap.profileId }, data: profileData });
+        await initializeDefaultModules(tx, bootstrap.profileId, template.id);
         await tx.virtualCard.update({ where: { id: bootstrap.id }, data: { name: cardName, displayLabel:cardName, type: cardType, themeId: template.id, status: "ACTIVE" } });
         await tx.destination.deleteMany({ where: { profileId: bootstrap.profileId, type: { notIn: ["PROFILE", "VCF"] } } });
         if (links.length) await tx.destination.createMany({ data: links.map(link => ({ ...link, userId: user.id, profileId: bootstrap.profileId })) });
         return bootstrap.profileId;
       }
       const created = await tx.profile.create({ data: { userId: user.id, ...profileData } });
+      await initializeDefaultModules(tx, created.id, template.id);
       await tx.virtualCard.create({ data: { userId: user.id, name: cardName, displayLabel:cardName, type: cardType, profileId: created.id, themeId: template.id, isDefault: used === 0 } });
       await tx.destination.createMany({ data: [
         { userId: user.id, profileId: created.id, type: "PROFILE", title: "Public profile", titleAr: "الملف العام", titleEn: "Public profile", url: `/p/id/${created.id}`, iconKey: "profile", sortOrder: 0 },

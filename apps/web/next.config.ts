@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     ];
     return [
       { source: "/:path*", headers: securityHeaders },
+      { source: "/dashboard/nearby", headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), browsing-topics=()" }] },
       { source: "/dashboard/:path*", headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }] },
       { source: "/admin/:path*", headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }] },
       { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Service-Worker-Allowed", value: "/" }] },

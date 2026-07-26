@@ -2,6 +2,7 @@ package com.popwam.pop.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -35,21 +36,41 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import coil3.compose.AsyncImage
 import com.popwam.pop.R
+import com.popwam.pop.ui.theme.AppearanceStore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogout: () -> Unit) {
+fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogout: () -> Unit, appearanceStore:AppearanceStore) {
+    val context = LocalContext.current
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
     val current by nav.currentBackStackEntryAsState()
     val topRoutes = PopNavigationPolicy.bottomRoutes
     val currentRoute = current?.destination?.route
+    BackHandler(enabled=currentRoute in topRoutes) {
+        // Root destinations are switched through the bottom bar; one system
+        // Back press must not terminate the authenticated app unexpectedly.
+    }
     val snackbar = remember { SnackbarHostState() }
     var howItWorks by rememberSaveable { mutableStateOf(false) }
     val darkBackground = currentRoute == "home" || currentRoute?.startsWith("virtual-card/") == true
     PopSystemBars(darkBackground)
-    LaunchedEffect(state.error, state.message) {
-        val message = state.error ?: state.message
+    val phaseGFeedback = when(state.error ?: state.message){
+        "ACTIVATION_COOLDOWN"->stringResource(R.string.share_activation_cooldown)
+        "ACTIVATION_UNAVAILABLE","ACTIVATION_CONFLICT"->stringResource(R.string.share_activation_failed)
+        "CARD_LIMIT_REACHED"->stringResource(R.string.share_activation_limit)
+        "SHARE_TARGET_UPDATED"->stringResource(R.string.share_target_updated)
+        "PRODUCT_STATUS_UPDATED"->stringResource(R.string.share_status_updated)
+        "PRODUCT_ACTIVATED"->stringResource(R.string.share_product_activated)
+        "REPORT_RECEIVED"->stringResource(R.string.friends_report_received)
+        "SEARCH_QUERY_INVALID"->stringResource(R.string.friends_search_minimum)
+        "REQUEST_FAILED"->stringResource(R.string.generic_error)
+        "FRIENDS_POLICY_REQUIRED","FRIENDS_POLICY_UNAVAILABLE","FRIENDS_REQUEST_FAILED","RELATIONSHIP_UNAVAILABLE","REQUEST_UNAVAILABLE","FRIEND_REQUEST_LIMITED","FRIEND_REQUEST_COOLDOWN","FRIENDSHIP_REQUIRED","REPORT_INVALID","REPORT_LIMITED","BLOCK_UNAVAILABLE"->stringResource(R.string.friends_action_failed)
+        "NEARBY_UNAVAILABLE","NEARBY_COMMUNITY_REQUIRED","NEARBY_CONSENT_UNAVAILABLE","NEARBY_CONSENT_REQUIRED","NEARBY_PROFILE_REQUIRED","NEARBY_PRESENCE_REQUIRED","NEARBY_SESSION_STALE","NEARBY_LOCATION_INVALID","NEARBY_RATE_LIMITED","NEARBY_MOVEMENT_LIMITED","NEARBY_REQUEST_FAILED"->stringResource(R.string.nearby_action_failed)
+        else->state.error ?: state.message
+    }
+    LaunchedEffect(phaseGFeedback) {
+        val message = phaseGFeedback
         if (!message.isNullOrBlank()) { snackbar.showSnackbar(message); vm.clearFeedback() }
     }
     PopDynamicBackground(when { currentRoute?.startsWith("virtual-card/")==true -> PopBackdrop.DETAILS; currentRoute=="home" -> PopBackdrop.HOME; else -> PopBackdrop.NEUTRAL }) {
@@ -62,17 +83,15 @@ fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogo
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = if(darkBackground) Color.White else Color.Black),
                 actions = {
                     state.uploadProgress?.let { CircularProgressIndicator(progress={it/100f},Modifier.size(24.dp),strokeWidth=2.dp) }
-                    TextButton(::toggleLanguage) { Text(stringResource(R.string.change_language),fontWeight=FontWeight.Bold,color=if(darkBackground) Color(0xFFD4AF37) else MaterialTheme.colorScheme.primary) }
+                    TextButton({toggleLanguage(context)}) { Text(stringResource(R.string.change_language),fontWeight=FontWeight.Bold,color=if(darkBackground) Color(0xFFD4AF37) else MaterialTheme.colorScheme.primary) }
                 },
             )
         },
         bottomBar = {
-            if (currentRoute in topRoutes) NavigationBar(containerColor = Color.White, tonalElevation = 3.dp) {
+            if (currentRoute in topRoutes) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
                 listOf(
                     Triple("home", R.string.home, Icons.Default.Home),
-                    Triple("virtual-cards", R.string.nav_cards, Icons.Default.ContactPage),
-                    Triple("activate", R.string.nav_scan, Icons.Default.QrCodeScanner),
-                    Triple("products", R.string.nav_products, Icons.Default.Inventory2),
+                    Triple("share", R.string.editor_share, Icons.Default.Share),
                     Triple("menu", R.string.nav_menu, Icons.Default.Menu),
                 ).forEach { (route, label, icon) ->
                     NavigationBarItem(
@@ -88,11 +107,16 @@ fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogo
     ) { padding ->
         Box(Modifier.padding(padding)) {
             NavHost(nav, if (initialRoute == "home" || initialRoute.startsWith("card/")) initialRoute else "home") {
-                composable("home") { FigmaHome(state, vm::reload, { howItWorks=true }) { nav.navigate(it) } }
+                composable("home") { ProfileEditorHomeScreen(state,vm) { nav.navigate(it) } }
+                composable("share") { ShareCenterScreen(state,vm,{nav.navigate("share-activate")}){nav.navigate(it)} }
+                composable("share-activate") { ShareActivationScreen(state,vm){nav.popBackStack()} }
                 composable("virtual-cards") { VirtualProfiles(state, vm::reload, { nav.navigate("virtual-card/$it") }, { nav.navigate("create-card/start") }) }
                 composable("products") { PhysicalCards(state, vm::reload) { nav.navigate("card/$it") } }
                 composable("activity") { ActivityFeed(state, vm::reload) }
                 composable("menu") { PopMenu(onLogout,{nav.navigate(it)},{howItWorks=true}) }
+                composable("friends") { FriendsScreen(state,vm) }
+                composable("friends/{tab}",arguments=listOf(navArgument("tab"){type=NavType.StringType})){entry->FriendsScreen(state,vm,entry.arguments?.getString("tab") ?: "friends")}
+                composable("nearby") { NearbyScreen(state,vm){nav.navigate(it)} }
                 composable("create-card/{step}", arguments = listOf(navArgument("step") { type = NavType.StringType })) { entry ->
                     VirtualCardWizardScreen(
                         step = entry.arguments?.getString("step") ?: "start", state = state, vm = vm,
@@ -102,23 +126,34 @@ fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogo
                 }
                 composable("virtual-card/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     val id = entry.arguments?.getString("id").orEmpty()
-                    VirtualCardDetailsScreen(id, state, vm, { nav.popBackStack() }) { nav.navigate("profile/$id") }
+                    VirtualCardDetailsScreen(id, state, vm, { nav.popBackStack() }, { nav.navigate("profile/$id") }) { nav.navigate("profile-publish/$id") }
                 }
+                composable("profile-publish/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ProfilePublishingScreen(entry.arguments?.getString("id").orEmpty(),state,vm,nav::popBackStack)}
                 composable("profile/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     LegacyProfileEditor(state.profiles.firstOrNull { it.id == entry.arguments?.getString("id") }, vm, nav::popBackStack)
                 }
                 composable("card/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     val id = entry.arguments?.getString("id").orEmpty(); LaunchedEffect(id) { vm.card(id) }
-                    LegacyPhysicalCardDetails(state.selectedCard, state.destinations, { status, destination -> vm.updateCard(id, status, destination) }, nav::popBackStack)
+                    var confirmLost by remember{mutableStateOf(false)}
+                    var verifyLost by remember{mutableStateOf(false)}
+                    Box(Modifier.fillMaxSize()){
+                        LegacyPhysicalCardDetails(state.selectedCard, state.destinations, { status, destination -> vm.updateCard(id, status, destination) }, nav::popBackStack)
+                        if(state.selectedCard?.cardStatus in setOf("ACTIVE","PAUSED"))ExtendedFloatingActionButton({confirmLost=true},Modifier.align(Alignment.BottomEnd).padding(20.dp),containerColor=MaterialTheme.colorScheme.error){Icon(Icons.Default.ReportProblem,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.settings_report_lost))}
+                    }
+                    if(confirmLost)AlertDialog(onDismissRequest={confirmLost=false},title={Text(stringResource(R.string.settings_report_lost_confirm))},confirmButton={TextButton({confirmLost=false;verifyLost=true}){Text(stringResource(R.string.continue_label))}},dismissButton={TextButton({confirmLost=false}){Text(stringResource(R.string.cancel))}})
+                    if(verifyLost)StepUpSheet(vm,"PRODUCT_LOST",{verifyLost=false}){grant->vm.reportProductLost(id,grant);verifyLost=false}
                 }
                 composable("activate") { ActivationScannerScreen(state, vm) }
                 // NFC services remain contextual for activation, device-card selection and authorized programming; there is no public NFC Tools route.
                 composable("programming") { LaunchedEffect(Unit) { vm.loadProgramming() }; LegacyProgrammingList(state.programmingCards) { nav.navigate("program/$it") } }
                 composable("program/{id}") { entry -> state.programmingCards.firstOrNull { it.id == entry.arguments?.getString("id") }?.let { LegacyProgramming(it, state, vm) } }
                 composable("hce") { LegacyHce(state.cards) }
-                composable("settings") { LegacySettings(onLogout) }
+                composable("settings") { SecuritySettingsScreen("root",state,vm,appearanceStore,{if(it.startsWith("friends")||it=="nearby"||it.startsWith("legal/"))nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout) }
+                composable("settings/{section}",arguments=listOf(navArgument("section"){type=NavType.StringType})){entry->SecuritySettingsScreen(entry.arguments?.getString("section") ?: "root",state,vm,appearanceStore,{if(it.startsWith("friends")||it=="nearby"||it.startsWith("legal/"))nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout)}
                 composable("integrations") { SecurePortal(R.string.connected_accounts,"dashboard/integrations",R.string.connected_accounts_help) }
-                composable("passkeys") { SecurePortal(R.string.passkeys,"dashboard/security/passkeys",R.string.passkeys_help) }
+                composable("passkeys") { SecuritySettingsScreen("passkeys",state,vm,appearanceStore,{nav.navigate("settings/$it")},nav::popBackStack,onLogout) }
+                composable("legal/terms"){NativeLegalScreen(PreAuthLegalKind.TERMS,onBack=nav::popBackStack)}
+                composable("legal/privacy"){NativeLegalScreen(PreAuthLegalKind.PRIVACY,onBack=nav::popBackStack)}
             }
         }
     }
@@ -248,15 +283,28 @@ private fun ActivityFeed(state: MainUiState, refresh: () -> Unit) = RefreshScree
 private fun PopMenu(onLogout:()->Unit,navigate:(String)->Unit,howItWorks:()->Unit){
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
         item{Text(stringResource(R.string.nav_menu),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)}
-        item{MenuRow(Icons.Default.AccountCircle,stringResource(R.string.settings)){navigate("settings")}}
-        item{MenuRow(Icons.Default.Link,stringResource(R.string.connected_accounts)){navigate("integrations")}}
-        item{MenuRow(Icons.Default.Key,stringResource(R.string.passkeys)){navigate("passkeys")}}
-        item{MenuRow(Icons.Default.People,stringResource(R.string.friends),null)}
-        item{MenuRow(Icons.Default.PersonAdd,stringResource(R.string.nearby_users),null)}
+        item{Text(stringResource(R.string.settings_social_group),fontWeight=FontWeight.Black)}
+        item{MenuRow(Icons.Default.People,stringResource(R.string.friends)){navigate("friends")}}
+        item{MenuRow(Icons.Default.LocationOn,stringResource(R.string.nearby_title)){navigate("nearby")}}
         item{MenuRow(Icons.Default.Chat,stringResource(R.string.chats),null)}
-        item{MenuRow(Icons.Default.PrivacyTip,stringResource(R.string.privacy),null)}
-        item{MenuRow(Icons.Default.Security,stringResource(R.string.hce_experimental),null)}
-        item{MenuRow(Icons.Default.Language,stringResource(R.string.language)){toggleLanguage()}}
+        item{HorizontalDivider()}
+        item{Text(stringResource(R.string.settings_security_group),fontWeight=FontWeight.Black)}
+        item{MenuRow(Icons.Default.Security,stringResource(R.string.settings_security)){navigate("settings/security")}}
+        item{MenuRow(Icons.Default.Devices,stringResource(R.string.settings_devices)){navigate("settings/devices")}}
+        item{MenuRow(Icons.Default.LockClock,stringResource(R.string.settings_sessions)){navigate("settings/sessions")}}
+        item{MenuRow(Icons.Default.Key,stringResource(R.string.settings_passkeys)){navigate("settings/passkeys")}}
+        item{HorizontalDivider()}
+        item{Text(stringResource(R.string.settings_preferences_group),fontWeight=FontWeight.Black)}
+        item{MenuRow(Icons.Default.Palette,stringResource(R.string.settings_appearance)){navigate("settings/appearance")}}
+        item{MenuRow(Icons.Default.Notifications,stringResource(R.string.settings_notifications)){navigate("settings/notifications")}}
+        item{MenuRow(Icons.Default.PrivacyTip,stringResource(R.string.settings_privacy)){navigate("settings/privacy")}}
+        item{MenuRow(Icons.Default.AdminPanelSettings,stringResource(R.string.settings_permissions)){navigate("settings/permissions")}}
+        item{HorizontalDivider()}
+        item{Text(stringResource(R.string.settings_profile_integrations_group),fontWeight=FontWeight.Black)}
+        item{MenuRow(Icons.Default.Link,stringResource(R.string.connected_accounts)){navigate("integrations")}}
+        item{HorizontalDivider()}
+        item{Text(stringResource(R.string.settings_account_group),fontWeight=FontWeight.Black)}
+        item{MenuRow(Icons.Default.AccountCircle,stringResource(R.string.settings_account)){navigate("settings/account")}}
         item{MenuRow(Icons.Default.HelpOutline,stringResource(R.string.how_it_works),howItWorks)}
         item{HorizontalDivider(Modifier.padding(vertical=8.dp))}
         item{Text(stringResource(R.string.about_app),fontWeight=FontWeight.Bold);Text(stringResource(R.string.app_version),color=Color(0xFF6E6E6E),style=MaterialTheme.typography.bodySmall)}

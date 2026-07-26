@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "177838069464",
+    "project_id": "pop-by-popwam",
+    "storage_bucket": "pop-by-popwam.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:177838069464:android:b33b5fe33c09de3c7d29ad",
+        "android_client_info": {
+          "package_name": "com.popwam.pop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBiat_gbnib1NRD5i7qJFO8iHMg6s0OHpM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:177838069464:android:e860cb1aad6373c77d29ad",
+        "android_client_info": {
+          "package_name": "com.popwam.pop.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBiat_gbnib1NRD5i7qJFO8iHMg6s0OHpM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

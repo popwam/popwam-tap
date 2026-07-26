@@ -2,17 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+:root {
+  color-scheme: light dark;
+  --app-bg: #07090f;
+  --app-text: #f5f7fb;
+  --app-panel: rgba(255,255,255,.045);
+  --app-border: rgba(255,255,255,.1);
+  --app-input: rgba(0,0,0,.3);
+}
+html[data-ui-theme="dark"] { color-scheme: dark; }
+html[data-ui-theme="light"] {
+  color-scheme: light;
+  --app-bg: #f5f7fb;
+  --app-text: #17202a;
+  --app-panel: rgba(255,255,255,.88);
+  --app-border: rgba(23,32,42,.13);
+  --app-input: rgba(255,255,255,.9);
+}
+@media (prefers-color-scheme: light) {
+  html:not([data-ui-theme="dark"]):not([data-ui-theme="light"]) {
+    color-scheme: light;
+    --app-bg: #f5f7fb;
+    --app-text: #17202a;
+    --app-panel: rgba(255,255,255,.88);
+    --app-border: rgba(23,32,42,.13);
+    --app-input: rgba(255,255,255,.9);
+  }
+}
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
   margin: 0;
   min-height: 100vh;
-  color: #f5f7fb;
+  color: var(--app-text);
   background:
     radial-gradient(circle at 10% -10%, rgba(38, 201, 154, .14), transparent 28rem),
     radial-gradient(circle at 100% 15%, rgba(79, 107, 255, .12), transparent 32rem),
-    #07090f;
+    var(--app-bg);
 }
 
 @media print {
@@ -24,6 +50,8 @@ body {
 }
 body { font-family: var(--font-latin), sans-serif; }
 html[lang="ar"] body { font-family: var(--font-arabic), sans-serif; }
+html[data-ui-font="cairo"] body { font-family: var(--font-arabic), sans-serif; }
+html[data-ui-font="abeezee"] body { font-family: var(--font-latin), sans-serif; }
 html[dir="rtl"] .directional-icon { transform: scaleX(-1); }
 
 .public-theme { --profile-bg:#07090f;--profile-panel:#111722;--profile-text:#f5f7fb;--profile-muted:#94a3b8;--profile-accent:#32d6a2;--profile-accent-text:#03120d;--profile-border:rgba(255,255,255,.1);--profile-radius:1.5rem;--item-radius:1rem;--profile-shadow:0 24px 80px rgba(0,0,0,.34);--profile-font:var(--font-latin);--profile-cover-filter:saturate(1.05) contrast(1.02);--profile-button-radius:.9rem; color:var(--profile-text);background:var(--profile-bg);font-family:var(--profile-font),sans-serif; }
@@ -132,11 +160,18 @@ input[type="tel"], input[autocomplete="one-time-code"], .ltr-token { direction:l
 @media (prefers-reduced-motion:reduce) { .scan-beam { animation:none } }
 
 @layer components {
-  .card { @apply rounded-2xl border border-white/10 bg-white/[.045] shadow-glow backdrop-blur-sm; }
-  .input { @apply w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-brand-500/70 focus:ring-2 focus:ring-brand-500/10; }
+  .card { @apply rounded-2xl shadow-glow backdrop-blur-sm; border:1px solid var(--app-border);background:var(--app-panel); }
+  .input { @apply w-full rounded-xl px-3.5 py-2.5 text-sm outline-none placeholder:text-slate-600 focus:border-brand-500/70 focus:ring-2 focus:ring-brand-500/10; border:1px solid var(--app-border);background:var(--app-input);color:var(--app-text); }
   .label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400; }
   .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50; }
   .btn-primary { @apply btn bg-brand-500 text-ink hover:bg-brand-400; }
   .btn-secondary { @apply btn border border-white/10 bg-white/[.06] text-slate-100 hover:bg-white/10; }
   .btn-danger { @apply btn border border-red-400/20 bg-red-500/10 text-red-300 hover:bg-red-500/20; }
+}
+html[data-ui-theme="light"] :is(.text-white,.text-slate-100) { color:#17202a; }
+html[data-ui-theme="light"] :is(.text-slate-300,.text-slate-400) { color:#52606d; }
+html[data-ui-theme="light"] :is(.text-slate-500,.text-slate-600) { color:#687785; }
+@media (prefers-color-scheme: light) {
+  html:not([data-ui-theme="dark"]):not([data-ui-theme="light"]) :is(.text-white,.text-slate-100) { color:#17202a; }
+  html:not([data-ui-theme="dark"]):not([data-ui-theme="light"]) :is(.text-slate-300,.text-slate-400) { color:#52606d; }
 }

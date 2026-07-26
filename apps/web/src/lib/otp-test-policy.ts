@@ -5,7 +5,6 @@ export type OtpTestEnvironment = {
   OTP_TEST_PHONES?: string;
   OTP_TEST_CODE?: string;
   OTP_EXPOSE_IN_RESPONSE?: string;
-  SMSMISR_ENVIRONMENT?: string;
   NODE_ENV?: string;
   STAGING?: string;
 };
@@ -31,16 +30,14 @@ export function evaluateOtpTestConfig(env: OtpTestEnvironment) {
   const requested = enabled(env.OTP_TEST_MODE);
   const staging = enabled(env.STAGING);
   const environmentAllowed = env.NODE_ENV !== "production" || staging;
-  const smsTestEnvironment = env.SMSMISR_ENVIRONMENT?.trim() === "2";
   const fixedCode = env.OTP_TEST_CODE?.trim() || "";
   const fixedCodeValid = !fixedCode || /^\d{6}$/.test(fixedCode);
-  const effective = requested && environmentAllowed && smsTestEnvironment && allowlist.valid && fixedCodeValid;
+  const effective = requested && environmentAllowed && allowlist.valid && fixedCodeValid;
   return {
     requested,
     effective,
     staging,
     environmentAllowed,
-    smsTestEnvironment,
     allowlist,
     fixedCode,
     fixedCodeValid,

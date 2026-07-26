@@ -88,9 +88,139 @@ enum ProfileType {
   ORGANIZATION
 }
 
+enum ProfileKind {
+  PERSONAL
+  BUSINESS
+}
+
+enum ProfileLifecycle {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  ARCHIVED
+}
+
+enum ProfileAccess {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+enum ProfileRevisionStatus {
+  PUBLISHED
+  SUPERSEDED
+}
+
+enum ProfileMediaState {
+  TEMPORARY
+  DRAFT_ATTACHED
+  PUBLISHED
+  ORPHANED
+  DELETED
+}
+
+enum ProfileMediaPurpose {
+  AVATAR
+  COVER
+  LOGO
+  GALLERY
+  ONBOARDING_IMAGE
+}
+
+enum ProfileModuleVisibility {
+  PUBLIC
+  FRIENDS
+  ONLY_ME
+  UNLISTED
+}
+
+enum ProfileEntitlementSourceType {
+  PLAN
+  PRODUCT
+  PURCHASE
+  ADMIN
+  PROMOTION
+  LEGACY
+}
+
+enum ProfileEntitlementStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum OnboardingDefinitionStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum OnboardingStepType {
+  FORM
+  REVIEW
+}
+
+enum OnboardingQuestionType {
+  TEXT
+  TEXTAREA
+  PHONE
+  EMAIL
+  URL
+  NUMBER
+  CURRENCY
+  BOOLEAN
+  SINGLE_SELECT
+  MULTI_SELECT
+  IMAGE
+  LOCATION
+  TIME
+  DAY_HOURS
+}
+
+enum OnboardingMappingKey {
+  PROFILE_DISPLAY_NAME
+  ABOUT_BIO
+  CONTACT_PHONE
+  CONTACT_EMAIL
+  CONTACT_LOCATION
+  JOB_TITLE
+  ORGANIZATION_NAME
+  SOCIAL_LINK
+  SERVICE_CREATE
+  BRANCH_CREATE
+  GALLERY_ATTACH
+  SETUP_LATER
+}
+
+enum OnboardingConditionOperator {
+  EQUALS
+  NOT_EQUALS
+  IN
+  NOT_IN
+  IS_TRUE
+  IS_FALSE
+  ANSWERED
+  NOT_ANSWERED
+}
+
+enum LegalDocumentType {
+  TERMS
+  PRIVACY
+  COMMUNITY_GUIDELINES
+  NEARBY_PRIVACY
+}
+
+enum LegalConsentSource {
+  WEB
+  ANDROID
+  ONBOARDING
+}
+
 enum OtpPurpose {
   LOGIN
   ACTIVATION
+  STEP_UP
+  CHANGE_PHONE
 }
 
 enum OtpDeliveryStatus {
@@ -133,6 +263,20 @@ enum ConnectedAccountStatus {
   ERROR
 }
 
+enum ExternalIdentityProvider {
+  FIREBASE
+}
+
+enum ExternalIdentityType {
+  ANONYMOUS
+  VERIFIED
+}
+
+enum ExternalIdentityStatus {
+  ACTIVE
+  REVOKED
+}
+
 enum ImportedFieldSyncMode {
   MANUAL
   AUTO
@@ -141,6 +285,63 @@ enum ImportedFieldSyncMode {
 enum PasskeyChallengeType {
   REGISTER
   AUTHENTICATE
+  AUTHENTICATE_MOBILE
+  STEP_UP
+}
+
+enum UserThemePreference {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+enum UserLanguagePreference {
+  SYSTEM
+  ENGLISH
+  ARABIC
+}
+
+enum UserFontPreference {
+  DEFAULT
+  CAIRO
+  ABEEZEE
+}
+
+enum LogicalDeviceType {
+  WEB_BROWSER
+  MOBILE_APP
+}
+
+enum SessionAuthMethod {
+  OTP
+  PASSKEY
+  PASSWORD
+  LEGACY
+}
+
+enum StepUpPurpose {
+  CHANGE_PHONE
+  DELETE_ACCOUNT
+  ADD_PASSKEY
+  REMOVE_PASSKEY
+  REVOKE_SESSION
+  REVOKE_OTHER_SESSIONS
+  PRODUCT_LOST
+  PRODUCT_TRANSFER
+  SECURITY_SETTINGS
+  LINK_DEVICE_APPROVAL
+}
+
+enum StepUpMethod {
+  PASSKEY
+  OTP
+}
+
+enum AccountDeletionRequestStatus {
+  REQUESTED
+  REVIEWING
+  CANCELLED
+  COMPLETED
 }
 
 enum ProfessionType {
@@ -171,6 +372,14 @@ enum ActivationClaimStatus {
   VERIFIED
   CONSUMED
   EXPIRED
+}
+
+enum ActivationSecretState {
+  LEGACY
+  SCRATCH_READY
+  LOCKED
+  CONSUMED
+  REISSUE_REQUIRED
 }
 
 enum TagMode {
@@ -247,14 +456,69 @@ enum FriendRequestStatus {
   PENDING
   ACCEPTED
   REJECTED
+  CANCELLED
+  EXPIRED
   BLOCKED
 }
 
 enum UserReportStatus {
   OPEN
   REVIEWING
+  ACTIONED
   RESOLVED
   DISMISSED
+}
+
+enum FriendRequestSource {
+  SEARCH
+  PROFILE
+  NEARBY
+}
+
+enum UserBlockSource {
+  FRIENDS
+  PROFILE
+  REPORT
+  NEARBY
+}
+
+enum UserReportSource {
+  FRIENDS
+  PROFILE
+  NEARBY
+}
+
+enum UserReportCategory {
+  SPAM
+  HARASSMENT
+  IMPERSONATION
+  INAPPROPRIATE_CONTENT
+  SCAM
+  PRIVACY
+  OTHER
+}
+
+enum FriendNotificationType {
+  FRIEND_REQUEST_RECEIVED
+  FRIEND_REQUEST_ACCEPTED
+}
+
+enum FriendNotificationStatus {
+  PENDING
+  SENT
+  SUPPRESSED
+  FAILED
+}
+
+enum NearbyPresenceSource {
+  WEB
+  ANDROID
+}
+
+enum NearbyRateLimitKind {
+  ENABLE
+  PRESENCE_UPDATE
+  DISCOVERY
 }
 
 enum CardInventoryStatus {
@@ -430,6 +694,7 @@ model User {
   allowNearbyDiscovery     Boolean                  @default(false)
   defaultSharingCardId     String?
   lastLoginAt              DateTime?
+  sessionsRevokedBefore    DateTime?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
   accounts                 Account[]
@@ -443,6 +708,7 @@ model User {
   limitOverride            UserLimitOverride?
   profileFields            ProfileField[]
   uploads                  UploadedFile[]           @relation("UploadedBy")
+  profileMediaAssets       ProfileMediaAsset[]
   auditLogs                AuditLog[]               @relation("AuditActor")
   ownedCards               Card[]                   @relation("CardOwner")
   createdCardBatches       CardBatch[]              @relation("CardBatchCreator")
@@ -464,6 +730,13 @@ model User {
   friendshipsB             Friendship[]             @relation("FriendshipUserB")
   friendshipRequests       Friendship[]             @relation("FriendshipRequester")
   friendshipBlocks         Friendship[]             @relation("FriendshipBlocker")
+  friendRequestsSent       FriendRequest[]           @relation("FriendRequestRequester")
+  friendRequestsReceived   FriendRequest[]           @relation("FriendRequestRecipient")
+  friendPreferencesOwned   FriendPreference[]        @relation("FriendPreferenceOwner")
+  friendPreferencesAbout   FriendPreference[]        @relation("FriendPreferenceFriend")
+  friendsPreference        FriendsPreference?
+  friendNotifications      FriendNotificationEvent[] @relation("FriendNotificationRecipient")
+  friendNotificationActors FriendNotificationEvent[] @relation("FriendNotificationActor")
   privacyRulesOwned        FriendPrivacyRule[]      @relation("PrivacyRuleOwner")
   privacyRulesReceived     FriendPrivacyRule[]      @relation("PrivacyRuleFriend")
   chatMemberships          ChatMember[]
@@ -482,6 +755,8 @@ model User {
   reportsReceived          UserReport[]             @relation("UserReportSubject")
   moderatedUserReports     UserReport[]             @relation("UserReportReviewer")
   nearbyPreference         NearbyPreference?
+  nearbyPresence           NearbyPresence?
+  nearbyRateLimitBuckets   NearbyRateLimitBucket[]
   deviceSessions           DeviceSession[]
   productStatusHistory     ProductStatusHistory[]   @relation("ProductStatusActor")
   passkeys                 PasskeyCredential[]
@@ -489,7 +764,14 @@ model User {
   connectedAccounts        ConnectedAccount[]
   oauthStates              OAuthConnectionState[]
   devicePushTokens         DevicePushToken[]
+  externalIdentities       ExternalIdentity[]
   platformSuggestions      PlatformSuggestion[]
+  profileEntitlements      ProfileEntitlement[]     @relation("ProfileEntitlementUser")
+  legalConsents            UserLegalConsent[]
+  preference               UserPreference?
+  notificationPreference   NotificationPreference?
+  stepUpGrants             StepUpGrant[]
+  accountDeletionRequests  AccountDeletionRequest[]
 }
 
 model Plan {
@@ -598,11 +880,21 @@ model Account {
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String            @id @default(cuid())
+  sessionToken        String            @unique
+  userId              String
+  expires             DateTime
+  deviceSessionId     String?
+  authMethod          SessionAuthMethod @default(LEGACY)
+  createdAt           DateTime          @default(now())
+  lastSeenAt          DateTime          @default(now())
+  lastAuthenticatedAt DateTime?
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession       DeviceSession?    @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
+  stepUpGrants        StepUpGrant[]
+
+  @@index([userId, expires])
+  @@index([deviceSessionId, expires])
 }
 
 model VerificationToken {
@@ -645,16 +937,27 @@ model Membership {
 }
 
 model Profile {
-  id                   String           @id @default(cuid())
+  id                   String               @id @default(cuid())
   userId               String
   organizationId       String?
-  slug                 String?          @unique
+  categoryId           String?
+  templateId           String?
+  slug                 String?              @unique
+  draftSlug            String?
   displayName          String
   displayLabel         String?
-  type                 ProfileType      @default(PERSONAL)
-  profession           ProfessionType   @default(PERSONAL)
+  type                 ProfileType          @default(PERSONAL)
+  profileKind          ProfileKind?
+  lifecycle            ProfileLifecycle     @default(DRAFT)
+  access               ProfileAccess        @default(PRIVATE)
+  draftRevision        Int                  @default(0)
+  isPrimary            Boolean              @default(false)
+  creationKey          String?              @unique
+  publishedAt          DateTime?
+  archivedAt           DateTime?
+  profession           ProfessionType       @default(PERSONAL)
   customProfession     String?
-  primaryLanguage      String           @default("ar")
+  primaryLanguage      String               @default("ar")
   firstName            String?
   lastName             String?
   displayNameAr        String?
@@ -694,30 +997,32 @@ model Profile {
   addressEn            String?
   contactNotesAr       String?
   contactNotesEn       String?
-  isPublic             Boolean          @default(true)
-  theme                ProfileTheme     @default(CLASSIC_DARK)
+  isPublic             Boolean              @default(true)
+  theme                ProfileTheme         @default(CLASSIC_DARK)
   avatarCrop           Json?
   coverCrop            Json?
-  showAvatar           Boolean          @default(true)
-  showCover            Boolean          @default(true)
-  showDisplayName      Boolean          @default(true)
-  showTitle            Boolean          @default(true)
-  showBio              Boolean          @default(true)
-  showPhone            Boolean          @default(true)
-  showEmail            Boolean          @default(true)
-  showWebsite          Boolean          @default(true)
-  showLocation         Boolean          @default(true)
-  showWhatsappBusiness Boolean          @default(true)
-  showWhatsappPrivate  Boolean          @default(true)
-  showSocialLinks      Boolean          @default(true)
-  showCustomFields     Boolean          @default(true)
-  showUploadedFiles    Boolean          @default(true)
-  showSaveContact      Boolean          @default(true)
-  allowInstallable     Boolean          @default(false)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
-  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization         Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  showAvatar           Boolean              @default(true)
+  showCover            Boolean              @default(true)
+  showDisplayName      Boolean              @default(true)
+  showTitle            Boolean              @default(true)
+  showBio              Boolean              @default(true)
+  showPhone            Boolean              @default(true)
+  showEmail            Boolean              @default(true)
+  showWebsite          Boolean              @default(true)
+  showLocation         Boolean              @default(true)
+  showWhatsappBusiness Boolean              @default(true)
+  showWhatsappPrivate  Boolean              @default(true)
+  showSocialLinks      Boolean              @default(true)
+  showCustomFields     Boolean              @default(true)
+  showUploadedFiles    Boolean              @default(true)
+  showSaveContact      Boolean              @default(true)
+  allowInstallable     Boolean              @default(false)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization         Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  category             ProfileCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  template             ProfileTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
   destinations         Destination[]
   tags                 Tag[]
   cards                Card[]
@@ -726,10 +1031,400 @@ model Profile {
   services             ProfileService[]
   branches             ProfileBranch[]
   virtualCard          VirtualCard?
+  modules              ProfileModule[]
+  entitlementGrants    ProfileEntitlement[] @relation("ProfileEntitlementProfile")
+  onboardingProgress   OnboardingProgress?
+  publication          ProfilePublication?
+  revisions            ProfileRevision[]
+  slugHistory          ProfileSlugHistory[]
+  mediaAssets          ProfileMediaAsset[]
+  selectedForFriends   FriendsPreference[]          @relation("FriendsSocialProfile")
+  friendReports        UserReport[]                  @relation("UserReportProfile")
 
   @@index([userId])
+  @@index([userId, lifecycle])
   @@index([organizationId])
   @@index([slug])
+  @@index([categoryId])
+  @@index([templateId])
+}
+
+model ProfilePublication {
+  id                  String          @id @default(cuid())
+  profileId           String          @unique
+  publishedRevisionId String          @unique
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  profile             Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  publishedRevision   ProfileRevision @relation("CurrentPublishedRevision", fields: [publishedRevisionId], references: [id], onDelete: Restrict)
+
+  @@index([profileId, publishedRevisionId])
+}
+
+model ProfileRevision {
+  id                   String                @id @default(cuid())
+  profileId            String
+  revisionNumber       Int
+  sourceDraftRevision  Int
+  draftFingerprint     String
+  status               ProfileRevisionStatus @default(PUBLISHED)
+  access               ProfileAccess
+  slug                 String?
+  displayName          String
+  displayLabel         String?
+  type                  ProfileType
+  profileKind           ProfileKind?
+  primaryLanguage       String
+  displayNameAr         String?
+  displayNameEn         String?
+  title                 String?
+  jobTitleAr            String?
+  jobTitleEn            String?
+  company               String?
+  bio                   String?
+  bioAr                 String?
+  bioEn                 String?
+  organizationNameAr    String?
+  organizationNameEn    String?
+  industryAr            String?
+  industryEn            String?
+  descriptionAr         String?
+  descriptionEn         String?
+  avatarUrl             String?
+  coverUrl              String?
+  logoUrl               String?
+  phone                 String?
+  alternatePhone        String?
+  whatsappBusiness      String?
+  whatsappPrivate       String?
+  email                 String?
+  website               String?
+  facebook              String?
+  linkedin              String?
+  github                String?
+  tiktok                String?
+  vcfUrl                String?
+  locationText          String?
+  addressAr             String?
+  addressEn             String?
+  contactNotesAr        String?
+  contactNotesEn        String?
+  theme                 ProfileTheme
+  showAvatar            Boolean
+  showCover             Boolean
+  showDisplayName       Boolean
+  showTitle             Boolean
+  showBio               Boolean
+  showPhone             Boolean
+  showEmail             Boolean
+  showWebsite           Boolean
+  showLocation          Boolean
+  showWhatsappBusiness  Boolean
+  showWhatsappPrivate   Boolean
+  showSocialLinks       Boolean
+  showCustomFields      Boolean
+  showUploadedFiles     Boolean
+  showSaveContact       Boolean
+  allowInstallable      Boolean
+  templateSlug          String?
+  templateConfiguration Json?
+  publishedAt           DateTime              @default(now())
+  createdAt             DateTime              @default(now())
+  profile               Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  currentFor            ProfilePublication?   @relation("CurrentPublishedRevision")
+  modules               ProfileRevisionModule[]
+  fields                ProfileRevisionField[]
+  destinations          ProfileRevisionDestination[]
+  files                 ProfileRevisionFile[]
+  services              ProfileRevisionService[]
+  branches              ProfileRevisionBranch[]
+  media                  ProfileRevisionMedia[]
+
+  @@unique([profileId, revisionNumber])
+  @@index([profileId, status, revisionNumber])
+}
+
+model ProfileRevisionModule {
+  id            String                  @id @default(cuid())
+  revisionId    String
+  key           String
+  enabled       Boolean
+  visibility    ProfileModuleVisibility
+  sortOrder     Int
+  configuration Json?
+  revision      ProfileRevision         @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@unique([revisionId, key])
+  @@index([revisionId, enabled, visibility, sortOrder])
+}
+
+model ProfileRevisionField {
+  id            String           @id @default(cuid())
+  revisionId    String
+  sourceId      String
+  label         String
+  labelAr       String?
+  labelEn       String?
+  value         String
+  type          ProfileFieldType
+  iconKey       String?
+  customIconUrl String?
+  actionUrl     String?
+  sortOrder     Int
+  revision      ProfileRevision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([revisionId, sortOrder])
+}
+
+model ProfileRevisionDestination {
+  id            String          @id @default(cuid())
+  revisionId    String
+  sourceId      String
+  title         String
+  titleAr       String?
+  titleEn       String?
+  type          DestinationType
+  url           String
+  icon          String?
+  iconKey       String?
+  customIconUrl String?
+  sortOrder     Int
+  revision      ProfileRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([revisionId, sortOrder])
+}
+
+model ProfileRevisionFile {
+  id               String          @id @default(cuid())
+  revisionId       String
+  sourceId         String
+  publicUrl        String
+  originalFilename String
+  originalName     String?
+  mimeType         String
+  title            String?
+  displayTitleAr   String?
+  displayTitleEn   String?
+  sortOrder        Int
+  revision         ProfileRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([revisionId, sortOrder])
+}
+
+model ProfileRevisionService {
+  id            String          @id @default(cuid())
+  revisionId    String
+  sourceId      String
+  nameAr        String?
+  nameEn        String?
+  descriptionAr String?
+  descriptionEn String?
+  url           String?
+  iconKey       String?
+  sortOrder     Int
+  revision      ProfileRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([revisionId, sortOrder])
+}
+
+model ProfileRevisionBranch {
+  id         String          @id @default(cuid())
+  revisionId String
+  sourceId   String
+  nameAr     String?
+  nameEn     String?
+  addressAr  String?
+  addressEn  String?
+  phone      String?
+  mapUrl     String?
+  sortOrder  Int
+  revision   ProfileRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([revisionId, sortOrder])
+}
+
+model ProfileRevisionMedia {
+  id         String          @id @default(cuid())
+  revisionId String
+  mediaId    String
+  purpose    ProfileMediaPurpose
+  visibility ProfileModuleVisibility @default(PUBLIC)
+  publicUrl  String
+  sortOrder  Int             @default(0)
+  revision   ProfileRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@unique([revisionId, mediaId])
+  @@index([revisionId, sortOrder])
+}
+
+model ProfileSlugHistory {
+  id        String   @id @default(cuid())
+  profileId String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt])
+}
+
+model ProfileMediaAsset {
+  id                 String              @id @default(cuid())
+  userId             String
+  profileId          String?
+  purpose            ProfileMediaPurpose
+  state              ProfileMediaState   @default(TEMPORARY)
+  visibility         ProfileModuleVisibility @default(ONLY_ME)
+  storageKey         String              @unique
+  publicStorageKey   String?             @unique
+  publicUrl          String?
+  originalFilename   String
+  mimeType           String
+  sizeBytes          BigInt
+  width              Int?
+  height             Int?
+  sortOrder          Int                 @default(0)
+  temporaryExpiresAt DateTime?
+  orphanedAt         DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile            Profile?            @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([userId, state, createdAt])
+  @@index([profileId, state, sortOrder])
+  @@index([state, temporaryExpiresAt])
+  @@index([state, orphanedAt])
+}
+
+model ProfileCategory {
+  id                    String                 @id @default(cuid())
+  slug                  String                 @unique
+  profileKind           ProfileKind
+  nameEn                String
+  nameAr                String
+  descriptionEn         String?
+  descriptionAr         String?
+  isActive              Boolean                @default(true)
+  sortOrder             Int                    @default(0)
+  defaultTemplateId     String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  defaultTemplate       ProfileTemplate?       @relation("ProfileCategoryDefaultTemplate", fields: [defaultTemplateId], references: [id], onDelete: SetNull)
+  templates             ProfileTemplate[]      @relation("ProfileTemplateCategory")
+  profiles              Profile[]
+  onboardingDefinitions OnboardingDefinition[]
+
+  @@index([profileKind, isActive, sortOrder])
+  @@index([defaultTemplateId])
+}
+
+model ProfileModuleDefinition {
+  id                 String                  @id @default(cuid())
+  key                String                  @unique
+  nameEn             String
+  nameAr             String
+  schemaVersion      Int                     @default(1)
+  isActive           Boolean                 @default(true)
+  supportsVisibility Boolean                 @default(true)
+  supportsMultiple   Boolean                 @default(false)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  modules            ProfileModule[]
+  templateRules      ProfileTemplateModule[]
+  onboardingSteps    OnboardingStep[]
+
+  @@index([isActive, key])
+}
+
+model ProfileModule {
+  id                   String                  @id @default(cuid())
+  profileId            String
+  moduleDefinitionId   String
+  instanceKey          String                  @default("default")
+  enabled              Boolean                 @default(true)
+  visibility           ProfileModuleVisibility @default(PUBLIC)
+  sortOrder            Int                     @default(0)
+  configurationVersion Int                     @default(1)
+  configuration        Json?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  profile              Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  moduleDefinition     ProfileModuleDefinition @relation(fields: [moduleDefinitionId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, moduleDefinitionId, instanceKey])
+  @@index([profileId, enabled, visibility, sortOrder])
+  @@index([moduleDefinitionId, enabled])
+}
+
+model ProfileTemplateModule {
+  id                   String                  @id @default(cuid())
+  templateId           String
+  moduleDefinitionId   String
+  allowed              Boolean                 @default(true)
+  enabledByDefault     Boolean                 @default(false)
+  required             Boolean                 @default(false)
+  defaultSortOrder     Int                     @default(0)
+  defaultConfiguration Json?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  template             ProfileTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  moduleDefinition     ProfileModuleDefinition @relation(fields: [moduleDefinitionId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, moduleDefinitionId])
+  @@index([templateId, allowed, enabledByDefault, defaultSortOrder])
+  @@index([moduleDefinitionId])
+}
+
+model ProfileEntitlement {
+  id                    String                       @id @default(cuid())
+  userId                String
+  profileId             String?                      @unique
+  sourceType            ProfileEntitlementSourceType
+  sourceId              String?
+  profileLimitIncrement Int                          @default(0)
+  status                ProfileEntitlementStatus     @default(ACTIVE)
+  startsAt              DateTime                     @default(now())
+  endsAt                DateTime?
+  revokedAt             DateTime?
+  createdAt             DateTime                     @default(now())
+  user                  User                         @relation("ProfileEntitlementUser", fields: [userId], references: [id], onDelete: Cascade)
+  profile               Profile?                     @relation("ProfileEntitlementProfile", fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, startsAt, endsAt])
+  @@index([sourceType, sourceId])
+}
+
+model LegalDocument {
+  id           String             @id @default(cuid())
+  documentType LegalDocumentType
+  version      String
+  locale       String
+  contentHash  String
+  effectiveAt  DateTime
+  required     Boolean            @default(true)
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  consents     UserLegalConsent[]
+
+  @@unique([documentType, version, locale])
+  @@index([documentType, isActive, effectiveAt])
+}
+
+model UserLegalConsent {
+  id              String             @id @default(cuid())
+  userId          String
+  legalDocumentId String
+  acceptedAt      DateTime           @default(now())
+  revokedAt       DateTime?
+  source          LegalConsentSource
+  createdAt       DateTime           @default(now())
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  legalDocument   LegalDocument      @relation(fields: [legalDocumentId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, legalDocumentId])
+  @@index([userId, acceptedAt])
+  @@index([legalDocumentId])
 }
 
 model ProfileField {
@@ -801,6 +1496,61 @@ model Friendship {
   @@unique([userAId, userBId])
   @@index([userAId, status])
   @@index([userBId, status])
+}
+
+model FriendRequest {
+  id              String              @id @default(cuid())
+  pairKey         String
+  requesterUserId String
+  recipientUserId String
+  status          FriendRequestStatus @default(PENDING)
+  source          FriendRequestSource @default(SEARCH)
+  revision        Int                 @default(1)
+  createdAt       DateTime            @default(now())
+  respondedAt     DateTime?
+  cancelledAt     DateTime?
+  expiresAt       DateTime?
+  requester       User                @relation("FriendRequestRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  recipient       User                @relation("FriendRequestRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  notifications   FriendNotificationEvent[]
+
+  @@index([requesterUserId, status, createdAt])
+  @@index([recipientUserId, status, createdAt])
+  @@index([pairKey, status, createdAt])
+}
+
+model FriendPreference {
+  id        String   @id @default(cuid())
+  ownerId   String
+  friendId  String
+  favorite  Boolean  @default(false)
+  muted     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner     User     @relation("FriendPreferenceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  friend    User     @relation("FriendPreferenceFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, friendId])
+  @@index([ownerId, favorite, updatedAt])
+  @@index([ownerId, muted])
+}
+
+model FriendsPreference {
+  id                            String   @id @default(cuid())
+  userId                        String   @unique
+  socialKey                     String   @unique @default(cuid())
+  socialProfileId               String?
+  allowFriendRequests           Boolean  @default(true)
+  discoverableByProfileSearch   Boolean  @default(false)
+  profileConfiguredAt           DateTime?
+  privacyConfiguredAt           DateTime?
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+  user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  socialProfile                 Profile? @relation("FriendsSocialProfile", fields: [socialProfileId], references: [id], onDelete: SetNull)
+
+  @@index([discoverableByProfileSearch, updatedAt])
+  @@index([socialProfileId])
 }
 
 model FriendPrivacyRule {
@@ -939,6 +1689,7 @@ model Destination {
   isVisible            Boolean         @default(true)
   sortOrder            Int             @default(0)
   isOfflineCapable     Boolean         @default(false)
+  publicShareKey       String?         @unique
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1041,6 +1792,13 @@ model Card {
   publicToken               String                   @unique
   activationTokenHash       String                   @unique
   activationTokenConsumedAt DateTime?
+  activationSecretHash       String?
+  activationSecretState      ActivationSecretState    @default(LEGACY)
+  activationSecretVersion    Int?
+  activationSecretConsumedAt DateTime?
+  activationAttemptWindowAt  DateTime?
+  activationFailedAttempts   Int                      @default(0)
+  activationLockoutUntil     DateTime?
   cardType                  CardType
   batchId                   String?
   ownerId                   String?
@@ -1141,13 +1899,21 @@ model ActivationClaimSession {
 }
 
 model ActivationAttempt {
-  id        String   @id @default(cuid())
-  cardId    String
-  success   Boolean
-  createdAt DateTime @default(now())
-  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  id                     String   @id @default(cuid())
+  cardId                 String
+  actorId                String?
+  contextFingerprintHash String?
+  networkFingerprintHash String?
+  method                 String?
+  failureClass           String?
+  success                Boolean
+  createdAt              DateTime @default(now())
+  card                    Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([contextFingerprintHash, createdAt])
+  @@index([networkFingerprintHash, createdAt])
 }
 
 model OtpChallenge {
@@ -1165,6 +1931,9 @@ model OtpChallenge {
   channel           PhoneOtpChannel         @default(SMS)
   providerMessageId String?
   requestIpHash     String?
+  securityUserId    String?
+  stepUpPurpose     StepUpPurpose?
+  sessionBindingHash String?
   lastSentAt        DateTime                @default(now())
   createdAt         DateTime                @default(now())
   claimSession      ActivationClaimSession? @relation(fields: [claimSessionId], references: [id], onDelete: Cascade)
@@ -1172,6 +1941,7 @@ model OtpChallenge {
   @@index([phone, createdAt])
   @@index([requestIpHash, createdAt])
   @@index([claimSessionId])
+  @@index([securityUserId, purpose, expiresAt])
   @@index([expiresAt])
 }
 
@@ -1193,6 +1963,7 @@ model AuthTicket {
   id         String    @id @default(cuid())
   tokenHash  String    @unique
   userId     String
+  authMethod SessionAuthMethod @default(OTP)
   expiresAt  DateTime
   consumedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -1202,19 +1973,22 @@ model AuthTicket {
 }
 
 model MobileRefreshToken {
-  id         String    @id @default(cuid())
-  tokenHash  String    @unique
-  familyId   String
-  userId     String
-  deviceName String?
-  expiresAt  DateTime
-  lastUsedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String         @id @default(cuid())
+  tokenHash       String         @unique
+  familyId        String
+  userId          String
+  deviceSessionId String?
+  deviceName      String?
+  expiresAt       DateTime
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession   DeviceSession? @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
 
   @@index([userId, revokedAt])
   @@index([familyId])
+  @@index([deviceSessionId, revokedAt])
   @@index([expiresAt])
 }
 
@@ -1302,6 +2076,9 @@ model ProducedTag {
   permanentUrl        String            @unique
   activationCode      String            @unique
   activationTokenHash String            @unique
+  scratchSecretExportCiphertext String?
+  scratchSecretExportedAt DateTime?
+  activationSecretVersion Int?
   status              ProducedTagStatus @default(UNASSIGNED)
   assignedUserId      String?
   activatedAt         DateTime?
@@ -1390,9 +2167,12 @@ model PasskeyCredential {
   createdAt    DateTime  @default(now())
   lastUsedAt   DateTime?
   revokedAt    DateTime?
+  deviceSessionId String?
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession DeviceSession? @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
 
   @@index([userId, revokedAt])
+  @@index([deviceSessionId, revokedAt])
 }
 
 model PasskeyChallenge {
@@ -1402,10 +2182,13 @@ model PasskeyChallenge {
   type          PasskeyChallengeType
   expiresAt     DateTime
   consumedAt    DateTime?
+  stepUpPurpose StepUpPurpose?
+  sessionBindingHash String?
   createdAt     DateTime             @default(now())
   user          User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, expiresAt])
+  @@index([userId, stepUpPurpose, expiresAt])
   @@index([expiresAt])
 }
 
@@ -1455,6 +2238,24 @@ model OAuthConnectionState {
   @@index([expiresAt])
 }
 
+model ExternalIdentity {
+  id              String                   @id @default(cuid())
+  userId          String?
+  provider        ExternalIdentityProvider
+  providerSubject String
+  identityType    ExternalIdentityType     @default(ANONYMOUS)
+  status          ExternalIdentityStatus   @default(ACTIVE)
+  linkedAt        DateTime?
+  lastSeenAt      DateTime?                @default(now())
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  user            User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerSubject])
+  @@index([userId, provider, status])
+  @@index([provider, status])
+}
+
 model CardImportedField {
   id                 String                @id @default(cuid())
   virtualCardId      String
@@ -1480,9 +2281,12 @@ model DevicePushToken {
   createdAt      DateTime  @default(now())
   lastSeenAt     DateTime  @default(now())
   revokedAt      DateTime?
+  deviceSessionId String?
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession  DeviceSession? @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
 
   @@index([userId, platform, revokedAt])
+  @@index([deviceSessionId, revokedAt])
 }
 
 model PlatformSuggestion {
@@ -1720,62 +2524,202 @@ model Follow {
 }
 
 model UserBlock {
-  id        String   @id @default(cuid())
-  ownerId   String
-  blockedId String
-  reason    String?
-  createdAt DateTime @default(now())
-  owner     User     @relation("UserBlockOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  blocked   User     @relation("UserBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  id             String              @id @default(cuid())
+  ownerId        String
+  blockedId      String
+  reason         String?
+  reasonCategory UserReportCategory?
+  source         UserBlockSource     @default(FRIENDS)
+  createdAt      DateTime            @default(now())
+  owner          User                @relation("UserBlockOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  blocked        User                @relation("UserBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@unique([ownerId, blockedId])
+  @@index([ownerId, createdAt])
+  @@index([blockedId])
 }
 
 model UserReport {
-  id           String           @id @default(cuid())
-  reporterId   String
-  subjectId    String?
-  reason       String
-  details      String?
-  status       UserReportStatus @default(OPEN)
-  reviewedById String?
-  reviewNote   String?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  reporter     User             @relation("UserReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
-  subject      User?            @relation("UserReportSubject", fields: [subjectId], references: [id], onDelete: SetNull)
-  reviewedBy   User?            @relation("UserReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  id             String              @id @default(cuid())
+  reporterId     String
+  subjectId      String?
+  targetProfileId String?
+  reason         String
+  category       UserReportCategory?
+  source         UserReportSource      @default(FRIENDS)
+  details        String?
+  status         UserReportStatus    @default(OPEN)
+  reviewedById   String?
+  reviewedAt     DateTime?
+  reviewNote     String?
+  resolutionCode String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  reporter       User                @relation("UserReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  subject        User?               @relation("UserReportSubject", fields: [subjectId], references: [id], onDelete: SetNull)
+  targetProfile  Profile?            @relation("UserReportProfile", fields: [targetProfileId], references: [id], onDelete: SetNull)
+  reviewedBy     User?               @relation("UserReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
   @@index([subjectId])
+  @@index([reporterId, subjectId, createdAt])
+  @@index([targetProfileId, createdAt])
 }
 
 model NearbyPreference {
-  id            String    @id @default(cuid())
-  userId        String    @unique
-  enabled       Boolean   @default(false)
-  visibleUntil  DateTime?
-  virtualCardId String?
-  audience      String    @default("EVERYONE_OPTED_IN")
-  updatedAt     DateTime  @updatedAt
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  enabled        Boolean   @default(false)
+  discoverable   Boolean   @default(false)
+  generation     Int       @default(0)
+  activatedAt    DateTime?
+  disabledAt     DateTime?
+  visibleUntil   DateTime?
+  virtualCardId  String?
+  audience       String    @default("EVERYONE_OPTED_IN")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([enabled, discoverable, updatedAt])
   @@index([enabled, visibleUntil])
 }
 
+model NearbyPresence {
+  id                    String               @id @default(cuid())
+  userId                String               @unique
+  coarseCell            String
+  cellVersion           Int                  @default(1)
+  generation            Int
+  sessionHash           String               @unique
+  source                NearbyPresenceSource
+  cellWindowStartedAt   DateTime
+  cellChangesInWindow   Int                  @default(0)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  expiresAt             DateTime
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([coarseCell, expiresAt])
+  @@index([expiresAt])
+}
+
+model NearbyRateLimitBucket {
+  id            String              @id @default(cuid())
+  userId        String
+  kind          NearbyRateLimitKind
+  windowStart   DateTime
+  count         Int                 @default(0)
+  updatedAt     DateTime            @updatedAt
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@index([kind, windowStart])
+}
+
 model DeviceSession {
-  id              String    @id @default(cuid())
-  userId          String
-  tokenFamilyHash String    @unique
-  deviceName      String?
-  platform        String
-  appVersion      String?
-  lastSeenAt      DateTime  @default(now())
-  revokedAt       DateTime?
-  createdAt       DateTime  @default(now())
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String            @id @default(cuid())
+  userId              String
+  tokenFamilyHash     String            @unique
+  deviceType          LogicalDeviceType @default(MOBILE_APP)
+  deviceName          String?
+  userLabel           String?
+  platform            String
+  browserName         String?
+  appName             String?
+  appVersion          String?
+  authMethod          SessionAuthMethod @default(LEGACY)
+  lastSeenAt          DateTime          @default(now())
+  lastAuthenticatedAt DateTime?
+  revokedAt           DateTime?
+  createdAt           DateTime          @default(now())
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webSessions         Session[]
+  mobileRefreshTokens MobileRefreshToken[]
+  pushTokens          DevicePushToken[]
+  passkeys            PasskeyCredential[]
+  stepUpGrants        StepUpGrant[]
 
   @@index([userId, revokedAt, lastSeenAt])
+  @@index([userId, deviceType, revokedAt])
+}
+
+model UserPreference {
+  id        String                 @id @default(cuid())
+  userId    String                 @unique
+  theme     UserThemePreference    @default(SYSTEM)
+  language  UserLanguagePreference @default(SYSTEM)
+  font      UserFontPreference     @default(DEFAULT)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreference {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  generalEnabled   Boolean  @default(true)
+  securityEnabled  Boolean  @default(true)
+  productsEnabled  Boolean  @default(true)
+  socialEnabled    Boolean  @default(true)
+  marketingEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FriendNotificationEvent {
+  id              String                   @id @default(cuid())
+  recipientUserId String
+  actorUserId     String?
+  requestId       String?
+  type            FriendNotificationType
+  status          FriendNotificationStatus @default(PENDING)
+  createdAt       DateTime                 @default(now())
+  availableAt     DateTime                 @default(now())
+  sentAt          DateTime?
+  recipient       User                     @relation("FriendNotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  actor           User?                    @relation("FriendNotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  request         FriendRequest?           @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, status, createdAt])
+  @@index([status, availableAt])
+  @@index([actorUserId, recipientUserId, createdAt])
+}
+
+model StepUpGrant {
+  id                 String         @id @default(cuid())
+  tokenHash          String         @unique
+  userId             String
+  deviceSessionId    String?
+  webSessionId       String?
+  purpose            StepUpPurpose
+  method             StepUpMethod
+  assuranceLevel     Int            @default(2)
+  sessionBindingHash String
+  issuedAt           DateTime       @default(now())
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession      DeviceSession? @relation(fields: [deviceSessionId], references: [id], onDelete: Cascade)
+  webSession         Session?       @relation(fields: [webSessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, expiresAt])
+  @@index([deviceSessionId, expiresAt])
+  @@index([webSessionId, expiresAt])
+}
+
+model AccountDeletionRequest {
+  id          String                       @id @default(cuid())
+  userId      String
+  status      AccountDeletionRequestStatus @default(REQUESTED)
+  requestedAt DateTime                     @default(now())
+  reviewedAt  DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  user        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, requestedAt])
 }
 
 model ProductStatusHistory {
@@ -1829,33 +2773,152 @@ model TagTransfer {
 }
 
 model ProfileTemplate {
-  id              String        @id @default(cuid())
-  nameAr          String
-  nameEn          String
-  slug            String        @unique
-  category        String
-  minimumPlan     String
-  previewImageUrl String?
-  configuration   Json
-  isActive        Boolean       @default(true)
-  sortOrder       Int           @default(0)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  virtualCards    VirtualCard[]
+  id                    String                  @id @default(cuid())
+  nameAr                String
+  nameEn                String
+  slug                  String                  @unique
+  category              String
+  categoryId            String?
+  profileKind           ProfileKind?
+  minimumPlan           String
+  previewImageUrl       String?
+  configuration         Json
+  isActive              Boolean                 @default(true)
+  sortOrder             Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  virtualCards          VirtualCard[]
+  categoryRef           ProfileCategory?        @relation("ProfileTemplateCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  defaultForCategories  ProfileCategory[]       @relation("ProfileCategoryDefaultTemplate")
+  profiles              Profile[]
+  moduleRules           ProfileTemplateModule[]
+  onboardingDefinitions OnboardingDefinition[]
 
   @@index([isActive, sortOrder])
   @@index([minimumPlan])
+  @@index([categoryId, profileKind, isActive])
 }
 
 model OnboardingProgress {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  currentStep Int       @default(1)
-  completedAt DateTime?
-  data        Json      @default("{}")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String                @id @default(cuid())
+  userId            String                @unique
+  profileId         String?               @unique
+  definitionId      String?
+  definitionVersion Int?
+  currentStep       Int                   @default(1)
+  currentStepKey    String?
+  revision          Int                   @default(0)
+  draftAnswers      Json                  @default("{}")
+  initialAnswers    Json                  @default("{}")
+  completedAt       DateTime?
+  data              Json                  @default("{}")
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile           Profile?              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  definition        OnboardingDefinition? @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+
+  @@index([definitionId, definitionVersion])
+  @@index([profileId, completedAt])
+}
+
+model OnboardingDefinition {
+  id          String                     @id @default(cuid())
+  key         String
+  version     Int
+  profileKind ProfileKind
+  categoryId  String?
+  templateId  String?
+  status      OnboardingDefinitionStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  category    ProfileCategory?           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  template    ProfileTemplate?           @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  steps       OnboardingStep[]
+  progress    OnboardingProgress[]
+
+  @@unique([key, version])
+  @@index([profileKind, status, version])
+  @@index([categoryId, status, version])
+  @@index([templateId, status, version])
+}
+
+model OnboardingStep {
+  id                 String                   @id @default(cuid())
+  definitionId       String
+  key                String
+  sortOrder          Int
+  titleEn            String
+  titleAr            String
+  descriptionEn      String?
+  descriptionAr      String?
+  stepType           OnboardingStepType       @default(FORM)
+  required           Boolean                  @default(true)
+  moduleDefinitionId String?
+  active             Boolean                  @default(true)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  definition         OnboardingDefinition     @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  moduleDefinition   ProfileModuleDefinition? @relation(fields: [moduleDefinitionId], references: [id], onDelete: Restrict)
+  questions          OnboardingQuestion[]
+
+  @@unique([definitionId, key])
+  @@index([definitionId, active, sortOrder])
+  @@index([moduleDefinitionId])
+}
+
+model OnboardingQuestion {
+  id           String                        @id @default(cuid())
+  stepId       String
+  key          String
+  questionType OnboardingQuestionType
+  labelEn      String
+  labelAr      String
+  helpEn       String?
+  helpAr       String?
+  required     Boolean                       @default(false)
+  sortOrder    Int
+  mappingKey   OnboardingMappingKey
+  minLength    Int?
+  maxLength    Int?
+  minValue     Decimal?                      @db.Decimal(14, 2)
+  maxValue     Decimal?                      @db.Decimal(14, 2)
+  maxItems     Int?
+  active       Boolean                       @default(true)
+  createdAt    DateTime                      @default(now())
+  updatedAt    DateTime                      @updatedAt
+  step         OnboardingStep                @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  options      OnboardingQuestionOption[]
+  conditions   OnboardingQuestionCondition[]
+
+  @@unique([stepId, key])
+  @@index([stepId, active, sortOrder])
+}
+
+model OnboardingQuestionOption {
+  id         String             @id @default(cuid())
+  questionId String
+  key        String
+  labelEn    String
+  labelAr    String
+  sortOrder  Int                @default(0)
+  active     Boolean            @default(true)
+  question   OnboardingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, key])
+  @@index([questionId, active, sortOrder])
+}
+
+model OnboardingQuestionCondition {
+  id                String                      @id @default(cuid())
+  questionId        String
+  sourceQuestionKey String
+  operator          OnboardingConditionOperator
+  expectedValues    String[]
+  question          OnboardingQuestion          @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
 }
 
 model InventoryBatch {

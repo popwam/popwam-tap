@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "rolloutState": "DISABLED",
+  "presenceEnabled": false,
+  "discoveryEnabled": false,
+  "limitedPercentage": 0,
+  "cellPrecision": 6,
+  "neighborRing": 2,
+  "presenceTtlSeconds": 600,
+  "heartbeatMinSeconds": 60,
+  "maxResults": 20,
+  "minimumCrowdSize": 2,
+  "presenceUpdatesPerWindow": 12,
+  "presenceWindowSeconds": 600,
+  "discoveryRequestsPerWindow": 30,
+  "discoveryWindowSeconds": 600,
+  "enableRequestsPerWindow": 6,
+  "enableWindowSeconds": 3600,
+  "maxCellChangesPerWindow": 3,
+  "cellChangeWindowSeconds": 600
+}

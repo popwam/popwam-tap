@@ -49,7 +49,17 @@ export async function POST(request: Request) {
       } });
       const productionBatch = await tx.productionBatch.create({ data: { batchCode, productId, quantity, status: "GENERATED", createdById: admin.id, legacyCardBatchId: legacyBatch.id } });
       const cards = await tx.card.createManyAndReturn({
-        data: rows.map(row => ({ serialNumber: row.serialNumber, publicSlug: row.publicSlug, publicToken: row.immutableToken, activationTokenHash: row.activationTokenHash, cardType, batchId: legacyBatch.id })),
+        data: rows.map(row => ({
+          serialNumber: row.serialNumber,
+          publicSlug: row.publicSlug,
+          publicToken: row.immutableToken,
+          activationTokenHash: row.activationTokenHash,
+          activationSecretHash: row.activationSecretHash,
+          activationSecretState: "SCRATCH_READY",
+          activationSecretVersion: 1,
+          cardType,
+          batchId: legacyBatch.id,
+        })),
         select: { id: true, publicSlug: true },
       });
       const cardIdBySlug = new Map(cards.map(card => [card.publicSlug, card.id]));
@@ -59,8 +69,13 @@ export async function POST(request: Request) {
         immutableToken: row.immutableToken,
         shortCode: row.publicSlug,
         permanentUrl: row.permanentUrl,
-        activationCode: sealActivationCode(row.activationCode),
+        // New products never receive a bearer activation token. This required
+        // legacy column is deliberately made unusable and remains isolated for
+        // already-packaged inventory only.
+        activationCode: `legacy-disabled:${row.immutableToken}`,
         activationTokenHash: row.activationTokenHash,
+        scratchSecretExportCiphertext: sealActivationCode(row.scratchSecret),
+        activationSecretVersion: 1,
       })) });
       await tx.inventoryBatch.create({ data: { productId, batchCode, producedQuantity: quantity, availableQuantity: quantity, unitCost: stock.unitCost } });
       await tx.inventoryMovement.create({ data: { inventoryItemId: productId, type: "CARD_BATCH_CREATED", quantity: -quantity, unitCost: stock.unitCost, referenceType: "PRODUCTION_BATCH", referenceId: productionBatch.id, notes: `Generated ${batchCode}`, createdBy: admin.id } });

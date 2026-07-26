@@ -25,9 +25,10 @@ try {
   if (!/^postgres(ql)?:$/.test(database.protocol)) errors.push("DATABASE_URL must be PostgreSQL");
 } catch { errors.push("DATABASE_URL must be a valid PostgreSQL URL"); }
 
-for (const name of ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "OTP_PEPPER"]) strongSecret(name);
-const secrets = [value("NEXTAUTH_SECRET"), value("MOBILE_TOKEN_SECRET"), value("OTP_PEPPER")].filter(Boolean);
-if (new Set(secrets).size !== secrets.length) errors.push("NEXTAUTH_SECRET, MOBILE_TOKEN_SECRET and OTP_PEPPER must be distinct");
+for (const name of ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "OTP_PEPPER", "ACTIVATION_SCRATCH_PEPPER", "ACTIVATION_RATE_LIMIT_PEPPER"]) strongSecret(name);
+const secretNames = ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "OTP_PEPPER", "ACTIVATION_SCRATCH_PEPPER", "ACTIVATION_RATE_LIMIT_PEPPER"];
+const secrets = secretNames.map(value).filter(Boolean);
+if (new Set(secrets).size !== secrets.length) errors.push(`${secretNames.join(", ")} must be distinct`);
 
 exactUrl("NEXTAUTH_URL", "https://pop.popwam.com");
 httpsUrl("NEXT_PUBLIC_APP_URL", "go.popwam.com");
@@ -43,26 +44,20 @@ if (metaCapabilities.some(capability => !allowedMetaCapabilities.has(capability)
 if (value("APP_HOST") !== "pop.popwam.com") errors.push("APP_HOST must be pop.popwam.com");
 if (value("PUBLIC_HOST") !== "go.popwam.com") errors.push("PUBLIC_HOST must be go.popwam.com");
 
-const smsProvider = value("SMS_PROVIDER").toLowerCase();
+const firebaseWebConfig = ["NEXT_PUBLIC_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET", "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", "NEXT_PUBLIC_FIREBASE_APP_ID"];
+const firebaseAdminConfig = ["FCM_PROJECT_ID", "FCM_CLIENT_EMAIL", "FCM_PRIVATE_KEY"];
+for (const name of firebaseAdminConfig) required(name);
+if (firebaseWebConfig.some(name => value(name))) for (const name of firebaseWebConfig) required(name);
+if (value("FCM_ENABLED") && !["true", "false"].includes(value("FCM_ENABLED").toLowerCase())) errors.push("FCM_ENABLED must be true or false");
+if (value("FCM_ENABLED").toLowerCase() === "true") for (const name of firebaseAdminConfig) required(name);
+
 const booleanValue = name => ["true", "false"].includes(value(name).toLowerCase());
 for (const name of ["STAGING", "OTP_TEST_MODE", "OTP_EXPOSE_IN_RESPONSE"]) if (value(name) && !booleanValue(name)) errors.push(`${name} must be true or false`);
 const staging = value("STAGING").toLowerCase() === "true";
 const otpTestMode = value("OTP_TEST_MODE").toLowerCase() === "true";
 const otpExpose = value("OTP_EXPOSE_IN_RESPONSE").toLowerCase() === "true";
-if (!['smsmisr', 'webhook'].includes(smsProvider)) errors.push("SMS_PROVIDER must be smsmisr or webhook in production");
-if (smsProvider === "smsmisr") {
-  for (const name of ["SMSMISR_ENVIRONMENT", "SMSMISR_USERNAME", "SMSMISR_PASSWORD", "SMSMISR_SENDER_TOKEN", "SMSMISR_TEMPLATE_TOKEN"]) required(name);
-  httpsUrl("SMSMISR_BASE_URL", "smsmisr.com");
-  if (!["1", "2"].includes(value("SMSMISR_ENVIRONMENT"))) errors.push("SMSMISR_ENVIRONMENT must be 1 (Live) or 2 (Test)");
-  if (value("SMSMISR_ENVIRONMENT") === "2") console.warn("WARNING: SMSMISR_ENVIRONMENT=2 is Test mode, not Live delivery.");
-}
-if (smsProvider === "webhook") {
-  httpsUrl("SMS_API_URL"); required("SMS_API_TOKEN"); required("SMS_SENDER_ID");
-}
-
 if (otpTestMode) {
   if (!staging) errors.push("OTP_TEST_MODE=true is forbidden on live production; set it only on an explicitly marked STAGING deployment");
-  if (value("SMSMISR_ENVIRONMENT") !== "2") errors.push("OTP_TEST_MODE=true requires SMSMISR_ENVIRONMENT=2");
   const phones = value("OTP_TEST_PHONES").split(",").map(phone => phone.trim()).filter(Boolean);
   if (!phones.length || phones.some(phone => !/^\+[1-9]\d{7,14}$/.test(phone))) errors.push("OTP_TEST_PHONES must be a non-empty comma-separated list of normalized E.164 phone numbers");
   if (value("OTP_TEST_CODE") && !/^\d{6}$/.test(value("OTP_TEST_CODE"))) errors.push("OTP_TEST_CODE must be exactly 6 digits when provided");

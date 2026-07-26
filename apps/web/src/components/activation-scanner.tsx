@@ -3,13 +3,19 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Image as ImageIcon, Keyboard, RefreshCw, ScanLine, Zap } from "lucide-react";
 type Detector = { detect(source: ImageBitmapSource): Promise<Array<{ rawValue: string }>> }; type DetectorCtor = new(options: { formats: string[] }) => Detector;
 
-export function ActivationScanner({ publicSlug = "", locale }: { publicSlug?: string; locale: "ar" | "en" }) {
+export function ActivationScanner({ publicSlug = "", locale, onIdentified }: { publicSlug?: string; locale: "ar" | "en"; onIdentified?: (value: string) => void | Promise<void> }) {
   const video = useRef<HTMLVideoElement>(null); const stream = useRef<MediaStream | null>(null); const timer = useRef<number | null>(null); const locked = useRef(false);
   const [mode, setMode] = useState<"choice"|"camera"|"manual">("choice"); const [manual, setManual] = useState(""); const [status, setStatus] = useState(""); const [facingMode, setFacingMode] = useState<"environment"|"user">("environment"); const ar = locale === "ar";
   function stop() { if (timer.current) window.clearInterval(timer.current); timer.current = null; stream.current?.getTracks().forEach(track => track.stop()); stream.current = null; }
   useEffect(() => stop, []);
   async function submit(value: string) {
     if (locked.current || !value.trim()) return; locked.current = true; setStatus(ar ? "جارٍ التحقق…" : "Verifying…");
+    if (onIdentified) {
+      stop();
+      await onIdentified(value);
+      locked.current = false;
+      return;
+    }
     const response = await fetch("/api/activation/start", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ publicSlug, activationValue:value }) }); const result = await response.json().catch(() => ({}));
     if (response.ok) { stop(); window.location.assign(result.nextUrl); return; } locked.current = false;
     const messages: Record<string,string> = ar ? { ACTIVATION_RATE_LIMITED:"محاولات كثيرة. حاول لاحقًا.", ACTIVATION_CARD_MISMATCH:"رمز QR يخص كارتًا مختلفًا.", CARD_ALREADY_ACTIVATED:"تم تفعيل هذا الكارت بالفعل بواسطة حساب آخر.", CARD_SUSPENDED:"هذا الكارت موقوف ولا يمكن تفعيله.", ACTIVATION_INVALID:"QR منتهي أو غير صحيح." } : { ACTIVATION_RATE_LIMITED:"Too many attempts. Try later.", ACTIVATION_CARD_MISMATCH:"This QR belongs to a different card.", CARD_ALREADY_ACTIVATED:"Another account has already activated this card.", CARD_SUSPENDED:"This card is suspended and cannot be activated.", ACTIVATION_INVALID:"This QR is expired or invalid." };

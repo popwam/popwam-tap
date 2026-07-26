@@ -22,7 +22,7 @@ POPWAM_PUBLIC_BASE_URL=https://go.popwam.com/
 GOOGLE_WEB_CLIENT_ID=
 ```
 
-`POPWAM_API_BASE_URL` must use HTTPS for release builds. Phone OTP and SMS providers are configured on the backend, not in the APK. Google login is optional and requires a matching backend OAuth configuration.
+`POPWAM_API_BASE_URL` must use HTTPS for release builds. Phone ownership is verified with the official Firebase Android Phone Authentication flow, then exchanged server-side for the normal POP mobile session. Google login is optional and requires a matching backend OAuth configuration.
 
 The app requests:
 

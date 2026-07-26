@@ -29,7 +29,7 @@ const androidMalformed = [...androidEn, ...androidAr].filter(([, value]) => susp
 const sourceFiles = [
   "apps/web/src/app/page.tsx", "apps/web/src/app/login/page.tsx", "apps/web/src/app/login/phone/page.tsx",
   "apps/web/src/app/(admin-auth)/admin/login/page.tsx", "apps/web/src/app/activate/page.tsx", "apps/web/src/app/download/page.tsx",
-  "apps/web/src/components/login-form.tsx", "apps/web/src/components/admin-login-form.tsx", "apps/web/src/components/otp-form.tsx",
+  "apps/web/src/components/login-form.tsx", "apps/web/src/components/admin-login-form.tsx", "apps/web/src/components/phone-entry-screen.tsx",
 ];
 const hardcoded = [];
 for (const file of sourceFiles) {

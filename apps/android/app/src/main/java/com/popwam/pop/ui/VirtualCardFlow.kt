@@ -281,7 +281,7 @@ private fun PreviewStep(draft: VirtualCardDraft, templates: List<ProfileTemplate
 }
 
 @Composable
-fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainViewModel, back: () -> Unit, edit: () -> Unit) {
+fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainViewModel, back: () -> Unit, edit: () -> Unit, publish: () -> Unit) {
     val context = LocalContext.current
     val profile = state.profiles.firstOrNull { it.id == profileId }
     if (profile == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
@@ -290,7 +290,7 @@ fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainView
     val selectedTemplate = state.templates.firstOrNull { it.id == selectedTemplateId } ?: card?.template
     val draft = profile.toDraft(selectedTemplateId)
     val hceSupported=context.packageManager.hasSystemFeature("android.hardware.nfc.hce")
-    val publicUrl="${BuildConfig.PUBLIC_BASE_URL.trimEnd('/')}/${if(!profile.slug.isNullOrBlank()) "profile/${profile.slug}" else "p/id/${profile.id}"}"
+    val publicUrl="${BuildConfig.PUBLIC_BASE_URL.trimEnd('/')}/${if(!profile.slug.isNullOrBlank()) "p/${profile.slug}" else "p/id/${profile.id}"}"
     var hceActive by remember(card?.id){mutableStateOf(card?.id!=null&&HceConfig.enabled(context)&&HceConfig.activeHceVirtualCardId(context)==card.id)}
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { WizardHeader(stringResource(R.string.vc_card_details), 0, back) }
@@ -302,6 +302,7 @@ fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainView
                 OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(publicUrl))) }, Modifier.weight(1f)) { Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.vc_open_public_page), maxLines = 1) }
             }
         }
+        item { Button(publish,Modifier.padding(horizontal=20.dp).fillMaxWidth()){Icon(Icons.Default.Visibility,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.publish_title))} }
         item { Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Button(onClick={if(card!=null){hceActive=!hceActive;HceConfig.save(context,hceActive,if(hceActive)publicUrl else null,if(hceActive)card.id else null)}},enabled=hceSupported&&card!=null,modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFFD4AF37),contentColor=Color.Black)){Icon(Icons.Default.Contactless,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.set_device_card))};Text(if(hceSupported)stringResource(R.string.hce_experimental) else stringResource(R.string.nfc_unavailable),style=MaterialTheme.typography.bodySmall,color=Color(0xFF6E6E6E))} }
         item { Text(stringResource(R.string.vc_change_template), Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
         item {

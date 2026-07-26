@@ -4,6 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -27,6 +29,19 @@ private val Light = lightColorScheme(
     onPrimary = Color.White,
     error = Color(0xFFD92D20),
 )
+private val Dark = darkColorScheme(
+    primary = Color(0xFFD4AF37),
+    secondary = Color(0xFFF5D76E),
+    background = Color(0xFF07090F),
+    surface = Color(0xFF111722),
+    surfaceVariant = Color(0xFF18202C),
+    outline = Color(0xFF8D7440),
+    onBackground = Color(0xFFF5F7FB),
+    onSurface = Color(0xFFF5F7FB),
+    onSurfaceVariant = Color(0xFFB8C1CC),
+    onPrimary = Color(0xFF171100),
+    error = Color(0xFFFFB4AB),
+)
 
 private val Cairo = FontFamily(
     Font(R.font.cairo,FontWeight.Normal),
@@ -45,11 +60,13 @@ private fun popwamTypography(font:FontFamily)=Typography(
 )
 
 @Composable
-fun PopwamTheme(content: @Composable () -> Unit) {
+fun PopwamTheme(themeMode:String="SYSTEM",fontMode:String="DEFAULT",content: @Composable () -> Unit) {
     val arabic = LocalConfiguration.current.locales[0].language == "ar"
+    val dark=when(themeMode){"DARK"->true;"LIGHT"->false;else->isSystemInDarkTheme()}
+    val font=when(fontMode){"CAIRO"->Cairo;"ABEEZEE"->ABeeZee;else->if(arabic)Cairo else ABeeZee}
     MaterialTheme(
-        colorScheme = Light,
-        typography = popwamTypography(if(arabic) Cairo else ABeeZee),
+        colorScheme = if(dark) Dark else Light,
+        typography = popwamTypography(font),
         shapes = Shapes(
             small = RoundedCornerShape(14.dp),
             medium = RoundedCornerShape(24.dp),

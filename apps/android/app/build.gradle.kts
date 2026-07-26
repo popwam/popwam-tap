@@ -2,6 +2,11 @@ import java.util.Properties
 
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id("org.jetbrains.kotlin.plugin.compose") }
 
+// The checked-in Firebase client only covers the release package. Keep plugin application opt-in
+// until Firebase Console has a separate client for com.popwam.pop.debug.
+val firebaseAndroidIntegrationEnabled = providers.gradleProperty("popwam.firebase.android.enabled").orNull == "true"
+if (firebaseAndroidIntegrationEnabled) { apply(plugin = "com.google.gms.google-services"); apply(plugin = "com.google.firebase.crashlytics") }
+
 val localProperties = Properties().apply { val file=rootProject.file("local.properties"); if(file.exists()) file.inputStream().use(::load) }
 val apiBaseUrl = (System.getenv("POPWAM_API_BASE_URL") ?: localProperties.getProperty("POPWAM_API_BASE_URL") ?: "https://pop.popwam.com/").let { if(it.endsWith('/')) it else "$it/" }
 val publicBaseUrl = (System.getenv("POPWAM_PUBLIC_BASE_URL") ?: localProperties.getProperty("POPWAM_PUBLIC_BASE_URL") ?: "https://go.popwam.com/").let { if(it.endsWith('/')) it else "$it/" }
@@ -19,6 +24,7 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "PUBLIC_BASE_URL", "\"$publicBaseUrl\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
+        buildConfigField("Boolean", "FIREBASE_RUNTIME_ENABLED", firebaseAndroidIntegrationEnabled.toString())
         vectorDrawables { useSupportLibrary = true }
     }
     buildTypes {
@@ -66,7 +72,12 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.googlecode.libphonenumber:libphonenumber:9.0.10")
-    implementation("com.google.firebase:firebase-messaging:25.0.0")
+    implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-crashlytics")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }
@@ -77,4 +88,26 @@ tasks.register("validateReleaseConfiguration") {
         check(apiBaseUrl.startsWith("https://")) { "Release API URL must use HTTPS" }
         println("Release configuration valid. Signing is intentionally external (Play App Signing or CI secrets).")
     }
+}
+
+tasks.register("verifyFirebaseDebugClient") {
+    group = "verification"
+    description = "Verifies that Firebase Console has a client for the debug applicationId."
+    doLast {
+        val config = file("google-services.json")
+        check(config.isFile) { "ANDROID FIREBASE DEBUG CLIENT: BLOCKED - apps/android/app/google-services.json is missing." }
+        @Suppress("UNCHECKED_CAST")
+        val root = groovy.json.JsonSlurper().parse(config) as Map<String, Any?>
+        val clients = root["client"] as? List<Map<String, Any?>> ?: emptyList()
+        val packageNames = clients.mapNotNull { client ->
+            ((client["client_info"] as? Map<String, Any?>)?.get("android_client_info") as? Map<String, Any?>)?.get("package_name") as? String
+        }
+        check("com.popwam.pop.debug" in packageNames) {
+            "ANDROID FIREBASE DEBUG CLIENT: BLOCKED - register com.popwam.pop.debug in Firebase Console, download the generated google-services.json, then enable -Ppopwam.firebase.android.enabled=true."
+        }
+    }
+}
+
+if (firebaseAndroidIntegrationEnabled) {
+    tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn("verifyFirebaseDebugClient") }
 }

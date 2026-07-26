@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.nfc.NfcAdapter
 import android.nfc.cardemulation.CardEmulation
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,8 +21,13 @@ import com.popwam.pop.ui.AuthFactory
 import com.popwam.pop.ui.AuthViewModel
 import com.popwam.pop.ui.MainFactory
 import com.popwam.pop.ui.MainViewModel
+import com.popwam.pop.ui.PreAuthStore
 import com.popwam.pop.ui.PopwamApp
 import com.popwam.pop.ui.theme.PopwamTheme
+import com.popwam.pop.ui.theme.AppearanceStore
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -30,6 +36,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE,
+        )
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
@@ -41,12 +51,18 @@ class MainActivity : AppCompatActivity() {
         }
         setContent {
             val app = application as TapApplication
-            val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions))
+            val appearanceStore=remember{AppearanceStore(applicationContext)}
+            val preAuthStore=remember{PreAuthStore(applicationContext)}
+            val appearance by appearanceStore.state.collectAsStateWithLifecycle()
+            val preAuth by preAuthStore.state.collectAsStateWithLifecycle()
+            val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
+            val authState by auth.state.collectAsStateWithLifecycle()
             val main: MainViewModel = viewModel(
-                factory = MainFactory(app.container.repository, app.container.sessions.role),
+                factory = MainFactory(app.container.repository, app.container.sessions.role,app.container.analytics),
             )
-            PopwamTheme {
-                PopwamApp(auth, main, NfcDeepLinkPolicy.route(intent?.dataString))
+            val firstLaunchTheme = if (!authState.authenticated && preAuth.appearance == null) "LIGHT" else appearance.theme
+            PopwamTheme(firstLaunchTheme,appearance.font) {
+                PopwamApp(auth, main, NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,preAuthStore)
             }
         }
     }
