@@ -1,7 +1,7 @@
-export type LegalDocumentForConsent = { id: string; isActive: boolean; effectiveAt: Date; required: boolean };
+export type LegalDocumentForConsent = { id: string; isActive: boolean; effectiveAt: Date; required: boolean; status?: string };
 
 export function legalConsentDecision(document: LegalDocumentForConsent | null, now = new Date()) {
-  if (!document || !document.isActive || document.effectiveAt > now) return { allowed: false as const, reason: "LEGAL_DOCUMENT_UNAVAILABLE" };
+  if (!document || !document.isActive || document.status === "DRAFT" || document.status === "ARCHIVED" || document.effectiveAt > now) return { allowed: false as const, reason: "LEGAL_DOCUMENT_UNAVAILABLE" };
   return { allowed: true as const, required: document.required };
 }
 

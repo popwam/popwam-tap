@@ -8,6 +8,7 @@ export type RuntimeLocale = {
   rtl: boolean;
   enabled: boolean;
   published: boolean;
+  displayOrder: number;
   translations: Record<string, string>;
 };
 
@@ -27,6 +28,7 @@ export const ENGLISH_ONLY_LOCALIZATION: RuntimeLocalizationConfig = {
     rtl: false,
     enabled: true,
     published: true,
+    displayOrder: 0,
     translations: {},
   }],
 };
@@ -66,6 +68,7 @@ export function sanitizeLocalizationConfig(value: unknown): RuntimeLocalizationC
       rtl: locale.rtl === true || metadata.rtl,
       enabled: locale.enabled === true,
       published: locale.published === true,
+      displayOrder: Number.isSafeInteger(locale.displayOrder) ? Number(locale.displayOrder) : 999,
       translations: cleanTranslations(locale.translations),
     }];
   });
@@ -75,8 +78,9 @@ export function sanitizeLocalizationConfig(value: unknown): RuntimeLocalizationC
     enabled: true,
     published: true,
     rtl: false,
+    displayOrder: 0,
   });
-  const normalized = [...unique.values()];
+  const normalized = [...unique.values()].sort((a,b)=>a.displayOrder-b.displayOrder || a.code.localeCompare(b.code));
   const available = normalized.filter(locale => locale.enabled && locale.published);
   const requestedDefault = String(raw.defaultLocale || SOURCE_LOCALE).toLowerCase();
   return {

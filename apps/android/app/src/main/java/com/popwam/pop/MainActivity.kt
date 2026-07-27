@@ -68,7 +68,7 @@ class MainActivity : AppCompatActivity() {
             )
             val firstLaunchTheme = if (!authState.authenticated && preAuth.appearance == null) "LIGHT" else appearance.theme
             PopwamTheme(firstLaunchTheme,appearance.font,appearance.identity) {
-                PopwamApp(auth, main, NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,preAuthStore,localization,coldLaunchReady)
+                PopwamApp(auth, main, NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,preAuthStore,localization,app.container.phoneCountries,coldLaunchReady)
             }
         }
     }

@@ -24,7 +24,13 @@ enum class AuthRuntimeStage {
 object AuthRuntimeDiagnostics {
     fun mark(stage:AuthRuntimeStage,outcome:String="started") {
         if(!BuildConfig.DEBUG)return
-        val safeOutcome=outcome.lowercase().filter { it.isLetterOrDigit()||it=='_' }.take(32).ifBlank { "unknown" }
+        val safeOutcome=outcome.lowercase().filter { it.isLetterOrDigit()||it=='_' }.take(180).ifBlank { "unknown" }
         runCatching { Log.d("PopAuthRuntime","stage=${stage.name} outcome=$safeOutcome") }
+    }
+    fun failure(stage:AuthRuntimeStage,error:Throwable?=null,http:Int?=null,safeError:String?=null) {
+        if(!BuildConfig.DEBUG)return
+        val safeCode=(safeError ?: "").filter { it.isLetterOrDigit()||it=='_'||it=='-' }.take(48)
+        val safeException=error?.javaClass?.simpleName.orEmpty().take(48)
+        runCatching { Log.d("PopAuthRuntime","stage=${stage.name} result=failed http=${http ?: 0} code=$safeCode exception=$safeException") }
     }
 }

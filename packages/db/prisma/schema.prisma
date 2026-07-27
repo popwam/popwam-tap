@@ -208,6 +208,17 @@ enum LegalDocumentType {
   PRIVACY
   COMMUNITY_GUIDELINES
   NEARBY_PRIVACY
+  TERMS_OF_USE
+  TERMS_OF_SERVICE
+  USER_AGREEMENT
+  COOKIE_POLICY
+  OTHER
+}
+
+enum LegalDocumentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
 enum LegalConsentSource {
@@ -1414,6 +1425,13 @@ model LegalDocument {
   version      String
   locale       String
   contentHash  String
+  slug         String             @default("")
+  title        String             @default("")
+  content      String             @default("")
+  status       LegalDocumentStatus @default(DRAFT)
+  requiresAcceptance Boolean       @default(true)
+  publishedAt  DateTime?
+  updatedAt    DateTime           @updatedAt
   effectiveAt  DateTime
   required     Boolean            @default(true)
   isActive     Boolean            @default(true)
@@ -1422,6 +1440,23 @@ model LegalDocument {
 
   @@unique([documentType, version, locale])
   @@index([documentType, isActive, effectiveAt])
+}
+
+model PhoneCountryConfig {
+  id               String   @id @default(cuid())
+  iso2             String   @unique
+  iso3             String?
+  name             String
+  localizedNames   Json     @default("{}")
+  dialCode         String
+  flagEmoji        String?
+  phonePlaceholder String?
+  enabled          Boolean  @default(false)
+  displayOrder     Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([enabled, displayOrder])
 }
 
 model UserLegalConsent {

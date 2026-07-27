@@ -60,6 +60,7 @@ import com.popwam.pop.BuildConfig
 import com.popwam.pop.R
 import com.popwam.pop.data.api.*
 import com.popwam.pop.data.auth.PhoneIdentity
+import com.popwam.pop.data.auth.PhoneCountryStore
 import com.popwam.pop.data.auth.PasskeyCoordinator
 import com.popwam.pop.data.localization.LocalizationAuthoritySnapshot
 import com.popwam.pop.hce.HceConfig
@@ -78,11 +79,13 @@ import com.google.gson.JsonParser
     appearanceStore:AppearanceStore,
     preAuthStore:PreAuthStore,
     localization:LocalizationAuthoritySnapshot,
+    phoneCountries:PhoneCountryStore,
     coldLaunchReady:Boolean,
 ){
     val authState by auth.state.collectAsStateWithLifecycle()
     val preAuthState by preAuthStore.state.collectAsStateWithLifecycle()
     val appearance by appearanceStore.state.collectAsStateWithLifecycle()
+    LaunchedEffect(phoneCountries) { phoneCountries.refresh() }
     var destination by rememberSaveable { mutableStateOf(UnauthenticatedDestination.PHONE_AUTH.name) }
     var pendingRoute by rememberSaveable { mutableStateOf(initialRoute) }
     var pendingActivation by rememberSaveable { mutableStateOf("") }
@@ -127,6 +130,7 @@ import com.google.gson.JsonParser
             UnauthenticatedDestination.PHONE_AUTH -> LoginScreen(
                 state=authState,
                 auth=auth,
+                phoneCountries=phoneCountries,
                 changePhone=auth::changePhone,
                 openHowWorks={destination=howPopWorksDestination().name},
                 openLegal={kind->destination=destinationForLegal(kind).name},
@@ -141,7 +145,6 @@ import com.google.gson.JsonParser
         }
         return
     }
-    LaunchedEffect(authState.authenticated){if(authState.authenticated)auth.refreshSetup(currentLocale())}
     if(authState.setupStage!=AuthSetupStage.READY){PhaseCSetupScreen(authState,auth,currentLocale());return}
     LaunchedEffect(authState.authenticated){main.reload();if(pendingActivation.isNotBlank()){main.inspectActivation(pendingActivation);pendingActivation=""}}
     FigmaMainNavigation(main,initialRoute=pendingRoute,onLogout={destination=UnauthenticatedDestination.PHONE_AUTH.name;auth.logout()},appearanceStore=appearanceStore)
@@ -295,6 +298,7 @@ fun openWeb(context:Context,path:String){CustomTabsIntent.Builder().setShowTitle
 private fun LoginScreen(
     state:AuthUiState,
     auth:AuthViewModel,
+    phoneCountries:PhoneCountryStore,
     changePhone:()->Unit,
     openHowWorks:()->Unit,
     openLegal:(PreAuthLegalKind)->Unit,
@@ -303,14 +307,16 @@ private fun LoginScreen(
     val activity=context as? ComponentActivity
     val scope=rememberCoroutineScope()
     val locale=currentLocale()
-    val options=remember(locale){PhoneIdentity.countries(Locale.forLanguageTag(locale))}
+    val countryConfig by phoneCountries.countries.collectAsStateWithLifecycle()
+    val options=remember(locale,countryConfig){PhoneIdentity.enabledCountries(Locale.forLanguageTag(locale),countryConfig)}
     var country by rememberSaveable{mutableStateOf(PhoneIdentity.suggestedCountry(context))}
     var countryPicker by rememberSaveable{mutableStateOf(false)}
     var phone by rememberSaveable{mutableStateOf("")}
     var phoneE164 by rememberSaveable{mutableStateOf("")}
     var code by rememberSaveable{mutableStateOf("")}
     var invalidPhone by rememberSaveable{mutableStateOf(false)}
-    LaunchedEffect(country){PhoneIdentity.saveCountry(context,country)}
+    LaunchedEffect(options){if(options.none { it.iso2==country }) country=options.firstOrNull()?.iso2 ?: ""}
+    LaunchedEffect(country){if(country.isNotBlank())PhoneIdentity.saveCountry(context,country)}
 
     if(state.challengeId!=null) {
         BackHandler(onBack=changePhone)
@@ -343,17 +349,17 @@ private fun LoginScreen(
             item { Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(82.dp),tint=MaterialTheme.colorScheme.primary);Text("POP",style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Black);Text(stringResource(R.string.pop_slogan),color=MaterialTheme.colorScheme.onSurfaceVariant)} }
             item {
                 val selected=options.firstOrNull{it.iso2==country}
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically){OutlinedButton({countryPicker=true},Modifier.heightIn(min=54.dp),contentPadding=PaddingValues(horizontal=12.dp)){Text(selected?.flag.orEmpty());Spacer(Modifier.width(5.dp));Text(selected?.callingCode?:"+20");Icon(Icons.Default.ExpandMore,null)};Box(Modifier.weight(1f)){LtrField(phone,{phone=it.filter{c->c.isDigit()||c in " -()"};invalidPhone=false},R.string.phone_number,null,KeyboardType.Phone,true)}}
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically){OutlinedButton({countryPicker=true},Modifier.heightIn(min=54.dp),enabled=options.isNotEmpty(),contentPadding=PaddingValues(horizontal=12.dp)){Text(selected?.flag.orEmpty());Spacer(Modifier.width(5.dp));Text(selected?.callingCode?:"+");Icon(Icons.Default.ExpandMore,null)};Box(Modifier.weight(1f)){LtrField(phone,{phone=it.filter{c->c.isDigit()||c in " -()"};invalidPhone=false},R.string.phone_number,null,KeyboardType.Phone,true,selected?.placeholder)}}
                 if(invalidPhone)Text(stringResource(R.string.phone_invalid),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             }
             item {
                 Button({
                     val normalized=PhoneIdentity.normalize(phone,country)
                     if(normalized==null||activity==null)invalidPhone=true else { phoneE164=normalized; auth.startPhoneVerification(activity,normalized,currentLocale()) }
-                },Modifier.fillMaxWidth().heightIn(min=54.dp),enabled=!state.loading&&phone.isNotBlank()){Text(stringResource(R.string.send_code))}
+                },Modifier.fillMaxWidth().heightIn(min=54.dp),enabled=!state.loading&&phone.isNotBlank()&&country.isNotBlank()){Text(stringResource(R.string.send_code))}
             }
             if(passkeyPlatformSupported(android.os.Build.VERSION.SDK_INT)) {
-                item { TextButton({
+                item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center){FilledTonalIconButton({
                         auth.beginPasskeyAuthentication()
                         scope.launch {
                             runCatching {
@@ -362,9 +368,10 @@ private fun LoginScreen(
                                 auth.verifyPasskey(JsonParser.parseString(assertion).asJsonObject,currentLocale())
                             }.onFailure(auth::passkeyClientFailure)
                         }
-                    },Modifier.fillMaxWidth(),enabled=!state.loading&&!state.passkeyLoading) {
-                        Text(stringResource(R.string.continue_with_passkey))
-                    }
+                    },enabled=!state.loading&&!state.passkeyLoading) { Icon(Icons.Default.Key,null) }
+                    Spacer(Modifier.width(16.dp))
+                    val biometricCapable=context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_FINGERPRINT)
+                    FilledTonalIconButton({},enabled=false){Icon(Icons.Default.Fingerprint,if(biometricCapable)"Set up biometric after first login" else "Biometric unavailable")}}
                 }
                 state.passkeyError?.let { error->
                     item { Text(stringResource(passkeyErrorString(error)),color=MaterialTheme.colorScheme.error) }
@@ -758,7 +765,7 @@ private fun DestinationEditor(
     )
 }
 @Composable private fun Field(value:String,onChange:(String)->Unit,label:Int,multiline:Boolean=false,keyboard:KeyboardType=KeyboardType.Text){if(keyboard==KeyboardType.Phone||keyboard==KeyboardType.Email||keyboard==KeyboardType.Uri)CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr){OutlinedTextField(value,onChange,label={Text(stringResource(label))},modifier=Modifier.fillMaxWidth(),minLines=if(multiline)3 else 1,keyboardOptions=KeyboardOptions(keyboardType=keyboard))}else OutlinedTextField(value,onChange,label={Text(stringResource(label))},modifier=Modifier.fillMaxWidth(),minLines=if(multiline)3 else 1,keyboardOptions=KeyboardOptions(keyboardType=keyboard))}
-@Composable private fun LtrField(value:String,onChange:(String)->Unit,label:Int,placeholder:Int?,keyboard:KeyboardType,enabled:Boolean){CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr){OutlinedTextField(value,onChange,label={Text(stringResource(label))},placeholder=placeholder?.let{{Text(stringResource(it))}},keyboardOptions=KeyboardOptions(keyboardType=keyboard),modifier=Modifier.fillMaxWidth(),enabled=enabled)}}
+@Composable private fun LtrField(value:String,onChange:(String)->Unit,label:Int,placeholder:Int?,keyboard:KeyboardType,enabled:Boolean,placeholderText:String?=null){CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr){OutlinedTextField(value,onChange,label={Text(stringResource(label))},placeholder={Text(placeholderText ?: placeholder?.let{stringResource(it)}.orEmpty())},keyboardOptions=KeyboardOptions(keyboardType=keyboard),modifier=Modifier.fillMaxWidth(),enabled=enabled)}}
 @Composable private fun LabelValue(label:Int,value:String,ltr:Boolean=false){Column{Text(stringResource(label),style=MaterialTheme.typography.labelMedium);if(ltr)LtrText(value)else Text(value)}}
 @Composable private fun LtrText(value:String,style:androidx.compose.ui.text.TextStyle=LocalTextStyle.current){CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr){Text(value,style=style)}}
 @Composable private fun Loading(){Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){CircularProgressIndicator()}}

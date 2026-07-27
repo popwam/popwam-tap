@@ -20,13 +20,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun PhaseCSetupScreen(state:AuthUiState, auth:AuthViewModel, locale:String) {
     when (state.setupStage) {
-        AuthSetupStage.AUTHENTICATED_CHECKING -> SetupLoading(auth, locale)
+        AuthSetupStage.AUTHENTICATED_CHECKING -> SetupLoading(state,auth, locale)
+        AuthSetupStage.SETUP_UNAVAILABLE -> SetupLoading(state.copy(error=state.error ?: "SETUP_STATUS_UNAVAILABLE"),auth,locale)
         AuthSetupStage.LEGAL_REQUIRED -> LegalConsentScreen(state, auth, locale)
         AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED -> ProfileBootstrapScreen(state, auth, locale)
         AuthSetupStage.PASSKEY_OFFER -> PasskeyOfferScreen(auth, locale)
         AuthSetupStage.DYNAMIC_ONBOARDING -> DynamicOnboardingScreen(state,auth,locale)
         AuthSetupStage.LEGACY_COMPATIBILITY -> LegacyCompatibilityScreen(auth)
-        else -> SetupLoading(auth, locale)
+        else -> SetupLoading(state,auth, locale)
     }
 }
 
@@ -39,8 +40,8 @@ fun PhaseCSetupScreen(state:AuthUiState, auth:AuthViewModel, locale:String) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun SetupLoading(auth:AuthViewModel,locale:String) {
-    ModalBottomSheet(onDismissRequest={}) { Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Text(stringResource(R.string.setup_checking),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black);Row(verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp);Spacer(Modifier.width(12.dp));Text("Verifying your account…",color=MaterialTheme.colorScheme.onSurfaceVariant)};TextButton({auth.refreshSetup(locale)}){Text(stringResource(R.string.retry))}} }
+@Composable private fun SetupLoading(state:AuthUiState,auth:AuthViewModel,locale:String) {
+    ModalBottomSheet(onDismissRequest={}) { Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Text(if(state.error==null)stringResource(R.string.setup_checking) else "We couldn't finish signing you in.",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black);if(state.error==null)Row(verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp);Spacer(Modifier.width(12.dp));Text("Verifying your account…",color=MaterialTheme.colorScheme.onSurfaceVariant)};TextButton({auth.refreshSetup(locale)}){Text(stringResource(R.string.retry))}} }
 }
 
 @Composable private fun LegalConsentScreen(state:AuthUiState,auth:AuthViewModel,locale:String) {

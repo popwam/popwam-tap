@@ -25,6 +25,23 @@ data class LocalizationBootstrapResponse(
     val availableLocales:List<LocalizationLocaleDto> = emptyList(),
     val error:String?=null,
 )
+data class PlatformPhoneCountryDto(
+    val iso2:String="",
+    val iso3:String?=null,
+    val name:String="",
+    val localizedNames:Map<String,String> = emptyMap(),
+    val dialCode:String="",
+    val flagEmoji:String?=null,
+    val phonePlaceholder:String?=null,
+    val displayOrder:Int=0,
+)
+data class PlatformBootstrapResponse(
+    val ok:Boolean=false,
+    val defaultLocale:String="en",
+    val translationVersion:Int=0,
+    val availableLocales:List<LocalizationLocaleDto> = emptyList(),
+    val phoneCountries:List<PlatformPhoneCountryDto> = emptyList(),
+)
 data class QuotaRequestDto(
     val id:String="",
     val resource:String="",

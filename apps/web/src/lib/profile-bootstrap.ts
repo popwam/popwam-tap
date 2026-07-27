@@ -1,12 +1,12 @@
 import { LegalConsentSource, Prisma, ProfileKind, prisma } from "@popwam/db";
 import { acceptActiveRequiredLegalDocuments } from "./legal-consent";
 import { initializeDefaultModules, validateProfileTemplate } from "./profile-domain";
+import { accountLegalDocumentTypes, legalReadyForDocuments } from "./legal-readiness-policy";
 
 type BootstrapData = Record<string, unknown>;
-const accountLegalDocumentTypes = ["TERMS", "PRIVACY"] as const;
 const readData = (data: unknown): BootstrapData => data && typeof data === "object" && !Array.isArray(data) ? data as BootstrapData : {};
 
-export type ProfileBootstrapInput = { userId: string; locale: "ar" | "en"; displayName: string; profileKind: ProfileKind; categorySlug: string; templateId?: string | null };
+export type ProfileBootstrapInput = { userId: string; locale: string; displayName: string; profileKind: ProfileKind; categorySlug: string; templateId?: string | null };
 
 export async function markNewAccountForProfileBootstrap(tx: Prisma.TransactionClient, userId: string) {
   const current = await tx.onboardingProgress.findUnique({ where: { userId }, select: { data: true } });
@@ -14,25 +14,26 @@ export async function markNewAccountForProfileBootstrap(tx: Prisma.TransactionCl
   await tx.onboardingProgress.upsert({ where: { userId }, update: { data: data as Prisma.InputJsonValue }, create: { userId, data: data as Prisma.InputJsonValue } });
 }
 
-export async function getProfileBootstrapStatus(userId: string, locale: "ar" | "en") {
+export async function getProfileBootstrapStatus(userId: string, locale: string) {
   const now = new Date();
   const [progress, profiles, documents, consents, passkeyCount] = await Promise.all([
     prisma.onboardingProgress.findUnique({ where: { userId }, select: { data: true } }),
     prisma.profile.findMany({ where: { userId }, select: { id: true, isPrimary: true, profileKind: true, categoryId: true, templateId: true, lifecycle: true }, orderBy: { createdAt: "asc" } }),
-    prisma.legalDocument.findMany({ where: { locale, documentType: { in: [...accountLegalDocumentTypes] }, required: true, isActive: true, effectiveAt: { lte: now } }, select: { id: true, documentType: true, version: true } }),
+    prisma.legalDocument.findMany({ where: { locale, documentType: { in: [...accountLegalDocumentTypes] }, required: true, requiresAcceptance: true, isActive: true, status: "PUBLISHED", effectiveAt: { lte: now } }, select: { id: true, documentType: true, version: true, required: true, requiresAcceptance: true, isActive: true, status: true, effectiveAt: true } }),
     prisma.userLegalConsent.findMany({ where: { userId }, select: { legalDocumentId: true } }),
     prisma.passkeyCredential.count({ where: { userId, revokedAt: null } }),
   ]);
   const data = readData(progress?.data);
   const requiredIds = new Set(documents.map((document) => document.id));
   const acceptedIds = new Set(consents.map((consent) => consent.legalDocumentId));
-  const legalAccepted = documents.length > 0 && [...requiredIds].every((id) => acceptedIds.has(id));
+  const legalReady=legalReadyForDocuments(documents, now);
+  const legalAccepted = legalReady && [...requiredIds].every((id) => acceptedIds.has(id));
   const primary = profiles.find((profile) => profile.isPrimary && profile.lifecycle !== "ARCHIVED");
   return {
     isNewAccount: data.phaseCNewAccount === true,
     bootstrapComplete: data.phaseCProfileBootstrapComplete === true,
     hasPrimaryProfile: Boolean(primary),
-    legalReady: documents.length > 0,
+    legalReady,
     legalAccepted,
     requiredDocuments: documents.map((document) => ({ ...document, documentType: document.documentType as "TERMS" | "PRIVACY" })),
     passkeyCount,
@@ -41,7 +42,7 @@ export async function getProfileBootstrapStatus(userId: string, locale: "ar" | "
   };
 }
 
-export async function acceptRequiredLegalConsentForBootstrap(userId: string, locale: "ar" | "en") {
+export async function acceptRequiredLegalConsentForBootstrap(userId: string, locale: string) {
   return acceptActiveRequiredLegalDocuments(userId, locale, LegalConsentSource.ONBOARDING);
 }
 
@@ -55,13 +56,13 @@ export async function completeInitialProfileBootstrap(input: ProfileBootstrapInp
     const now = new Date();
     const [progress, documents, accepted, profiles] = await Promise.all([
       tx.onboardingProgress.findUnique({ where: { userId: input.userId } }),
-      tx.legalDocument.findMany({ where: { locale: input.locale, documentType: { in: [...accountLegalDocumentTypes] }, required: true, isActive: true, effectiveAt: { lte: now } } }),
+      tx.legalDocument.findMany({ where: { locale: input.locale, documentType: { in: [...accountLegalDocumentTypes] }, required: true, requiresAcceptance: true, isActive: true, status: "PUBLISHED", effectiveAt: { lte: now } } }),
       tx.userLegalConsent.findMany({ where: { userId: input.userId }, select: { legalDocumentId: true } }),
       tx.profile.findMany({ where: { userId: input.userId }, orderBy: { createdAt: "asc" } }),
     ]);
     const data = readData(progress?.data);
     if (data.phaseCNewAccount !== true) throw new Error("PROFILE_BOOTSTRAP_COMPATIBILITY_REQUIRED");
-    if (!documents.length) throw new Error("LEGAL_DOCUMENTS_UNAVAILABLE");
+    if (!legalReadyForDocuments(documents, now)) throw new Error("LEGAL_DOCUMENTS_UNAVAILABLE");
     const acceptedIds = new Set(accepted.map((consent) => consent.legalDocumentId));
     if (documents.some((document) => !acceptedIds.has(document.id))) throw new Error("LEGAL_CONSENT_REQUIRED");
     const canonicalPrimary = profiles.find((profile) => profile.isPrimary && profile.lifecycle !== "ARCHIVED");

@@ -7,6 +7,7 @@ import retrofit2.http.*
 
 interface AuthApi {
     @GET("api/localization/bootstrap") suspend fun localizationBootstrap():LocalizationBootstrapResponse
+    @GET("api/platform/bootstrap") suspend fun platformBootstrap():PlatformBootstrapResponse
     @POST("api/mobile/auth/firebase/phone/exchange") suspend fun exchangeFirebasePhone(
         @Header("X-Firebase-Id-Token") firebaseIdToken:String,
         @Body body:FirebasePhoneExchangeRequest,

@@ -4,14 +4,16 @@ import android.os.Build
 import com.popwam.pop.data.api.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import retrofit2.HttpException
 
 class SessionRepository(private val authApi:AuthApi,private val store:SessionStore){private val mutex=Mutex();private var afterAuthentication:suspend()->Unit={};private var beforeLogout:suspend()->Unit={};val authenticated get()=store.snapshot()!=null;val role get()=store.snapshot()?.role
     fun setLifecycleHooks(onAuthenticated:suspend()->Unit,onBeforeLogout:suspend()->Unit){afterAuthentication=onAuthenticated;beforeLogout=onBeforeLogout}
     suspend fun initialize()=store.load()
     suspend fun exchangeFirebasePhone(idToken:String):AuthResponse{
         AuthRuntimeDiagnostics.mark(AuthRuntimeStage.POP_EXCHANGE_REQUEST)
-        val response=authApi.exchangeFirebasePhone(idToken,FirebasePhoneExchangeRequest(deviceName()))
+        val response=try { authApi.exchangeFirebasePhone(idToken,FirebasePhoneExchangeRequest(deviceName())) } catch(error:Throwable) { AuthRuntimeDiagnostics.failure(AuthRuntimeStage.POP_EXCHANGE_RESPONSE,error,(error as? HttpException)?.code()); throw error }
         AuthRuntimeDiagnostics.mark(AuthRuntimeStage.POP_EXCHANGE_RESPONSE,if(response.ok)"success" else "rejected")
+        if(!response.ok) AuthRuntimeDiagnostics.failure(AuthRuntimeStage.POP_EXCHANGE_RESPONSE,safeError=response.error)
         return acceptAuthenticated(response)
     }
     suspend fun passkeyAuthenticationOptions()=authApi.passkeyAuthenticationOptions()

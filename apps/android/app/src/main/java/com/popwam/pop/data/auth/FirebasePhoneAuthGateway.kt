@@ -160,12 +160,14 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
         FirebaseAuth.getInstance().signInWithCredential(credential).addOnCompleteListener { signIn ->
             if(!signIn.isSuccessful) {
                 AuthRuntimeDiagnostics.mark(AuthRuntimeStage.FIREBASE_SIGN_IN,"failed")
+                AuthRuntimeDiagnostics.failure(AuthRuntimeStage.FIREBASE_SIGN_IN,signIn.exception)
                 callback(FirebasePhoneEvent.Failed(firebasePhoneFailure(signIn.exception ?: IllegalStateException(),!automatic)))
                 return@addOnCompleteListener
             }
             AuthRuntimeDiagnostics.mark(AuthRuntimeStage.FIREBASE_SIGN_IN,"success")
             val user=signIn.result?.user
             if(user==null) {
+                AuthRuntimeDiagnostics.failure(AuthRuntimeStage.FIREBASE_SIGN_IN,safeError="missing_user")
                 callback(FirebasePhoneEvent.Failed(FirebasePhoneFailure.UNAVAILABLE))
                 return@addOnCompleteListener
             }
@@ -176,6 +178,7 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
                     callback(FirebasePhoneEvent.Verified(token,automatic))
                 } else {
                     AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ID_TOKEN_FETCH,"failed")
+                    AuthRuntimeDiagnostics.failure(AuthRuntimeStage.ID_TOKEN_FETCH,tokenTask.exception)
                     callback(FirebasePhoneEvent.Failed(firebasePhoneFailure(tokenTask.exception ?: IllegalStateException())))
                 }
             }

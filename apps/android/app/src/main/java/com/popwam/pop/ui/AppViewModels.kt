@@ -119,6 +119,7 @@ class AuthViewModel(
     val state = _state.asStateFlow()
     private var bootstrapInFlight=false
     private var firebaseExchangeInFlight=false
+    private var setupResolutionInFlight=false
 
     init { if (sessions.authenticated) refreshSetup("en") }
 
@@ -216,19 +217,27 @@ class AuthViewModel(
         }catch(error:Throwable){passkeyClientFailure(error)}
     }
 
-    fun refreshSetup(locale:String) = viewModelScope.launch {
-        if (!sessions.authenticated) return@launch
+    fun refreshSetup(locale:String) {
+        if (!sessions.authenticated || setupResolutionInFlight) return
+        setupResolutionInFlight=true
+        viewModelScope.launch { try {
         AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,"started")
         _state.value = _state.value.copy(setupStage = AuthSetupStage.AUTHENTICATED_CHECKING, error = null)
         runCatching { setup.status(locale) }.onSuccess { status ->
+            if(!status.ok) {
+                AuthRuntimeDiagnostics.failure(AuthRuntimeStage.AUTH_SETUP_RESOLVE,safeError=status.error ?: "response_not_ok")
+                _state.value=_state.value.copy(error="SETUP_STATUS_UNAVAILABLE",setupStage=AuthSetupStage.SETUP_UNAVAILABLE)
+                return@onSuccess
+            }
             val stage=resolveAuthSetupStage(true,status)
             _state.value = _state.value.copy(setupStatus = status, legalDocuments = status.requiredDocuments, setupStage = stage, error = null)
-            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,stage.name.lowercase())
+            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,"endpoint_api_profile_bootstrap_http_200_${stage.name.lowercase()}_new_${status.isNewAccount}_legal_ready_${status.legalReady}_legal_accepted_${status.legalAccepted}")
             if(stage==AuthSetupStage.READY)refreshDynamicOnboarding(locale)
-        }.onFailure {
-            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,"failed")
-            _state.value = _state.value.copy(error = "SETUP_STATUS_UNAVAILABLE", setupStage = AuthSetupStage.AUTHENTICATED_CHECKING)
+        }.onFailure { error ->
+            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.AUTH_SETUP_RESOLVE,error,(error as? retrofit2.HttpException)?.code())
+            _state.value = _state.value.copy(error = "SETUP_STATUS_UNAVAILABLE", setupStage = AuthSetupStage.SETUP_UNAVAILABLE)
         }
+        } finally { setupResolutionInFlight=false } }
     }
 
     private fun refreshDynamicOnboarding(locale:String)=viewModelScope.launch {

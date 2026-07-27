@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,6 +49,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -266,6 +269,7 @@ fun LanguageSelectionScreen(languages:List<LocalizationLocaleDto>,onSelect: (Str
 
 private data class AppearanceChoice(val value: String, val title: Int, val help: Int, val icon: ImageVector)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppearanceSelectionScreen(
     onBack: () -> Unit,
@@ -273,6 +277,7 @@ fun AppearanceSelectionScreen(
 ) {
     var selected by rememberSaveable { mutableStateOf("SYSTEM") }
     var identity by rememberSaveable { mutableStateOf("PULSE") }
+    var styleSheet by rememberSaveable { mutableStateOf(false) }
     val choices = remember {
         listOf(
             AppearanceChoice("SYSTEM", R.string.settings_system, R.string.pre_auth_theme_system_help, Icons.Default.SettingsSuggest),
@@ -288,14 +293,7 @@ fun AppearanceSelectionScreen(
                 contentPadding = PaddingValues(vertical = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp,Alignment.CenterVertically),
             ) {
-                item {
-                    Box(Modifier.fillMaxWidth()) {
-                        IconButton(onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-                        }
-                        PopPreAuthBrand(Modifier.align(Alignment.Center))
-                    }
-                }
+                item { PopPreAuthBrand(Modifier.fillMaxWidth()) }
                 item {
                     Icon(Icons.Default.Palette, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.primary)
                     Text(
@@ -338,11 +336,8 @@ fun AppearanceSelectionScreen(
                         }
                     }
                 }
-                item { Text("Your POP Style",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Black) }
-                item { androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) { PopIdentity.entries.filter { !it.proOnly }.forEach { option ->
-                    val active=identity==option.name
-                    Card(Modifier.weight(.5f).clickable { identity=option.name },colors=CardDefaults.cardColors(containerColor=if(active) option.primary.copy(alpha=.14f) else MaterialTheme.colorScheme.surface),border=BorderStroke(if(active)2.dp else 1.dp,if(active)option.primary else MaterialTheme.colorScheme.outline.copy(alpha=.3f))){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(30.dp),tint=option.primary);Spacer(Modifier.width(8.dp));Column{Text(option.label,fontWeight=FontWeight.Bold);Text(option.description,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)}}}
-                } } }
+                item { Text("POP Style",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Black) }
+                item { val option=PopIdentity.from(identity);Card(Modifier.fillMaxWidth().clickable{styleSheet=true},colors=CardDefaults.cardColors(containerColor=option.primary.copy(alpha=.12f)),border=BorderStroke(1.dp,option.primary.copy(alpha=.45f))){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(34.dp),tint=option.primary);Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(option.label,fontWeight=FontWeight.Bold);Text("Customize your POP",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)};Icon(Icons.AutoMirrored.Filled.ArrowForward,null,tint=option.primary)}} }
                 item {
                     Button(
                         onClick = { onComplete(selected,identity) },
@@ -356,6 +351,7 @@ fun AppearanceSelectionScreen(
                 }
             }
         }
+        if(styleSheet) ModalBottomSheet(onDismissRequest={styleSheet=false}) { LazyColumn(Modifier.fillMaxWidth().heightIn(max=560.dp).padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){item{Text("Your POP Style",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Black)};items(PopIdentity.entries.filter{!it.proOnly},key={it.name}){option->val active=identity==option.name;Card(Modifier.fillMaxWidth().clickable{identity=option.name;styleSheet=false},colors=CardDefaults.cardColors(containerColor=if(active)option.primary.copy(alpha=.14f) else MaterialTheme.colorScheme.surface),border=BorderStroke(if(active)2.dp else 1.dp,if(active)option.primary else MaterialTheme.colorScheme.outline.copy(alpha=.3f))){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(30.dp),tint=option.primary);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(option.label,fontWeight=FontWeight.Bold);Text(option.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)};if(active)Icon(Icons.Default.Check,null,tint=option.primary)}}}} }
     }
 }
 
@@ -380,23 +376,6 @@ fun ProductIntroScreen(
     val scope = rememberCoroutineScope()
     PreAuthBackdrop {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(
-                    onClick = {
-                        if (pager.currentPage == 0) onBack()
-                        else scope.launch { pager.animateScrollToPage(pager.currentPage - 1) }
-                    },
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-                }
-                PopPreAuthBrand(Modifier.weight(1f))
-                if (helpMode) {
-                    TextButton(onBack) { Text(stringResource(R.string.close)) }
-                }
-            }
             HorizontalPager(
                 state = pager,
                 modifier = Modifier.fillMaxWidth().weight(1f),

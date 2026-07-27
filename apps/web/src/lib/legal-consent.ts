@@ -1,7 +1,7 @@
 import { LegalConsentSource, prisma } from "@popwam/db";
 import { legalConsentDecision, legalConsentRecordDecision } from "./legal-consent-policy";
+import { accountLegalDocumentTypes } from "./legal-readiness-policy";
 
-const accountLegalDocumentTypes = ["TERMS", "PRIVACY"] as const;
 
 export async function acceptLegalDocument(userId: string, legalDocumentId: string, source: LegalConsentSource) {
   return prisma.$transaction(async (tx) => {
@@ -26,7 +26,7 @@ export async function acceptLegalDocument(userId: string, legalDocumentId: strin
 
 export async function missingRequiredLegalDocuments(userId: string, locale: string) {
   const now = new Date();
-  const documents = await prisma.legalDocument.findMany({ where: { locale, documentType: { in: [...accountLegalDocumentTypes] }, required: true, isActive: true, effectiveAt: { lte: now } }, orderBy: [{ documentType: "asc" }, { effectiveAt: "desc" }] });
+  const documents = await prisma.legalDocument.findMany({ where: { locale, documentType: { in: [...accountLegalDocumentTypes] }, required: true, requiresAcceptance: true, isActive: true, status: "PUBLISHED", effectiveAt: { lte: now } }, orderBy: [{ documentType: "asc" }, { effectiveAt: "desc" }] });
   const accepted = await prisma.userLegalConsent.findMany({ where: { userId, revokedAt: null, legalDocumentId: { in: documents.map((document) => document.id) } }, select: { legalDocumentId: true } });
   const acceptedIds = new Set(accepted.map((consent) => consent.legalDocumentId));
   return documents.filter((document) => !acceptedIds.has(document.id));
@@ -37,8 +37,8 @@ export async function missingRequiredLegalDocuments(userId: string, locale: stri
 export async function acceptActiveRequiredLegalDocuments(userId: string, locale: string, source: LegalConsentSource) {
   return prisma.$transaction(async (tx) => {
     const now = new Date();
-    const documents = await tx.legalDocument.findMany({ where: { locale, documentType: { in: [...accountLegalDocumentTypes] }, required: true, isActive: true, effectiveAt: { lte: now } }, orderBy: [{ documentType: "asc" }, { effectiveAt: "desc" }] });
-    if (!documents.length) throw new Error("LEGAL_DOCUMENTS_UNAVAILABLE");
+    const documents = await tx.legalDocument.findMany({ where: { locale, documentType: { in: [...accountLegalDocumentTypes] }, required: true, requiresAcceptance: true, isActive: true, status: "PUBLISHED", effectiveAt: { lte: now } }, orderBy: [{ documentType: "asc" }, { effectiveAt: "desc" }] });
+    if (documents.length !== accountLegalDocumentTypes.length) throw new Error("LEGAL_DOCUMENTS_UNAVAILABLE");
     const accepted = await tx.userLegalConsent.findMany({ where: { userId, revokedAt: null, legalDocumentId: { in: documents.map((document) => document.id) } }, select: { legalDocumentId: true } });
     const acceptedIds = new Set(accepted.map((consent) => consent.legalDocumentId));
     const created: string[] = [];

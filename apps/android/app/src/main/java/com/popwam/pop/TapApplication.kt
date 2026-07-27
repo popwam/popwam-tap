@@ -33,6 +33,7 @@ class AppContainer(application:Application){
         .build()
     private val authApi=Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL).client(baseClient()).addConverterFactory(GsonConverterFactory.create(gson)).build().create(AuthApi::class.java)
     val localization=LocalizationAuthorityStore(application,authApi)
+    val phoneCountries=PhoneCountryStore(application,authApi)
     val sessions=SessionRepository(authApi,sessionStore)
     private val apiClient=baseClient().newBuilder().addInterceptor(AccessTokenInterceptor(sessionStore)).authenticator(RefreshAuthenticator(sessions)).build()
     val api=Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL).client(apiClient).addConverterFactory(GsonConverterFactory.create(gson)).build().create(PopwamApi::class.java)
