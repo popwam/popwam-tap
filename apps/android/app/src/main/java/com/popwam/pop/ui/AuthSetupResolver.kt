@@ -13,7 +13,7 @@ fun resolveAuthSetupStage(authenticated:Boolean,status:ProfileBootstrapStatusRes
     !status.legalReady -> AuthSetupStage.SETUP_UNAVAILABLE
     !status.legalAccepted -> AuthSetupStage.LEGAL_REQUIRED
     !status.bootstrapComplete -> AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED
-    status.passkeyCount == 0 -> AuthSetupStage.PASSKEY_OFFER
+    status.passkeyEnrollmentEligible -> AuthSetupStage.PASSKEY_OFFER
     else -> AuthSetupStage.READY
 }
 

@@ -2,11 +2,15 @@ package com.popwam.pop.ui
 
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -42,8 +46,22 @@ fun DynamicOnboardingScreen(state:AuthUiState,auth:AuthViewModel,locale:String) 
     val progress=dynamicOnboardingProgress(definition,onboarding.answers,current.key)
     val index=steps.indexOfFirst { it.key==current.key }.coerceAtLeast(0)
     LaunchedEffect(current.key) { auth.onboardingStepViewed(current.key) }
-    LazyColumn(
-        modifier=Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal=20.dp),
+    BackHandler(enabled=!state.loading&&index>0) { auth.saveOnboarding("BACK",locale) }
+    Scaffold(
+        modifier=Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
+        bottomBar={
+            Surface(shadowElevation=10.dp,color=MaterialTheme.colorScheme.surface.copy(alpha=.97f)) {
+                Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal=20.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                        if(index>0) OutlinedButton(onClick={auth.saveOnboarding("BACK",locale)},modifier=Modifier.weight(1f).heightIn(min=52.dp),enabled=!state.loading) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.back)) }
+                        Button(onClick={auth.saveOnboarding("CONTINUE",locale)},modifier=Modifier.weight(1f).heightIn(min=52.dp),enabled=!state.loading) { Text(stringResource(if(index==steps.lastIndex)R.string.finish_setup else R.string.continue_label)) }
+                    }
+                    TextButton(onClick={auth.saveOnboarding("STAY",locale)},modifier=Modifier.fillMaxWidth(),enabled=!state.loading) { Text(stringResource(R.string.onboarding_save_resume)) }
+                }
+            }
+        },
+    ) { padding -> LazyColumn(
+        modifier=Modifier.fillMaxSize().padding(padding).padding(horizontal=20.dp),
         contentPadding=PaddingValues(vertical=24.dp),
         verticalArrangement=Arrangement.spacedBy(16.dp),
     ) {
@@ -69,38 +87,19 @@ fun DynamicOnboardingScreen(state:AuthUiState,auth:AuthViewModel,locale:String) 
             item { Text(stringResource(if(it=="ONBOARDING_PROGRESS_STALE")R.string.onboarding_stale else R.string.onboarding_error),color=MaterialTheme.colorScheme.error) }
         }
         if(state.loading)item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-        item {
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick={auth.saveOnboarding("BACK",locale)},
-                    modifier=Modifier.weight(1f),
-                    enabled=!state.loading&&index>0,
-                ) { Text(stringResource(R.string.back)) }
-                Button(
-                    onClick={auth.saveOnboarding("CONTINUE",locale)},
-                    modifier=Modifier.weight(1f),
-                    enabled=!state.loading,
-                ) { Text(stringResource(if(index==steps.lastIndex)R.string.finish_setup else R.string.continue_label)) }
-            }
-            TextButton(
-                onClick={auth.saveOnboarding("STAY",locale)},
-                modifier=Modifier.fillMaxWidth(),
-                enabled=!state.loading,
-            ) { Text(stringResource(R.string.onboarding_save_resume)) }
-        }
-    }
+    } }
 }
 
 @Composable
 private fun OnboardingQuestion(question:OnboardingQuestionDto,value:JsonElement?,error:String?,auth:AuthViewModel) {
-    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=.72f),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
             Text(question.label,fontWeight=FontWeight.Bold)
             if(!question.required)Text(stringResource(R.string.onboarding_optional),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         question.help?.let { Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         when(onboardingRenderControl(question.type)) {
-            OnboardingRenderControl.TEXT,OnboardingRenderControl.TEXTAREA -> OnboardingTextQuestion(question,value,auth)
+            OnboardingRenderControl.TEXT,OnboardingRenderControl.TEXTAREA -> OnboardingTextQuestion(question,value,error,auth)
             OnboardingRenderControl.BOOLEAN -> Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 val selected=runCatching { value?.asBoolean }.getOrNull()
                 FilterChip(selected=selected==true,onClick={auth.setOnboardingAnswer(question.key,JsonPrimitive(true))},label={Text(stringResource(R.string.yes))},modifier=Modifier.weight(1f))
@@ -132,7 +131,7 @@ private fun OnboardingQuestion(question:OnboardingQuestionDto,value:JsonElement?
             OnboardingRenderControl.UNKNOWN -> Text(stringResource(R.string.onboarding_unknown_question),color=MaterialTheme.colorScheme.error)
         }
         if(error!=null)Text(stringResource(if(error=="REQUIRED")R.string.onboarding_required else R.string.onboarding_invalid),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
-    }
+    } }
 }
 
 @Composable
@@ -153,7 +152,7 @@ private fun OnboardingImageQuestion(questionKey:String,value:JsonElement?,auth:A
 }
 
 @Composable
-private fun OnboardingTextQuestion(question:OnboardingQuestionDto,value:JsonElement?,auth:AuthViewModel) {
+private fun OnboardingTextQuestion(question:OnboardingQuestionDto,value:JsonElement?,error:String?,auth:AuthViewModel) {
     val text=runCatching { value?.asString.orEmpty() }.getOrDefault("")
     val keyboard=when(question.type) {
         "PHONE" -> KeyboardType.Phone
@@ -172,6 +171,7 @@ private fun OnboardingTextQuestion(question:OnboardingQuestionDto,value:JsonElem
             modifier=Modifier.fillMaxWidth(),
             minLines=if(question.type in setOf("TEXTAREA","LOCATION","DAY_HOURS"))3 else 1,
             keyboardOptions=KeyboardOptions(keyboardType=keyboard),
+            isError=error!=null,
         )
     }
     if(question.type in setOf("PHONE","EMAIL","URL","NUMBER","CURRENCY","TIME"))

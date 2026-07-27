@@ -62,6 +62,9 @@ import com.popwam.pop.data.api.*
 import com.popwam.pop.data.auth.PhoneIdentity
 import com.popwam.pop.data.auth.PhoneCountryStore
 import com.popwam.pop.data.auth.PasskeyCoordinator
+import com.popwam.pop.data.auth.AuthRuntimeDiagnostics
+import com.popwam.pop.data.auth.AuthRuntimeStage
+import com.popwam.pop.data.auth.biometricUnlockEligibility
 import com.popwam.pop.data.localization.LocalizationAuthoritySnapshot
 import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.nfc.NfcCoordinator
@@ -315,6 +318,15 @@ private fun LoginScreen(
     var phoneE164 by rememberSaveable{mutableStateOf("")}
     var code by rememberSaveable{mutableStateOf("")}
     var invalidPhone by rememberSaveable{mutableStateOf(false)}
+    // No biometric-bound POP credential exists yet. Keep the control explicitly disabled
+    // rather than treating a fingerprint callback as account authentication.
+    val biometricEligibility=remember(context) {
+        biometricUnlockEligibility(
+            hasLocalPopAuthority=false,
+            canAuthenticate=androidx.biometric.BiometricManager.from(context).canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG),
+        )
+    }
+    LaunchedEffect(biometricEligibility) { AuthRuntimeDiagnostics.mark(AuthRuntimeStage.BIOMETRIC_ELIGIBILITY,biometricEligibility.name.lowercase()) }
     LaunchedEffect(options){if(options.none { it.iso2==country }) country=options.firstOrNull()?.iso2 ?: ""}
     LaunchedEffect(country){if(country.isNotBlank())PhoneIdentity.saveCountry(context,country)}
 
@@ -370,8 +382,7 @@ private fun LoginScreen(
                         }
                     },enabled=!state.loading&&!state.passkeyLoading) { Icon(Icons.Default.Key,null) }
                     Spacer(Modifier.width(16.dp))
-                    val biometricCapable=context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_FINGERPRINT)
-                    FilledTonalIconButton({},enabled=false){Icon(Icons.Default.Fingerprint,if(biometricCapable)"Set up biometric after first login" else "Biometric unavailable")}}
+                    FilledTonalIconButton({},enabled=false){Icon(Icons.Default.Fingerprint,stringResource(R.string.biometric_quick_unlock_unavailable))}}
                 }
                 state.passkeyError?.let { error->
                     item { Text(stringResource(passkeyErrorString(error)),color=MaterialTheme.colorScheme.error) }
@@ -535,6 +546,7 @@ private fun passkeyErrorString(error:PasskeyLoginError)=when(error){
     PasskeyLoginError.UNAVAILABLE->R.string.passkey_login_unavailable
     PasskeyLoginError.NO_CREDENTIAL->R.string.passkey_login_no_credential
     PasskeyLoginError.NETWORK->R.string.passkey_login_network
+    PasskeyLoginError.STEP_UP_REQUIRED->R.string.passkey_login_failed
     PasskeyLoginError.AUTHENTICATION_FAILED->R.string.passkey_login_failed
     PasskeyLoginError.SERVER_UNAVAILABLE->R.string.passkey_login_server
 }

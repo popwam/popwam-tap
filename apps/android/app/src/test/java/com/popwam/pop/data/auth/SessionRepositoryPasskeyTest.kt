@@ -1,6 +1,7 @@
 package com.popwam.pop.data.auth
 
 import com.google.gson.JsonObject
+import com.google.gson.JsonArray
 import com.popwam.pop.data.api.*
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -37,6 +38,10 @@ class SessionRepositoryPasskeyTest {
     @Test fun `server rejection stores no session`()=runTest {
         val store=Store();val repository=SessionRepository(Api(AuthResponse(ok=false,error="PASSKEY_AUTH_FAILED")),store)
         assertFalse(repository.verifyPasskey(JsonObject()).ok);assertNull(store.tokens)
+    }
+    @Test fun `authentication options must contain the real WebAuthn challenge and RP identifier`() {
+        assertTrue(passkeyAuthenticationOptionsValid(JsonObject().apply { addProperty("challenge","opaque");addProperty("rpId","pop.popwam.com") }))
+        assertFalse(passkeyAuthenticationOptionsValid(JsonObject().apply { addProperty("ok",false);addProperty("error","PASSKEY_UNAVAILABLE") }))
     }
     @Test fun `Firebase proof exchange stores only the resulting POP session`()=runTest {
         val store=Store();val api=Api(success());val repository=SessionRepository(api,store)

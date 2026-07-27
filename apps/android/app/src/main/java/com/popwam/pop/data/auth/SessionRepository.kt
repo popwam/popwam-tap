@@ -16,10 +16,35 @@ class SessionRepository(private val authApi:AuthApi,private val store:SessionSto
         if(!response.ok) AuthRuntimeDiagnostics.failure(AuthRuntimeStage.POP_EXCHANGE_RESPONSE,safeError=response.error)
         return acceptAuthenticated(response)
     }
-    suspend fun passkeyAuthenticationOptions()=authApi.passkeyAuthenticationOptions()
-    suspend fun verifyPasskey(assertion:com.google.gson.JsonObject)=acceptAuthenticated(authApi.verifyPasskey(PasskeyAuthVerifyRequest(assertion,deviceName())))
+    suspend fun passkeyAuthenticationOptions():com.google.gson.JsonObject {
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_AUTH_OPTIONS_REQUEST)
+        return try {
+            authApi.passkeyAuthenticationOptions().also { options->
+                if(!passkeyAuthenticationOptionsValid(options)) throw IllegalStateException("PASSKEY_OPTIONS_INVALID")
+                AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_AUTH_OPTIONS_RESPONSE,"success")
+            }
+        } catch(error:Throwable) {
+            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_AUTH_OPTIONS_RESPONSE,error,(error as? HttpException)?.code())
+            throw error
+        }
+    }
+    suspend fun verifyPasskey(assertion:com.google.gson.JsonObject):AuthResponse {
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_AUTH_VERIFY_REQUEST)
+        return try {
+            val result=authApi.verifyPasskey(PasskeyAuthVerifyRequest(assertion,deviceName()))
+            if(result.ok) AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_AUTH_VERIFY_RESPONSE,"success")
+            else AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_AUTH_VERIFY_RESPONSE,safeError=result.error)
+            acceptAuthenticated(result,passkey=true)
+        } catch(error:Throwable) {
+            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_AUTH_VERIFY_RESPONSE,error,(error as? HttpException)?.code())
+            throw error
+        }
+    }
     suspend fun refresh():String?=mutex.withLock{val before=store.snapshot()?:return null;val response=runCatching{authApi.refresh(RefreshRequest(before.refreshToken,deviceName()))}.getOrNull();if(response?.ok==true){store.save(before.copy(accessToken=response.accessToken,refreshToken=response.refreshToken));response.accessToken}else{store.clear();null}}
     suspend fun logout(){val refresh=store.snapshot()?.refreshToken;runCatching{beforeLogout()};store.clear();if(refresh!=null)runCatching{authApi.logout(LogoutRequest(refresh))}}
-    private suspend fun acceptAuthenticated(response:AuthResponse):AuthResponse{if(response.ok&&response.user!=null&&response.accessToken.isNotBlank()&&response.refreshToken.isNotBlank()){store.save(SessionTokens(response.accessToken,response.refreshToken,response.user.id,response.user.role));AuthRuntimeDiagnostics.mark(AuthRuntimeStage.POP_SESSION_SAVE,"success");runCatching{afterAuthentication()}};return response}
+    private suspend fun acceptAuthenticated(response:AuthResponse,passkey:Boolean=false):AuthResponse{if(response.ok&&response.user!=null&&response.accessToken.isNotBlank()&&response.refreshToken.isNotBlank()){store.save(SessionTokens(response.accessToken,response.refreshToken,response.user.id,response.user.role));AuthRuntimeDiagnostics.mark(AuthRuntimeStage.POP_SESSION_SAVE,"success");if(passkey)AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SESSION_SAVE,"success");runCatching{afterAuthentication()}};return response}
     private fun deviceName()="${Build.MANUFACTURER} ${Build.MODEL}".take(120)
 }
+
+/** The app sends only server-issued WebAuthn JSON to Credential Manager. */
+fun passkeyAuthenticationOptionsValid(options:com.google.gson.JsonObject)=options.has("challenge")&&options.has("rpId")

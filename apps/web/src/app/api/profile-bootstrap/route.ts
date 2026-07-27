@@ -1,14 +1,21 @@
-import { getCurrentPopUser, isTrustedPopMutation, csrfRejected, unauthorized } from "@/lib/api-auth";
+import { getCurrentPopSessionContext, getCurrentPopUser, isTrustedPopMutation, csrfRejected, unauthorized } from "@/lib/api-auth";
 import { completeInitialProfileBootstrap, getProfileBootstrapStatus } from "@/lib/profile-bootstrap";
 import { getRuntimeLocalizationConfig } from "@/lib/localization-runtime";
+import { passkeyRegistrationEligibility } from "@/lib/passkey-registration-policy";
 
 const localeFrom = async (value: unknown) => { const config=await getRuntimeLocalizationConfig(); const requested=String(value||"").toLowerCase(); return config.locales.some(locale=>locale.code===requested&&locale.enabled&&locale.published)?requested:config.defaultLocale; };
 
 export async function GET(request: Request) {
-  const user = await getCurrentPopUser(request);
-  if (!user) return unauthorized();
+  const context = await getCurrentPopSessionContext(request);
+  if (!context) return unauthorized();
   const locale = await localeFrom(new URL(request.url).searchParams.get("locale"));
-  return Response.json({ ok: true, ...(await getProfileBootstrapStatus(user.id, locale)) }, { headers: { "cache-control": "no-store" } });
+  const status = await getProfileBootstrapStatus(context.user.id, locale);
+  const eligibility = passkeyRegistrationEligibility({
+    activePasskeyCount: status.passkeyCount,
+    authMethod: context.authMethod,
+    lastAuthenticatedAt: context.lastAuthenticatedAt,
+  });
+  return Response.json({ ok: true, ...status, passkeyEnrollmentEligible: eligibility.passkeyEnrollmentEligible }, { headers: { "cache-control": "no-store" } });
 }
 
 export async function POST(request: Request) {

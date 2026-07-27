@@ -67,11 +67,35 @@ data class QuotaIncreaseResponse(val ok:Boolean=false,val request:QuotaRequestDt
 data class LegalDocumentDto(val id:String="",val documentType:String="",val version:String="",val title:String="",val path:String="")
 data class LegalRequiredResponse(val ok:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val documents:List<LegalDocumentDto> = emptyList(),val error:String?=null)
 data class LegalConsentRequest(val accepted:Boolean=true,val locale:String)
-data class ProfileCategoryBootstrapDto(val id:String="",val slug:String="",val nameAr:String?=null,val nameEn:String?=null,val profileKind:String="",val defaultTemplateId:String?=null)
+data class ProfileCategoryBootstrapDto(
+    val id:String="",
+    val slug:String="",
+    val nameAr:String?=null,
+    val nameEn:String?=null,
+    val descriptionAr:String?=null,
+    val descriptionEn:String?=null,
+    val profileKind:String="",
+    val defaultTemplateId:String?=null,
+)
 data class ProfileCategoriesBootstrapResponse(val ok:Boolean=false,val categories:List<ProfileCategoryBootstrapDto> = emptyList(),val error:String?=null)
-data class ProfileBootstrapTemplateDto(val id:String="",val slug:String="",val nameAr:String?=null,val nameEn:String?=null)
+/**
+ * Bootstrap templates are already filtered by the canonical server profile kind/category.
+ * The presentation metadata is a compact projection of the same template configuration
+ * used by the profile renderer; it is never a second client-side template registry.
+ */
+data class ProfileBootstrapTemplateDto(
+    val id:String="",
+    val slug:String="",
+    val nameAr:String?=null,
+    val nameEn:String?=null,
+    val profileKind:String?=null,
+    val category:String?=null,
+    val categorySlug:String?=null,
+    val previewImageUrl:String?=null,
+    val configuration:TemplateConfigurationDto=TemplateConfigurationDto(),
+)
 data class ProfileTemplatesBootstrapResponse(val ok:Boolean=false,val templates:List<ProfileBootstrapTemplateDto> = emptyList(),val defaultTemplateId:String?=null,val error:String?=null)
-data class ProfileBootstrapStatusResponse(val ok:Boolean=false,val isNewAccount:Boolean=false,val bootstrapComplete:Boolean=false,val hasPrimaryProfile:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val requiredDocuments:List<LegalDocumentDto> = emptyList(),val passkeyCount:Int=0,val legacyProfileCount:Int=0,val primaryProfileId:String?=null,val error:String?=null)
+data class ProfileBootstrapStatusResponse(val ok:Boolean=false,val isNewAccount:Boolean=false,val bootstrapComplete:Boolean=false,val hasPrimaryProfile:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val requiredDocuments:List<LegalDocumentDto> = emptyList(),val passkeyCount:Int=0,val passkeyEnrollmentEligible:Boolean=false,val legacyProfileCount:Int=0,val primaryProfileId:String?=null,val error:String?=null)
 data class ProfileBootstrapRequest(val displayName:String,val profileKind:String,val categorySlug:String,val templateId:String?=null,val locale:String)
 data class ProfileBootstrapResponse(val ok:Boolean=false,val error:String?=null)
 data class OnboardingOptionDto(val key:String="",val label:String="")

@@ -57,14 +57,19 @@ import com.popwam.pop.data.auth.FirebasePhoneAuthGateway
 import com.popwam.pop.data.auth.FirebasePhoneEvent
 import com.popwam.pop.data.auth.FirebasePhoneFailure
 import com.popwam.pop.data.auth.PhoneIdentity
+import com.popwam.pop.data.auth.PasskeyCoordinator
 import com.popwam.pop.data.auth.AuthRuntimeDiagnostics
 import com.popwam.pop.data.auth.AuthRuntimeStage
 import com.popwam.pop.data.repository.AuthSetupRepository
+import com.popwam.pop.data.repository.PasskeyOptionsHttpException
+import com.popwam.pop.data.repository.PASSKEY_OPTIONS_FAILED
+import com.popwam.pop.data.repository.STEP_UP_REQUIRED
 import com.popwam.pop.data.repository.PopwamRepository
 import com.popwam.pop.data.repository.AndroidUploadPolicy
 import com.popwam.pop.nfc.NfcResult
 import com.popwam.pop.nfc.NfcTagManager
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -96,7 +101,7 @@ data class AuthUiState(
     val onboardingFieldErrors: Map<String,String> = emptyMap(),
 )
 
-enum class PasskeyLoginError { CANCELLED, UNAVAILABLE, NO_CREDENTIAL, NETWORK, AUTHENTICATION_FAILED, SERVER_UNAVAILABLE }
+enum class PasskeyLoginError { CANCELLED, UNAVAILABLE, NO_CREDENTIAL, NETWORK, STEP_UP_REQUIRED, AUTHENTICATION_FAILED, SERVER_UNAVAILABLE }
 internal val returningAuthActionOrder=listOf("PASSKEY","PHONE")
 internal fun passkeyPlatformSupported(sdkInt:Int)=sdkInt>=28
 internal fun phoneFallbackAvailable(@Suppress("UNUSED_PARAMETER") error:PasskeyLoginError?)=true
@@ -104,6 +109,9 @@ internal fun passkeyLoginError(error:Throwable)=when {
     error::class.simpleName?.contains("Cancellation",true)==true -> PasskeyLoginError.CANCELLED
     error::class.simpleName?.contains("NoCredential",true)==true -> PasskeyLoginError.NO_CREDENTIAL
     error is java.io.IOException -> PasskeyLoginError.NETWORK
+    error is PasskeyOptionsHttpException && error.safeCode==STEP_UP_REQUIRED -> PasskeyLoginError.STEP_UP_REQUIRED
+    error is PasskeyOptionsHttpException && error.safeCode==PASSKEY_OPTIONS_FAILED -> PasskeyLoginError.SERVER_UNAVAILABLE
+    error is PasskeyOptionsHttpException && error.statusCode>=500 -> PasskeyLoginError.SERVER_UNAVAILABLE
     error is retrofit2.HttpException && error.code()>=500 -> PasskeyLoginError.SERVER_UNAVAILABLE
     error is retrofit2.HttpException -> PasskeyLoginError.AUTHENTICATION_FAILED
     else -> PasskeyLoginError.UNAVAILABLE
@@ -205,8 +213,15 @@ class AuthViewModel(
     }
 
     suspend fun passkeyAuthenticationOptions()=sessions.passkeyAuthenticationOptions()
-    fun beginPasskeyAuthentication(){_state.value=_state.value.copy(passkeyLoading=true,passkeyError=null)}
-    fun passkeyClientFailure(error:Throwable){_state.value=_state.value.copy(passkeyLoading=false,passkeyError=passkeyLoginError(error))}
+    fun beginPasskeyAuthentication(){
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SIGNIN_UI_CLICK)
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_CAPABILITY_CHECK,"supported")
+        _state.value=_state.value.copy(passkeyLoading=true,passkeyError=null)
+    }
+    fun passkeyClientFailure(error:Throwable){
+        AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_GET_CREDENTIAL_RESULT,error)
+        _state.value=_state.value.copy(passkeyLoading=false,passkeyError=passkeyLoginError(error))
+    }
     fun verifyPasskey(assertion:com.google.gson.JsonObject,locale:String="en")=viewModelScope.launch {
         try{
             val result=sessions.verifyPasskey(assertion)
@@ -351,6 +366,34 @@ class AuthViewModel(
         if (result.ok) analytics.track("passkey_enrollment_completed",mapOf("platform" to "android")) else _state.value=_state.value.copy(error=result.error ?: "PASSKEY_ENROLLMENT_FAILED")
         refreshSetup(locale)
     } }
+    /** Registration always proves possession through Credential Manager and server verification;
+     * no local flag can mark a passkey as registered. */
+    fun registerPasskey(activity:ComponentActivity?,locale:String) {
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_UI_CLICK)
+        if(activity==null) {
+            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_CAPABILITY_CHECK,safeError="ACTIVITY_UNAVAILABLE")
+            _state.value=_state.value.copy(passkeyLoading=false,passkeyError=PasskeyLoginError.UNAVAILABLE)
+            return
+        }
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_CAPABILITY_CHECK,"supported")
+        _state.value=_state.value.copy(passkeyLoading=true,passkeyError=null)
+        viewModelScope.launch {
+            try {
+                val options=setup.passkeyOptions()
+                val response=PasskeyCoordinator(activity).register(activity,options.toString())
+                val result=setup.verifyPasskey(JsonParser.parseString(response).asJsonObject)
+                if(!result.ok) {
+                    _state.value=_state.value.copy(passkeyLoading=false,passkeyError=PasskeyLoginError.AUTHENTICATION_FAILED,error=result.error ?: "PASSKEY_ENROLLMENT_FAILED")
+                    return@launch
+                }
+                analytics.track("passkey_enrollment_completed",mapOf("platform" to "android"))
+                _state.value=_state.value.copy(passkeyLoading=false,passkeyError=null,error=null)
+                refreshSetup(locale)
+            } catch(error:Throwable) {
+                _state.value=_state.value.copy(passkeyLoading=false,passkeyError=passkeyLoginError(error))
+            }
+        }
+    }
     suspend fun passkeyRegistrationOptions()=setup.passkeyOptions()
     fun skipPasskey(locale:String) {
         _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING)
@@ -793,9 +836,25 @@ class MainViewModel(
     suspend fun startPhoneChange(phone:String,locale:String,grant:String)=repo.startPhoneChange(phone,locale,grant)
     suspend fun verifyPhoneChange(challengeId:String,code:String)=repo.verifyPhoneChange(challengeId,code)
     suspend fun requestAccountDeletion(grant:String)=repo.requestAccountDeletion(grant)
-    suspend fun passkeyRegistrationOptions(grant:String)=repo.passkeyRegistrationOptions(grant)
+    suspend fun passkeyRegistrationOptions(grant:String):JsonObject {
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_REGISTER_OPTIONS_REQUEST)
+        return try {
+            repo.passkeyRegistrationOptions(grant).also { options->
+                if(!options.has("challenge")||!options.has("rp")||!options.has("user")) throw IllegalStateException("PASSKEY_OPTIONS_INVALID")
+                AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_REGISTER_OPTIONS_RESPONSE,"success")
+            }
+        } catch(error:Throwable) {
+            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_REGISTER_OPTIONS_RESPONSE,error,(error as? HttpException)?.code())
+            throw error
+        }
+    }
     suspend fun verifyPasskeyRegistration(response:JsonObject):Boolean {
-        val result=repo.verifyPasskeyRegistration(response)
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_REGISTER_VERIFY_REQUEST)
+        val result=try { repo.verifyPasskeyRegistration(response) } catch(error:Throwable) {
+            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_REGISTER_VERIFY_RESPONSE,error,(error as? HttpException)?.code())
+            throw error
+        }
+        if(result.ok)AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_REGISTER_VERIFY_RESPONSE,"success") else AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_REGISTER_VERIFY_RESPONSE,safeError=result.error)
         if(result.ok){
             analytics.track("passkey_enrollment_completed",mapOf("platform" to "android"))
             loadSecuritySettings()

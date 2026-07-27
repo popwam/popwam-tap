@@ -22,6 +22,15 @@ const GRANT_TTL_MS = 7 * 60_000;
 const PURPOSES = new Set(Object.values(StepUpPurpose));
 const METHODS = new Set(Object.values(StepUpMethod));
 
+/** Deliberately distinct from persistence/runtime errors so callers never
+ * misreport an internal failure as an assurance failure. */
+export class StepUpRequiredError extends Error {
+  constructor() {
+    super("STEP_UP_REQUIRED");
+    this.name = "StepUpRequiredError";
+  }
+}
+
 export function parseStepUpPurpose(value: unknown) {
   return typeof value === "string" && PURPOSES.has(value as StepUpPurpose) ? value as StepUpPurpose : null;
 }
@@ -226,7 +235,7 @@ export async function consumeStepUpGrant(
   purpose: StepUpPurpose,
   token: string | null | undefined,
 ) {
-  if (!context.bindingHash || !token || token.length < 32 || token.length > 256) throw new Error("STEP_UP_REQUIRED");
+  if (!context.bindingHash || !token || token.length < 32 || token.length > 256) throw new StepUpRequiredError();
   const now = new Date();
   const grant = await tx.stepUpGrant.findUnique({ where: { tokenHash: grantTokenHash(token) } });
   if (!grant ||
@@ -234,7 +243,7 @@ export async function consumeStepUpGrant(
       grant.purpose !== purpose ||
       grant.sessionBindingHash !== context.bindingHash ||
       grant.expiresAt <= now ||
-      grant.consumedAt) throw new Error("STEP_UP_REQUIRED");
+      grant.consumedAt) throw new StepUpRequiredError();
   const consumed = await tx.stepUpGrant.updateMany({
     where: {
       id: grant.id,
@@ -246,7 +255,7 @@ export async function consumeStepUpGrant(
     },
     data: { consumedAt: now },
   });
-  if (consumed.count !== 1) throw new Error("STEP_UP_REQUIRED");
+  if (consumed.count !== 1) throw new StepUpRequiredError();
   return { method: grant.method, grantId: grant.id };
 }
 
