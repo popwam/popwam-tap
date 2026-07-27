@@ -20,8 +20,8 @@ describe("passkey registration eligibility", () => {
       .toMatchObject({ freshnessSatisfied: false, stepUpRequired: true, passkeyEnrollmentEligible: false });
   });
 
-  it("requires step-up when adding another passkey even with fresh OTP", () => {
+  it("permits replacement enrollment after fresh OTP while retaining the existing credential", () => {
     expect(passkeyRegistrationEligibility({ activePasskeyCount: 1, authMethod: "OTP", lastAuthenticatedAt: now, now }))
-      .toMatchObject({ hasExistingPasskey: true, freshnessSatisfied: true, stepUpRequired: true, passkeyEnrollmentEligible: false });
+      .toMatchObject({ hasExistingPasskey: true, freshnessSatisfied: true, stepUpRequired: false, passkeyEnrollmentEligible: true });
   });
 });

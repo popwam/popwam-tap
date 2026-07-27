@@ -20,6 +20,14 @@ enum class AuthRuntimeStage {
     PASSKEY_REGISTER_OPTIONS_RESPONSE,
     PASSKEY_CREATE_REQUEST,
     PASSKEY_CREATE_RESULT,
+    PASSKEY_SKIP_UI_CLICK,
+    PASSKEY_SKIP,
+    PASSKEY_SKIP_ROUTE_RESOLVE,
+    PASSKEY_OPTIONS_VALIDATION,
+    ONBOARDING_CURRENT_REQUEST,
+    ONBOARDING_CURRENT_RESPONSE,
+    ONBOARDING_START_REQUEST,
+    ONBOARDING_START_RESPONSE,
     PASSKEY_REGISTER_VERIFY_REQUEST,
     PASSKEY_REGISTER_VERIFY_RESPONSE,
     PASSKEY_SIGNIN_UI_CLICK,
@@ -54,5 +62,13 @@ object AuthRuntimeDiagnostics {
         val safeCode=(safeError ?: "").filter { it.isLetterOrDigit()||it=='_'||it=='-' }.take(48)
         val safeException=error?.javaClass?.simpleName.orEmpty().take(48)
         runCatching { Log.d("PopAuthRuntime","stage=${stage.name} result=failed http=${http ?: 0} code=$safeCode exception=$safeException") }
+    }
+    /** DOM errors are platform-defined categories. Never include their message or ceremony JSON. */
+    fun domFailure(stage:AuthRuntimeStage,error:Throwable,domError:String,classification:String) {
+        if(!BuildConfig.DEBUG)return
+        val safeDomError=domError.filter { it.isLetterOrDigit()||it=='_' }.take(48).ifBlank { "unknown" }
+        val safeClassification=classification.filter { it.isLetterOrDigit()||it=='_' }.take(48).ifBlank { "unknown" }
+        val safeException=error.javaClass.simpleName.take(48)
+        runCatching { Log.d("PopAuthRuntime","stage=${stage.name} result=failed http=0 code= exception=$safeException domError=$safeDomError classification=$safeClassification") }
     }
 }

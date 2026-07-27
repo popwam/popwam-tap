@@ -40,6 +40,7 @@ fun PhaseCSetupScreen(state:AuthUiState, auth:AuthViewModel, locale:String) {
         AuthSetupStage.LEGAL_REQUIRED -> LegalConsentScreen(state, auth, locale)
         AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED -> ProfileBootstrapScreen(state, auth, locale)
         AuthSetupStage.PASSKEY_OFFER -> PasskeyOfferScreen(auth, locale)
+        AuthSetupStage.PASSKEY_EXISTING -> ExistingPasskeyScreen(auth, locale)
         AuthSetupStage.DYNAMIC_ONBOARDING -> DynamicOnboardingScreen(state,auth,locale)
         AuthSetupStage.LEGACY_COMPATIBILITY -> LegacyCompatibilityScreen(auth)
         else -> SetupLoading(state,auth, locale)
@@ -271,6 +272,19 @@ private fun passkeyOfferErrorString(error:PasskeyLoginError)=when(error) {
     PasskeyLoginError.STEP_UP_REQUIRED->R.string.passkey_login_failed
     PasskeyLoginError.AUTHENTICATION_FAILED->R.string.passkey_login_failed
     PasskeyLoginError.SERVER_UNAVAILABLE->R.string.passkey_login_server
+}
+
+@Composable private fun ExistingPasskeyScreen(auth:AuthViewModel,locale:String) {
+    val context=LocalContext.current
+    val activity=context as? ComponentActivity
+    val state by auth.state.collectAsState()
+    SetupPage {
+        Text("Your account already has a passkey",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Black)
+        Text("Confirm it on this device, or securely create another passkey after your verified phone sign-in.")
+        state.passkeyError?.let { Text(stringResource(passkeyOfferErrorString(it)),color=MaterialTheme.colorScheme.error) }
+        Button({auth.useExistingPasskey(activity,locale)},Modifier.fillMaxWidth(),enabled=!state.passkeyLoading){Text("Use existing passkey")}
+        TextButton({auth.createReplacementPasskey(activity,locale)},Modifier.fillMaxWidth(),enabled=!state.passkeyLoading){Text("Create a new passkey instead")}
+    }
 }
 
 @Composable private fun LegacyCompatibilityScreen(auth:AuthViewModel) = SetupPage {

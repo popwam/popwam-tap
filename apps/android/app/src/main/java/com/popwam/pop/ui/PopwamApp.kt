@@ -203,7 +203,6 @@ fun openWeb(context:Context,path:String){CustomTabsIntent.Builder().setShowTitle
     openLegal:(PreAuthLegalKind)->Unit,
 ){
     val context=LocalContext.current
-    val scope=rememberCoroutineScope()
     val locale=currentLocale()
     val options=remember(locale){PhoneIdentity.enabledCountries(Locale.forLanguageTag(locale))}
     var country by rememberSaveable{mutableStateOf(PhoneIdentity.suggestedCountry(context))}
@@ -233,18 +232,6 @@ fun openWeb(context:Context,path:String){CustomTabsIntent.Builder().setShowTitle
         item{
             Text(stringResource(R.string.phone_auth_title),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Black)
             Text(stringResource(R.string.phone_auth_help),style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if(passkeyPlatformSupported(android.os.Build.VERSION.SDK_INT)) item{
-            Button({
-                auth.beginPasskeyAuthentication()
-                scope.launch {
-                    runCatching {
-                        val options=auth.passkeyAuthenticationOptions()
-                        val assertion=PasskeyCoordinator(context).authenticate(context,options.toString())
-                        auth.verifyPasskey(JsonParser.parseString(assertion).asJsonObject,currentLocale())
-                    }.onFailure(auth::passkeyClientFailure)
-                }
-            },Modifier.fillMaxWidth().heightIn(min=52.dp),enabled=!state.loading && !state.passkeyLoading){Text(stringResource(R.string.continue_with_passkey))}
         }
         if(passkeyPlatformSupported(android.os.Build.VERSION.SDK_INT)) {
             state.passkeyError?.let { item{Text(stringResource(passkeyErrorString(it)),color=MaterialTheme.colorScheme.error)} }
@@ -369,25 +356,6 @@ private fun LoginScreen(
                     val normalized=PhoneIdentity.normalize(phone,country)
                     if(normalized==null||activity==null)invalidPhone=true else { phoneE164=normalized; auth.startPhoneVerification(activity,normalized,currentLocale()) }
                 },Modifier.fillMaxWidth().heightIn(min=54.dp),enabled=!state.loading&&phone.isNotBlank()&&country.isNotBlank()){Text(stringResource(R.string.send_code))}
-            }
-            if(passkeyPlatformSupported(android.os.Build.VERSION.SDK_INT)) {
-                item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center){FilledTonalIconButton({
-                        auth.beginPasskeyAuthentication()
-                        scope.launch {
-                            runCatching {
-                                val credentialOptions=auth.passkeyAuthenticationOptions()
-                                val assertion=PasskeyCoordinator(context).authenticate(context,credentialOptions.toString())
-                                auth.verifyPasskey(JsonParser.parseString(assertion).asJsonObject,currentLocale())
-                            }.onFailure(auth::passkeyClientFailure)
-                        }
-                    },enabled=!state.loading&&!state.passkeyLoading) { Icon(Icons.Default.Key,null) }
-                    Spacer(Modifier.width(16.dp))
-                    FilledTonalIconButton({},enabled=false){Icon(Icons.Default.Fingerprint,stringResource(R.string.biometric_quick_unlock_unavailable))}}
-                }
-                state.passkeyError?.let { error->
-                    item { Text(stringResource(passkeyErrorString(error)),color=MaterialTheme.colorScheme.error) }
-                }
-                item { HorizontalDivider() }
             }
             state.phoneFailure?.let { failure->
                 item { Text(stringResource(phoneAuthErrorString(failure)),color=MaterialTheme.colorScheme.error) }

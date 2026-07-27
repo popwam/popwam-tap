@@ -97,6 +97,9 @@ data class AuthUiState(
     val templateId: String? = null,
     val passkeyLoading: Boolean = false,
     val passkeyError: PasskeyLoginError? = null,
+    /** Ephemeral per authenticated setup journey; it never changes server passkey policy. */
+    val passkeyOfferSkippedForCurrentSetup: Boolean = false,
+    val passkeyExistingDecisionHandled: Boolean = false,
     val onboarding: OnboardingCurrentResponse? = null,
     val onboardingFieldErrors: Map<String,String> = emptyMap(),
 )
@@ -198,7 +201,7 @@ class AuthViewModel(
             val result=attempt.getOrNull()
             if(result?.ok==true&&result.user!=null) {
                 analytics.track("phone_auth_verified",mapOf("platform" to "android","provider" to "firebase","outcome" to if(event.automatic)"automatic" else "manual"))
-                _state.value=_state.value.copy(authenticated=true,loading=false,setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error=null)
+                _state.value=_state.value.copy(authenticated=true,loading=false,setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error=null,passkeyExistingDecisionHandled=false,passkeyOfferSkippedForCurrentSetup=false)
                 refreshSetup(locale)
             } else {
                 val conflict=result?.error?.contains("CONFLICT")==true||
@@ -241,36 +244,60 @@ class AuthViewModel(
         runCatching { setup.status(locale) }.onSuccess { status ->
             if(!status.ok) {
                 AuthRuntimeDiagnostics.failure(AuthRuntimeStage.AUTH_SETUP_RESOLVE,safeError=status.error ?: "response_not_ok")
+                if(_state.value.passkeyOfferSkippedForCurrentSetup) {
+                    passkeySkipRouteFailure(safeError=status.error ?: "response_not_ok")
+                    return@onSuccess
+                }
                 _state.value=_state.value.copy(error="SETUP_STATUS_UNAVAILABLE",setupStage=AuthSetupStage.SETUP_UNAVAILABLE)
                 return@onSuccess
             }
-            val stage=resolveAuthSetupStage(true,status)
+            val skipRouteResolve=_state.value.passkeyOfferSkippedForCurrentSetup
+            val stage=resolveAuthSetupStage(true,status,skipRouteResolve,_state.value.passkeyExistingDecisionHandled)
             _state.value = _state.value.copy(setupStatus = status, legalDocuments = status.requiredDocuments, setupStage = stage, error = null)
             AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,"endpoint_api_profile_bootstrap_http_200_${stage.name.lowercase()}_new_${status.isNewAccount}_legal_ready_${status.legalReady}_legal_accepted_${status.legalAccepted}")
-            if(stage==AuthSetupStage.READY)refreshDynamicOnboarding(locale)
+            if(stage==AuthSetupStage.READY)refreshDynamicOnboarding(locale,skipRouteResolve)
+            else if(skipRouteResolve) completePasskeySkipRouteResolve(stage)
         }.onFailure { error ->
             AuthRuntimeDiagnostics.failure(AuthRuntimeStage.AUTH_SETUP_RESOLVE,error,(error as? retrofit2.HttpException)?.code())
-            _state.value = _state.value.copy(error = "SETUP_STATUS_UNAVAILABLE", setupStage = AuthSetupStage.SETUP_UNAVAILABLE)
+            if(_state.value.passkeyOfferSkippedForCurrentSetup)passkeySkipRouteFailure(error,(error as? retrofit2.HttpException)?.code())
+            else _state.value = _state.value.copy(error = "SETUP_STATUS_UNAVAILABLE", setupStage = AuthSetupStage.SETUP_UNAVAILABLE)
         }
         } finally { setupResolutionInFlight=false } }
     }
 
-    private fun refreshDynamicOnboarding(locale:String)=viewModelScope.launch {
+    private fun refreshDynamicOnboarding(locale:String,fromPasskeySkip:Boolean=false)=viewModelScope.launch {
         runCatching { setup.currentOnboarding(locale) }.onSuccess { current->
             when(current.state) {
-                "BYPASSED","ONBOARDING_COMPLETE" -> _state.value=_state.value.copy(setupStage=AuthSetupStage.READY,onboarding=current,error=null)
+                "BYPASSED","ONBOARDING_COMPLETE" -> {
+                    _state.value=_state.value.copy(setupStage=AuthSetupStage.READY,onboarding=current,error=null)
+                    if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.READY)
+                }
                 "ONBOARDING_REQUIRED" -> runCatching { setup.startOnboarding(locale) }.onSuccess { started->
                     analytics.track("onboarding_started",mapOf("platform" to "android","profile_kind" to (started.definition?.profileKind ?: ""),"category_key" to (started.definition?.categoryKey ?: "fallback"),"definition_version" to (started.definition?.version?.toString() ?: "0")))
                     _state.value=_state.value.copy(setupStage=AuthSetupStage.DYNAMIC_ONBOARDING,onboarding=started,error=null)
-                }.onFailure { _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_START_FAILED") }
+                    if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.DYNAMIC_ONBOARDING)
+                }.onFailure { error->
+                    if(fromPasskeySkip)passkeySkipRouteFailure(error,(error as? HttpException)?.code())
+                    else _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_START_FAILED")
+                }
                 "ONBOARDING_IN_PROGRESS" -> {
                     analytics.track("onboarding_resumed",mapOf("platform" to "android","definition_version" to (current.definition?.version?.toString() ?: "0")))
                     _state.value=_state.value.copy(setupStage=AuthSetupStage.DYNAMIC_ONBOARDING,onboarding=current,error=null)
+                    if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.DYNAMIC_ONBOARDING)
                 }
-                "BOOTSTRAP_REQUIRED" -> _state.value=_state.value.copy(setupStage=AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED,error=null)
-                else -> _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_STATUS_UNAVAILABLE")
+                "BOOTSTRAP_REQUIRED" -> {
+                    _state.value=_state.value.copy(setupStage=AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED,error=null)
+                    if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED)
+                }
+                else -> {
+                    if(fromPasskeySkip)passkeySkipRouteFailure(safeError="ONBOARDING_STATUS_UNAVAILABLE")
+                    else _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_STATUS_UNAVAILABLE")
+                }
             }
-        }.onFailure { _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_STATUS_UNAVAILABLE") }
+        }.onFailure { error->
+            if(fromPasskeySkip)passkeySkipRouteFailure(error,(error as? HttpException)?.code())
+            else _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_STATUS_UNAVAILABLE")
+        }
     }
 
     fun setOnboardingAnswer(key:String,value:com.google.gson.JsonElement) {
@@ -383,21 +410,55 @@ class AuthViewModel(
                 val response=PasskeyCoordinator(activity).register(activity,options.toString())
                 val result=setup.verifyPasskey(JsonParser.parseString(response).asJsonObject)
                 if(!result.ok) {
-                    _state.value=_state.value.copy(passkeyLoading=false,passkeyError=PasskeyLoginError.AUTHENTICATION_FAILED,error=result.error ?: "PASSKEY_ENROLLMENT_FAILED")
+                    _state.value=passkeyOfferFailure(_state.value,PasskeyLoginError.AUTHENTICATION_FAILED)
                     return@launch
                 }
                 analytics.track("passkey_enrollment_completed",mapOf("platform" to "android"))
-                _state.value=_state.value.copy(passkeyLoading=false,passkeyError=null,error=null)
+                _state.value=_state.value.copy(passkeyLoading=false,passkeyError=null,error=null,passkeyExistingDecisionHandled=true)
                 refreshSetup(locale)
             } catch(error:Throwable) {
-                _state.value=_state.value.copy(passkeyLoading=false,passkeyError=passkeyLoginError(error))
+                _state.value=passkeyOfferFailure(_state.value,passkeyLoginError(error))
             }
         }
     }
     suspend fun passkeyRegistrationOptions()=setup.passkeyOptions()
+    fun useExistingPasskey(activity:ComponentActivity?,locale:String) {
+        if(activity==null) { _state.value=passkeyOfferFailure(_state.value,PasskeyLoginError.UNAVAILABLE);return }
+        _state.value=_state.value.copy(passkeyLoading=true,passkeyError=null)
+        viewModelScope.launch {
+            try {
+                val options=setup.existingPasskeyAssertionOptions()
+                val assertion=PasskeyCoordinator(activity).authenticate(activity,options.toString())
+                val verified=setup.verifyExistingPasskeyAssertion(JsonParser.parseString(assertion).asJsonObject)
+                if(!verified.ok) { _state.value=passkeyOfferFailure(_state.value,PasskeyLoginError.AUTHENTICATION_FAILED);return@launch }
+                _state.value=_state.value.copy(passkeyLoading=false,passkeyError=null,passkeyExistingDecisionHandled=true)
+                refreshSetup(locale)
+            } catch(error:Throwable) { _state.value=passkeyOfferFailure(_state.value,passkeyLoginError(error)) }
+        }
+    }
+    fun createReplacementPasskey(activity:ComponentActivity?,locale:String) {
+        _state.value=_state.value.copy(passkeyExistingDecisionHandled=true)
+        registerPasskey(activity,locale)
+    }
     fun skipPasskey(locale:String) {
-        _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING)
-        refreshDynamicOnboarding(locale)
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SKIP_UI_CLICK)
+        if(!_state.value.authenticated)return
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SKIP,"accepted")
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SKIP_ROUTE_RESOLVE,"started")
+        _state.value=passkeyOfferSkipped(_state.value)
+        refreshSetup(locale)
+    }
+    private fun completePasskeySkipRouteResolve(stage:AuthSetupStage) {
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SKIP_ROUTE_RESOLVE,stage.name.lowercase())
+    }
+    private fun passkeySkipRouteFailure(error:Throwable?=null,http:Int?=null,safeError:String?=null) {
+        AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_SKIP_ROUTE_RESOLVE,error,http,safeError)
+        _state.value=_state.value.copy(
+            setupStage=AuthSetupStage.PASSKEY_OFFER,
+            passkeyLoading=false,
+            passkeyError=PasskeyLoginError.SERVER_UNAVAILABLE,
+            error=null,
+        )
     }
     fun continueLegacyCompatibility() { _state.value=_state.value.copy(setupStage=AuthSetupStage.READY) }
 

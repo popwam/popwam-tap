@@ -13,6 +13,8 @@ export function passkeyRegistrationEligibility(input: {
     input.authMethod !== "LEGACY",
   );
   const hasExistingPasskey = input.activePasskeyCount > 0;
-  const stepUpRequired = hasExistingPasskey || !freshnessSatisfied;
+  // A freshly verified OTP session is recovery proof for a replacement. Existing credentials
+  // remain active until a new registration has been fully verified and stored.
+  const stepUpRequired = !freshnessSatisfied;
   return { hasExistingPasskey, freshnessSatisfied, stepUpRequired, passkeyEnrollmentEligible: !stepUpRequired };
 }

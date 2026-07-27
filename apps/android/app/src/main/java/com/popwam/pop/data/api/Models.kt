@@ -95,7 +95,7 @@ data class ProfileBootstrapTemplateDto(
     val configuration:TemplateConfigurationDto=TemplateConfigurationDto(),
 )
 data class ProfileTemplatesBootstrapResponse(val ok:Boolean=false,val templates:List<ProfileBootstrapTemplateDto> = emptyList(),val defaultTemplateId:String?=null,val error:String?=null)
-data class ProfileBootstrapStatusResponse(val ok:Boolean=false,val isNewAccount:Boolean=false,val bootstrapComplete:Boolean=false,val hasPrimaryProfile:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val requiredDocuments:List<LegalDocumentDto> = emptyList(),val passkeyCount:Int=0,val passkeyEnrollmentEligible:Boolean=false,val legacyProfileCount:Int=0,val primaryProfileId:String?=null,val error:String?=null)
+data class ProfileBootstrapStatusResponse(val ok:Boolean=false,val isNewAccount:Boolean=false,val bootstrapComplete:Boolean=false,val hasPrimaryProfile:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val requiredDocuments:List<LegalDocumentDto> = emptyList(),val passkeyCount:Int=0,val passkeyState:String="NO_PASSKEY",val passkeyEnrollmentEligible:Boolean=false,val legacyProfileCount:Int=0,val primaryProfileId:String?=null,val error:String?=null)
 data class ProfileBootstrapRequest(val displayName:String,val profileKind:String,val categorySlug:String,val templateId:String?=null,val locale:String)
 data class ProfileBootstrapResponse(val ok:Boolean=false,val error:String?=null)
 data class OnboardingOptionDto(val key:String="",val label:String="")

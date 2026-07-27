@@ -12,10 +12,10 @@ class AuthSetupPasskeyPolicyTest {
     }
     @Test fun `registration options require the WebAuthn creation fields`() {
         val options=JsonObject().apply {
-            addProperty("challenge","opaque")
-            add("rp",JsonObject().apply { addProperty("id","pop.popwam.com") })
-            add("user",JsonObject().apply { addProperty("id","opaque") })
-            add("pubKeyCredParams",JsonArray())
+            addProperty("challenge","Y2hhbGxlbmdl")
+            add("rp",JsonObject().apply { addProperty("id","pop.popwam.com");addProperty("name","POP by POPWAM") })
+            add("user",JsonObject().apply { addProperty("id","dXNlci0x");addProperty("name","user");addProperty("displayName","POP user") })
+            add("pubKeyCredParams",JsonArray().apply { add(JsonObject().apply { addProperty("type","public-key");addProperty("alg",-7) }) })
         }
         assertTrue(passkeyRegistrationOptionsValid(options))
     }

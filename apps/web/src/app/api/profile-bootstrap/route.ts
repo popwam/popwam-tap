@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     authMethod: context.authMethod,
     lastAuthenticatedAt: context.lastAuthenticatedAt,
   });
-  return Response.json({ ok: true, ...status, passkeyEnrollmentEligible: eligibility.passkeyEnrollmentEligible }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ ok: true, ...status, passkeyState: status.passkeyCount > 0 ? "HAS_PASSKEY" : "NO_PASSKEY", passkeyEnrollmentEligible: eligibility.passkeyEnrollmentEligible }, { headers: { "cache-control": "no-store" } });
 }
 
 export async function POST(request: Request) {

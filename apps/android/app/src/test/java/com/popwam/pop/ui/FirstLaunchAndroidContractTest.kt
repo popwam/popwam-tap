@@ -58,12 +58,10 @@ class FirstLaunchAndroidContractTest {
         assertTrue(app.contains("auth.startPhoneVerification(activity,normalized,currentLocale())"))
     }
 
-    @Test fun `returning passkey remains before phone fallback`() {
+    @Test fun `initial login is phone first and has no direct passkey sign in`() {
         val app=source("src/main/java/com/popwam/pop/ui/PopwamApp.kt")
-        val viewModel=source("src/main/java/com/popwam/pop/ui/AppViewModels.kt")
-        assertTrue(app.indexOf("continue_with_passkey")<app.indexOf("use_phone_instead"))
-        assertTrue(app.contains("auth.verifyPasskey"))
-        assertTrue(viewModel.contains("phoneFallbackAvailable"))
+        assertFalse(app.contains("continue_with_passkey"))
+        assertTrue(app.contains("auth.startPhoneVerification(activity,normalized,currentLocale())"))
     }
 
     @Test fun `French is declared alongside Arabic and English`() {

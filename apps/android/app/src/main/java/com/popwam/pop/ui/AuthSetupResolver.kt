@@ -2,10 +2,10 @@ package com.popwam.pop.ui
 
 import com.popwam.pop.data.api.ProfileBootstrapStatusResponse
 
-enum class AuthSetupStage { PUBLIC, PHONE_ENTRY, OTP_REQUIRED, AUTHENTICATED_CHECKING, SETUP_UNAVAILABLE, LEGAL_REQUIRED, PROFILE_BOOTSTRAP_REQUIRED, PASSKEY_OFFER, DYNAMIC_ONBOARDING, LEGACY_COMPATIBILITY, READY }
+enum class AuthSetupStage { PUBLIC, PHONE_ENTRY, OTP_REQUIRED, AUTHENTICATED_CHECKING, SETUP_UNAVAILABLE, LEGAL_REQUIRED, PROFILE_BOOTSTRAP_REQUIRED, PASSKEY_OFFER, PASSKEY_EXISTING, DYNAMIC_ONBOARDING, LEGACY_COMPATIBILITY, READY }
 
 /** Single routing policy for an authenticated POP session. No state is inferred from preferences. */
-fun resolveAuthSetupStage(authenticated:Boolean,status:ProfileBootstrapStatusResponse?):AuthSetupStage = when {
+fun resolveAuthSetupStage(authenticated:Boolean,status:ProfileBootstrapStatusResponse?,passkeyOfferSkippedForCurrentSetup:Boolean=false,passkeyExistingDecisionHandled:Boolean=false):AuthSetupStage = when {
     !authenticated -> AuthSetupStage.PUBLIC
     status == null -> AuthSetupStage.AUTHENTICATED_CHECKING
     !status.isNewAccount && !status.hasPrimaryProfile -> AuthSetupStage.LEGACY_COMPATIBILITY
@@ -13,7 +13,8 @@ fun resolveAuthSetupStage(authenticated:Boolean,status:ProfileBootstrapStatusRes
     !status.legalReady -> AuthSetupStage.SETUP_UNAVAILABLE
     !status.legalAccepted -> AuthSetupStage.LEGAL_REQUIRED
     !status.bootstrapComplete -> AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED
-    status.passkeyEnrollmentEligible -> AuthSetupStage.PASSKEY_OFFER
+    status.passkeyState=="HAS_PASSKEY" && !passkeyExistingDecisionHandled -> AuthSetupStage.PASSKEY_EXISTING
+    status.passkeyState=="NO_PASSKEY" && status.passkeyEnrollmentEligible && !passkeyOfferSkippedForCurrentSetup -> AuthSetupStage.PASSKEY_OFFER
     else -> AuthSetupStage.READY
 }
 
