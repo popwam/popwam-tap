@@ -66,10 +66,12 @@ class LocalizationAuthorityStore(
     private fun reconcilePersistedSelection(snapshot:LocalizationAuthoritySnapshot) {
         val selected=PreAuthStore.persistedLanguage(appContext)
         val allowed=snapshot.availableLocales.map { it.code }.toSet()
+        val resolved=selected?.takeIf { it in allowed } ?: snapshot.defaultLocale
         if(selected!=null&&selected !in allowed) {
             PreAuthStore.clearLaterLanguageChoice(appContext)
-            applyPopLanguage(snapshot.defaultLocale)
         }
+        // POP's server-authoritative locale must always override the device locale.
+        applyPopLanguage(resolved)
     }
 
     companion object {

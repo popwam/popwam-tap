@@ -38,10 +38,9 @@ fun PhaseCSetupScreen(state:AuthUiState, auth:AuthViewModel, locale:String) {
     }
 }
 
-@Composable private fun SetupLoading(auth:AuthViewModel,locale:String) = SetupPage {
-    Text(stringResource(R.string.setup_checking),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Black)
-    CircularProgressIndicator()
-    TextButton({auth.refreshSetup(locale)},Modifier.fillMaxWidth()) { Text(stringResource(R.string.retry)) }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun SetupLoading(auth:AuthViewModel,locale:String) {
+    ModalBottomSheet(onDismissRequest={}) { Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Text(stringResource(R.string.setup_checking),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black);Row(verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp);Spacer(Modifier.width(12.dp));Text("Verifying your account…",color=MaterialTheme.colorScheme.onSurfaceVariant)};TextButton({auth.refreshSetup(locale)}){Text(stringResource(R.string.retry))}} }
 }
 
 @Composable private fun LegalConsentScreen(state:AuthUiState,auth:AuthViewModel,locale:String) {

@@ -222,8 +222,7 @@ class AuthViewModel(
         _state.value = _state.value.copy(setupStage = AuthSetupStage.AUTHENTICATED_CHECKING, error = null)
         runCatching { setup.status(locale) }.onSuccess { status ->
             val stage=resolveAuthSetupStage(true,status)
-            val routedStage=if(stage==AuthSetupStage.READY)AuthSetupStage.AUTHENTICATED_CHECKING else stage
-            _state.value = _state.value.copy(setupStatus = status, legalDocuments = status.requiredDocuments, setupStage = routedStage, error = null)
+            _state.value = _state.value.copy(setupStatus = status, legalDocuments = status.requiredDocuments, setupStage = stage, error = null)
             AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,stage.name.lowercase())
             if(stage==AuthSetupStage.READY)refreshDynamicOnboarding(locale)
         }.onFailure {

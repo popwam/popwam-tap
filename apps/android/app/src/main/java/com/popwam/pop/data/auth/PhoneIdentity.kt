@@ -5,7 +5,8 @@ import android.telephony.TelephonyManager
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import java.util.Locale
 
-data class CountryOption(val iso2:String,val callingCode:String,val name:String,val flag:String)
+data class CountryOption(val iso2:String,val callingCode:String,val name:String,val flag:String,val placeholder:String="")
+data class PhoneCountryConfig(val iso2:String,val enabled:Boolean=true,val displayOrder:Int=0,val placeholder:String="")
 object PhoneIdentity {
     private val util=PhoneNumberUtil.getInstance()
     fun countries(locale:Locale):List<CountryOption> = util.supportedRegions.map { iso ->
@@ -13,9 +14,14 @@ object PhoneIdentity {
             iso2=iso,
             callingCode="+${util.getCountryCodeForRegion(iso)}",
             name=Locale.Builder().setRegion(iso).build().getDisplayCountry(locale).ifBlank { iso },
-            flag=countryFlag(iso),
+            flag=countryFlag(iso), placeholder=if(iso=="EG")"00 000 0000 00" else "Phone number",
         )
     }.sortedBy { it.name }
+    /** Remote admin configuration is mapped here; this safe fallback is used only without it. */
+    fun enabledCountries(locale:Locale, config:List<PhoneCountryConfig>?=null):List<CountryOption> {
+        val effective=config?.filter { it.enabled } ?: listOf(PhoneCountryConfig("EG",displayOrder=1,placeholder="00 000 0000 00"),PhoneCountryConfig("SA",displayOrder=2),PhoneCountryConfig("AE",displayOrder=3))
+        return countries(locale).filter { option->effective.any { it.iso2==option.iso2 } }.map { option->option.copy(placeholder=effective.first { it.iso2==option.iso2 }.placeholder.ifBlank { option.placeholder }) }.sortedBy { option->effective.first { it.iso2==option.iso2 }.displayOrder }
+    }
     fun search(countries:List<CountryOption>,query:String):List<CountryOption> {
         val normalized=query.trim()
         if(normalized.isBlank())return countries

@@ -325,9 +325,9 @@
     <string name="settings_preferences_group">Preferences</string>
     <string name="settings_profile_integrations_group">Profile and integrations</string>
     <string name="settings_account_group">Account</string>
-    <string name="settings_system">System</string>
-    <string name="settings_light">Light</string>
-    <string name="settings_dark">Dark</string>
+    <string name="settings_system">Auto</string>
+    <string name="settings_light">Day</string>
+    <string name="settings_dark">Night</string>
     <string name="settings_product_default">Product default</string>
     <string name="settings_font">Font</string>
     <string name="settings_accessibility_scale">POP respects your system font and display scale.</string>

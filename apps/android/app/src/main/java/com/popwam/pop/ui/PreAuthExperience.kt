@@ -74,6 +74,7 @@ import androidx.core.content.edit
 import com.popwam.pop.R
 import com.popwam.pop.data.api.LocalizationLocaleDto
 import com.popwam.pop.ui.theme.PopwamTheme
+import com.popwam.pop.ui.theme.PopIdentity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -268,9 +269,10 @@ private data class AppearanceChoice(val value: String, val title: Int, val help:
 @Composable
 fun AppearanceSelectionScreen(
     onBack: () -> Unit,
-    onComplete: (String) -> Unit,
+    onComplete: (String, String) -> Unit,
 ) {
-    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var selected by rememberSaveable { mutableStateOf("SYSTEM") }
+    var identity by rememberSaveable { mutableStateOf("PULSE") }
     val choices = remember {
         listOf(
             AppearanceChoice("SYSTEM", R.string.settings_system, R.string.pre_auth_theme_system_help, Icons.Default.SettingsSuggest),
@@ -278,8 +280,8 @@ fun AppearanceSelectionScreen(
             AppearanceChoice("DARK", R.string.settings_dark, R.string.pre_auth_theme_dark_help, Icons.Default.DarkMode),
         )
     }
-    PopwamTheme(selected ?: "LIGHT", "DEFAULT") {
-        PopSystemBars(selected == "DARK")
+    PopwamTheme(selected, "DEFAULT", identity) {
+        PopSystemBars(MaterialTheme.colorScheme.background.red < .2f)
         PreAuthBackdrop {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 22.dp),
@@ -287,11 +289,11 @@ fun AppearanceSelectionScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp,Alignment.CenterVertically),
             ) {
                 item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.fillMaxWidth()) {
                         IconButton(onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
                         }
-                        PopPreAuthBrand(Modifier.weight(1f))
+                        PopPreAuthBrand(Modifier.align(Alignment.Center))
                     }
                 }
                 item {
@@ -307,6 +309,7 @@ fun AppearanceSelectionScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                item { Text("Appearance",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Black) }
                 choices.forEach { choice ->
                     item {
                         val isSelected = selected == choice.value
@@ -335,11 +338,16 @@ fun AppearanceSelectionScreen(
                         }
                     }
                 }
+                item { Text("Your POP Style",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Black) }
+                item { androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) { PopIdentity.entries.filter { !it.proOnly }.forEach { option ->
+                    val active=identity==option.name
+                    Card(Modifier.weight(.5f).clickable { identity=option.name },colors=CardDefaults.cardColors(containerColor=if(active) option.primary.copy(alpha=.14f) else MaterialTheme.colorScheme.surface),border=BorderStroke(if(active)2.dp else 1.dp,if(active)option.primary else MaterialTheme.colorScheme.outline.copy(alpha=.3f))){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(30.dp),tint=option.primary);Spacer(Modifier.width(8.dp));Column{Text(option.label,fontWeight=FontWeight.Bold);Text(option.description,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)}}}
+                } } }
                 item {
                     Button(
-                        onClick = { selected?.let(onComplete) },
+                        onClick = { onComplete(selected,identity) },
                         modifier = Modifier.fillMaxWidth().height(54.dp),
-                        enabled = selected != null,
+                        enabled = true,
                     ) {
                         Text(stringResource(R.string.continue_action))
                         Spacer(Modifier.width(8.dp))
@@ -545,14 +553,13 @@ private fun PreAuthBackdrop(content: @Composable () -> Unit) {
 
 @Composable
 private fun PopPreAuthBrand(modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(
-            painterResource(R.drawable.ic_launcher_foreground),
+            painterResource(R.drawable.pop_logo),
             contentDescription = stringResource(R.string.pop_brand_short),
             modifier = Modifier.size(48.dp),
-            tint = Color.Unspecified,
+            tint = MaterialTheme.colorScheme.primary,
         )
-        Spacer(Modifier.width(8.dp))
         Column {
             Text(stringResource(R.string.pop_brand_short), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
             Text(

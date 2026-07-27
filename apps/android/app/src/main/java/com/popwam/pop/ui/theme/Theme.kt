@@ -1,77 +1,48 @@
 package com.popwam.pop.ui.theme
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
-import androidx.compose.material3.Typography
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.*
+import androidx.compose.ui.unit.dp
 import com.popwam.pop.R
 
-private val Light = lightColorScheme(
-    primary = Color(0xFFD4AF37),
-    secondary = Color(0xFFF5D76E),
-    background = Color(0xFFFFFFFF),
-    surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFFCFCFC),
-    outline = Color(0xFF6E5420),
-    onBackground = Color(0xFF111111),
-    onSurface = Color(0xFF111111),
-    onSurfaceVariant = Color(0xFF6E6E6E),
-    onPrimary = Color.White,
-    error = Color(0xFFD92D20),
-)
-private val Dark = darkColorScheme(
-    primary = Color(0xFFD4AF37),
-    secondary = Color(0xFFF5D76E),
-    background = Color(0xFF07090F),
-    surface = Color(0xFF111722),
-    surfaceVariant = Color(0xFF18202C),
-    outline = Color(0xFF8D7440),
-    onBackground = Color(0xFFF5F7FB),
-    onSurface = Color(0xFFF5F7FB),
-    onSurfaceVariant = Color(0xFFB8C1CC),
-    onPrimary = Color(0xFF171100),
-    error = Color(0xFFFFB4AB),
-)
+/** Appearance controls surfaces; identity controls the POP personality. */
+data class PopIdentityPalette(val backgroundDay:Color=Color(0xFFF8FAFC),val backgroundNight:Color=Color(0xFF0B1220),val surfaceDay:Color=Color.White,val surfaceNight:Color=Color(0xFF121B2A),val primaryDay:Color,val primaryNight:Color,val accentDay:Color,val accentNight:Color,val titleDay:Color=Color(0xFF0F172A),val titleNight:Color=Color(0xFFF8FAFC),val bodyDay:Color=Color(0xFF334155),val bodyNight:Color=Color(0xFFCBD5E1),val mutedDay:Color=Color(0xFF64748B),val mutedNight:Color=Color(0xFFCBD5E1),val outlineDay:Color=Color(0xFF94A3B8),val outlineNight:Color=Color(0xFF64748B),val selectedSurfaceDay:Color,val selectedSurfaceNight:Color,val selectedContentDay:Color,val selectedContentNight:Color,val onPrimaryDay:Color=Color.White,val onPrimaryNight:Color=Color.White)
+private fun palette(primary:Color,accent:Color)=PopIdentityPalette(primaryDay=primary,primaryNight=accent,accentDay=accent,accentNight=accent,selectedSurfaceDay=primary.copy(alpha=.12f),selectedSurfaceNight=accent.copy(alpha=.24f),selectedContentDay=primary,selectedContentNight=accent)
+enum class PopIdentity(val label:String, val palette:PopIdentityPalette, val description:String, val proOnly:Boolean=false) {
+    PULSE("Pulse",palette(Color(0xFF1E5BFF),Color(0xFF60A5FA)),"Connected. Clear. Modern."), MINT("Mint",palette(Color(0xFF0EA5A4),Color(0xFF2DD4BF)),"Fresh. Calm. Capable."), VIOLET("Violet",palette(Color(0xFF7C3AED),Color(0xFFA78BFA)),"Expressive. Focused. Bold."), CORAL("Coral",palette(Color(0xFFF43F5E),Color(0xFFFB7185)),"Warm. Human. Energetic."), SOLAR("Solar",palette(Color(0xFFF59E0B),Color(0xFFFBBF24)),"Bright. Optimistic. Clear."), GRAPHITE("Graphite",palette(Color(0xFF334155),Color(0xFF94A3B8)),"Quiet. Solid. Precise."), PRO("POP Pro",palette(Color(0xFF0EA5A4),Color(0xFF5EEAD4)).copy(backgroundDay=Color(0xFFF0FDFA),backgroundNight=Color(0xFF071A1A),surfaceNight=Color(0xFF102727)),"Premium POP identity.",true);
+    val primary get()=palette.primaryDay; val accent get()=palette.accentDay
+    companion object { fun from(value:String?)=entries.firstOrNull { it.name==value }?:PULSE }
+}
 
-private val Cairo = FontFamily(
-    Font(R.font.cairo,FontWeight.Normal),
-    Font(R.font.cairo,FontWeight.Medium),
-    Font(R.font.cairo,FontWeight.Bold),
-    Font(R.font.cairo,FontWeight.Black),
+data class PopSemanticColors(
+    val brandPrimary:Color,val brandAccent:Color,val background:Color,val surface:Color,val surfaceVariant:Color,
+    val onBackground:Color,val onSurface:Color,val onPrimary:Color,val outline:Color,val mutedText:Color,
+    val selectedSurface:Color,val selectedContent:Color,val danger:Color,val success:Color,val warning:Color,
 )
-private val ABeeZee = FontFamily(Font(R.font.abeezee, FontWeight.Normal))
-private val BaseTypography=Typography()
-private fun popwamTypography(font:FontFamily)=Typography(
-    displayLarge=BaseTypography.displayLarge.copy(fontFamily=font),displayMedium=BaseTypography.displayMedium.copy(fontFamily=font),displaySmall=BaseTypography.displaySmall.copy(fontFamily=font),
-    headlineLarge=BaseTypography.headlineLarge.copy(fontFamily=font),headlineMedium=BaseTypography.headlineMedium.copy(fontFamily=font),headlineSmall=BaseTypography.headlineSmall.copy(fontFamily=font),
-    titleLarge=BaseTypography.titleLarge.copy(fontFamily=font),titleMedium=BaseTypography.titleMedium.copy(fontFamily=font),titleSmall=BaseTypography.titleSmall.copy(fontFamily=font),
-    bodyLarge=BaseTypography.bodyLarge.copy(fontFamily=font),bodyMedium=BaseTypography.bodyMedium.copy(fontFamily=font),bodySmall=BaseTypography.bodySmall.copy(fontFamily=font),
-    labelLarge=BaseTypography.labelLarge.copy(fontFamily=font),labelMedium=BaseTypography.labelMedium.copy(fontFamily=font),labelSmall=BaseTypography.labelSmall.copy(fontFamily=font),
-)
+val LocalPopColors=staticCompositionLocalOf { PopSemanticColors(Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified) }
 
-@Composable
-fun PopwamTheme(themeMode:String="SYSTEM",@Suppress("UNUSED_PARAMETER") fontMode:String="DEFAULT",content: @Composable () -> Unit) {
-    val arabic = LocalConfiguration.current.locales[0].language == "ar"
+fun logoColor(identity:PopIdentity,dark:Boolean)=when { identity==PopIdentity.GRAPHITE&&dark->Color(0xFFCBD5E1); dark->identity.palette.primaryNight; else->identity.palette.primaryDay }
+private fun resolveColors(identity:PopIdentity,dark:Boolean):Pair<ColorScheme,PopSemanticColors> {
+    val p=identity.palette; val background=if(dark)p.backgroundNight else p.backgroundDay; val surface=if(dark)p.surfaceNight else p.surfaceDay
+    val variant=surface.copy(alpha=if(dark).86f else .94f); val on=if(dark)p.titleNight else p.titleDay; val muted=if(dark)p.mutedNight else p.mutedDay
+    val primary=if(dark)p.primaryNight else p.primaryDay; val onPrimary=if(dark)p.onPrimaryNight else p.onPrimaryDay
+    val scheme=(if(dark) darkColorScheme() else lightColorScheme()).copy(primary=primary,onPrimary=onPrimary,secondary=identity.accent,onSecondary=if(dark)Color(0xFF06201F) else Color.White,background=background,onBackground=on,surface=surface,onSurface=on,surfaceVariant=variant,onSurfaceVariant=muted,outline=if(dark) Color(0xFF64748B) else Color(0xFF94A3B8),error=if(dark)Color(0xFFFFB4AB) else Color(0xFFBA1A1A))
+    return scheme to PopSemanticColors(primary,if(dark)p.accentNight else p.accentDay,background,surface,variant,on,if(dark)p.bodyNight else p.bodyDay,onPrimary,if(dark)p.outlineNight else p.outlineDay,muted,if(dark)p.selectedSurfaceNight else p.selectedSurfaceDay,if(dark)p.selectedContentNight else p.selectedContentDay,scheme.error,Color(0xFF22C55E),Color(0xFFF59E0B))
+}
+
+private val Cairo=FontFamily(Font(R.font.cairo,FontWeight.Normal),Font(R.font.cairo,FontWeight.Medium),Font(R.font.cairo,FontWeight.Bold),Font(R.font.cairo,FontWeight.Black))
+private val ABeeZee=FontFamily(Font(R.font.abeezee,FontWeight.Normal))
+private val Base=Typography()
+private fun typography(font:FontFamily)=Typography(displayLarge=Base.displayLarge.copy(fontFamily=font),displayMedium=Base.displayMedium.copy(fontFamily=font),displaySmall=Base.displaySmall.copy(fontFamily=font),headlineLarge=Base.headlineLarge.copy(fontFamily=font),headlineMedium=Base.headlineMedium.copy(fontFamily=font),headlineSmall=Base.headlineSmall.copy(fontFamily=font),titleLarge=Base.titleLarge.copy(fontFamily=font),titleMedium=Base.titleMedium.copy(fontFamily=font),titleSmall=Base.titleSmall.copy(fontFamily=font),bodyLarge=Base.bodyLarge.copy(fontFamily=font),bodyMedium=Base.bodyMedium.copy(fontFamily=font),bodySmall=Base.bodySmall.copy(fontFamily=font),labelLarge=Base.labelLarge.copy(fontFamily=font),labelMedium=Base.labelMedium.copy(fontFamily=font),labelSmall=Base.labelSmall.copy(fontFamily=font))
+
+@Composable fun PopwamTheme(themeMode:String="SYSTEM",fontMode:String="DEFAULT",identityTheme:String="PULSE",content: @Composable () -> Unit) {
     val dark=when(themeMode){"DARK"->true;"LIGHT"->false;else->isSystemInDarkTheme()}
-    val font=if(arabic)Cairo else ABeeZee
-    MaterialTheme(
-        colorScheme = if(dark) Dark else Light,
-        typography = popwamTypography(font),
-        shapes = Shapes(
-            small = RoundedCornerShape(14.dp),
-            medium = RoundedCornerShape(24.dp),
-            large = RoundedCornerShape(32.dp),
-        ),
-        content = content,
-    )
+    val (scheme,semantic)=resolveColors(PopIdentity.from(identityTheme),dark)
+    val arabic=com.popwam.pop.ui.LocalePolicy.isRtl(com.popwam.pop.ui.currentLocale())
+    CompositionLocalProvider(LocalPopColors provides semantic) { MaterialTheme(colorScheme=scheme,typography=typography(if(arabic) Cairo else ABeeZee),shapes=Shapes(small=RoundedCornerShape(14.dp),medium=RoundedCornerShape(24.dp),large=RoundedCornerShape(32.dp)),content=content) }
 }

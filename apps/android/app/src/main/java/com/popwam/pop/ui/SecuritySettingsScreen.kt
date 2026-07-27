@@ -34,6 +34,7 @@ import com.popwam.pop.R
 import com.popwam.pop.data.auth.PasskeyCoordinator
 import com.popwam.pop.data.api.SecuritySessionDto
 import com.popwam.pop.ui.theme.AppearanceStore
+import com.popwam.pop.ui.theme.PopIdentity
 import kotlinx.coroutines.launch
 
 private data class StepUpAction(val purpose:String,val action:suspend (String)->Unit)
@@ -115,6 +116,8 @@ fun SecuritySettingsScreen(
                 }
                 "appearance"->{
                     item{ChoiceSetting(R.string.theme,appearance.theme,listOf("SYSTEM" to R.string.settings_system,"LIGHT" to R.string.settings_light,"DARK" to R.string.settings_dark)){appearanceStore.setTheme(it);vm.updateAppearancePreference("theme",it)}}
+                    item{Text("POP Style",fontWeight=FontWeight.Bold)}
+                    item{PopIdentity.entries.filter{!it.proOnly}.forEach{option->Card(Modifier.fillMaxWidth().clickable{appearanceStore.setIdentity(option.name)}.padding(bottom=2.dp),colors=CardDefaults.cardColors(containerColor=if(appearance.identity==option.name) MaterialTheme.colorScheme.primary.copy(alpha=.12f) else MaterialTheme.colorScheme.surface)){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Palette,null,tint=option.primary);Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(option.label,fontWeight=FontWeight.Bold);Text(option.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)};if(appearance.identity==option.name)Icon(Icons.Default.Check,null,tint=MaterialTheme.colorScheme.primary)}}}}
                     item{ChoiceSetting(R.string.language,currentLocale(),LocalePolicy.availableLocales().mapNotNull { code -> when(code){"en"->code to R.string.english;"ar"->code to R.string.arabic;"fr"->code to R.string.french;else->null} }){
                         when(it){
                             "en","ar"->vm.updateAppearancePreference("language",if(it=="ar")"ARABIC" else "ENGLISH")

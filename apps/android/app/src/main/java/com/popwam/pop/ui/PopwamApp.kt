@@ -105,8 +105,9 @@ import com.google.gson.JsonParser
         PreAuthStage.APPEARANCE -> {
             AppearanceSelectionScreen(
                 onBack=preAuthStore::clearLanguage,
-                onComplete={ selected ->
+                onComplete={ selected, identity ->
                     appearanceStore.setTheme(selected)
+                    appearanceStore.setIdentity(identity)
                     preAuthStore.completeAppearance(selected)
                 },
             )
@@ -151,7 +152,7 @@ fun currentLocale():String{
     return LocalePolicy.resolve(selected.substringBefore('-'),selected)
 }
 
-@Composable private fun SplashScreen(){PopSystemBars(MaterialTheme.colorScheme.background.red < .2f);Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background){Box(Modifier.fillMaxSize().safeDrawingPadding(),contentAlignment=Alignment.Center){Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)){Icon(painterResource(R.drawable.ic_launcher_foreground),"POP",Modifier.size(108.dp),tint=Color.Unspecified);Text(stringResource(R.string.app_name),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black);CircularProgressIndicator(Modifier.size(28.dp),strokeWidth=2.dp,color=MaterialTheme.colorScheme.primary)}}}}
+@Composable private fun SplashScreen(){PopSystemBars(MaterialTheme.colorScheme.background.red < .2f);Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background){Box(Modifier.fillMaxSize().safeDrawingPadding(),contentAlignment=Alignment.Center){Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)){Icon(painterResource(R.drawable.pop_logo),"POP",Modifier.size(108.dp),tint=MaterialTheme.colorScheme.primary);Text(stringResource(R.string.app_name),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black);CircularProgressIndicator(Modifier.size(28.dp),strokeWidth=2.dp,color=MaterialTheme.colorScheme.primary)}}}}
 
 @Composable private fun WelcomeScreen(activate:()->Unit,scan:()->Unit,login:()->Unit){
     val context=LocalContext.current;val online=rememberOnline();var details by rememberSaveable{mutableStateOf(false)}
@@ -198,7 +199,7 @@ fun openWeb(context:Context,path:String){CustomTabsIntent.Builder().setShowTitle
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     val locale=currentLocale()
-    val options=remember(locale){PhoneIdentity.countries(Locale.forLanguageTag(locale))}
+    val options=remember(locale){PhoneIdentity.enabledCountries(Locale.forLanguageTag(locale))}
     var country by rememberSaveable{mutableStateOf(PhoneIdentity.suggestedCountry(context))}
     var countryPicker by rememberSaveable{mutableStateOf(false)}
     var channel by rememberSaveable{mutableStateOf("sms")}
@@ -339,24 +340,20 @@ private fun LoginScreen(
             contentPadding=PaddingValues(vertical=24.dp),
             verticalArrangement=Arrangement.spacedBy(18.dp,Alignment.CenterVertically),
         ) {
+            item { Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(82.dp),tint=MaterialTheme.colorScheme.primary);Text("POP",style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Black);Text(stringResource(R.string.pop_slogan),color=MaterialTheme.colorScheme.onSurfaceVariant)} }
             item {
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.pop_brand_short),style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Black,color=MaterialTheme.colorScheme.primary)
-                        Text(stringResource(R.string.pop_slogan),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    FilledTonalIconButton({toggleLanguage(context)}) {
-                        Icon(Icons.Default.Language,stringResource(R.string.language))
-                    }
-                }
+                val selected=options.firstOrNull{it.iso2==country}
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically){OutlinedButton({countryPicker=true},Modifier.heightIn(min=54.dp),contentPadding=PaddingValues(horizontal=12.dp)){Text(selected?.flag.orEmpty());Spacer(Modifier.width(5.dp));Text(selected?.callingCode?:"+20");Icon(Icons.Default.ExpandMore,null)};Box(Modifier.weight(1f)){LtrField(phone,{phone=it.filter{c->c.isDigit()||c in " -()"};invalidPhone=false},R.string.phone_number,null,KeyboardType.Phone,true)}}
+                if(invalidPhone)Text(stringResource(R.string.phone_invalid),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             }
             item {
-                Text(stringResource(R.string.phone_auth_title),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Black)
-                Text(stringResource(R.string.phone_auth_help),style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Button({
+                    val normalized=PhoneIdentity.normalize(phone,country)
+                    if(normalized==null||activity==null)invalidPhone=true else { phoneE164=normalized; auth.startPhoneVerification(activity,normalized,currentLocale()) }
+                },Modifier.fillMaxWidth().heightIn(min=54.dp),enabled=!state.loading&&phone.isNotBlank()){Text(stringResource(R.string.send_code))}
             }
             if(passkeyPlatformSupported(android.os.Build.VERSION.SDK_INT)) {
-                item {
-                    Button({
+                item { TextButton({
                         auth.beginPasskeyAuthentication()
                         scope.launch {
                             runCatching {
@@ -365,7 +362,7 @@ private fun LoginScreen(
                                 auth.verifyPasskey(JsonParser.parseString(assertion).asJsonObject,currentLocale())
                             }.onFailure(auth::passkeyClientFailure)
                         }
-                    },Modifier.fillMaxWidth().heightIn(min=52.dp),enabled=!state.loading&&!state.passkeyLoading) {
+                    },Modifier.fillMaxWidth(),enabled=!state.loading&&!state.passkeyLoading) {
                         Text(stringResource(R.string.continue_with_passkey))
                     }
                 }
@@ -374,58 +371,8 @@ private fun LoginScreen(
                 }
                 item { HorizontalDivider() }
             }
-            item { Text(stringResource(R.string.use_phone_instead),style=MaterialTheme.typography.labelLarge) }
-            item { Text(stringResource(R.string.phone_help),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-            item {
-                val selected=options.firstOrNull{it.iso2==country}
-                OutlinedButton(
-                    {countryPicker=true},
-                    Modifier.fillMaxWidth().heightIn(min=54.dp),
-                    contentPadding=PaddingValues(horizontal=16.dp),
-                ) {
-                    Text(selected?.flag.orEmpty(),style=MaterialTheme.typography.titleLarge)
-                    Spacer(Modifier.width(10.dp))
-                    Text(selected?.name?:country,Modifier.weight(1f),textAlign=androidx.compose.ui.text.style.TextAlign.Start)
-                    Text(selected?.callingCode.orEmpty(),fontWeight=FontWeight.Bold)
-                    Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Default.ExpandMore,null)
-                }
-            }
-            item {
-                LtrField(
-                    phone,
-                    {
-                        phone=it.filter{character->character.isDigit()||character in " -()"}
-                        invalidPhone=false
-                    },
-                    R.string.phone_number,
-                    R.string.phone_national_hint,
-                    KeyboardType.Phone,
-                    true,
-                )
-                if(invalidPhone)Text(stringResource(R.string.phone_invalid),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
-            }
-            item {
-                Button({
-                    val normalized=PhoneIdentity.normalize(phone,country)
-                    if(normalized==null||activity==null)invalidPhone=true
-                    else {
-                        phoneE164=normalized
-                        auth.startPhoneVerification(activity,normalized,currentLocale())
-                    }
-                },Modifier.fillMaxWidth().heightIn(min=54.dp),enabled=!state.loading&&phone.isNotBlank()) {
-                    Text(stringResource(R.string.send_code))
-                }
-            }
             state.phoneFailure?.let { failure->
                 item { Text(stringResource(phoneAuthErrorString(failure)),color=MaterialTheme.colorScheme.error) }
-            }
-            item {
-                TextButton(openHowWorks,Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.HelpOutline,null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.how_pop_works))
-                }
             }
             item {
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center) {
@@ -456,6 +403,7 @@ private fun PhoneOtpScreen(
             secondsLeft-=1
         }
     }
+    LaunchedEffect(code,state.loading) { if(code.length==6 && !state.loading) verify() }
     PopSystemBars(MaterialTheme.colorScheme.background.red < .2f)
     Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
         LazyColumn(
@@ -464,12 +412,9 @@ private fun PhoneOtpScreen(
             verticalArrangement=Arrangement.spacedBy(18.dp,Alignment.CenterVertically),
             horizontalAlignment=Alignment.CenterHorizontally,
         ) {
-            item {
-                Text(stringResource(R.string.pop_brand_short),style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Black,color=MaterialTheme.colorScheme.primary)
-            }
+            item { Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(78.dp),tint=MaterialTheme.colorScheme.primary) }
             item {
                 Text(stringResource(R.string.verify_phone_title),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Black)
-                Text(stringResource(R.string.verify_phone_help),style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
             state.maskedPhone?.let { masked->item{LtrText(masked,MaterialTheme.typography.titleMedium)} }
             item { OtpSixDigitField(code,onCode,!state.loading) }
@@ -477,19 +422,12 @@ private fun PhoneOtpScreen(
                 item { Text(stringResource(phoneAuthErrorString(failure)),color=MaterialTheme.colorScheme.error) }
             }
             item {
-                Button(
-                    verify,
-                    Modifier.fillMaxWidth().heightIn(min=54.dp),
-                    enabled=canSubmitOtp(code,state.loading),
-                ) { Text(stringResource(R.string.verify_continue)) }
-            }
-            item {
                 TextButton(resend,enabled=secondsLeft==0&&!state.loading) {
                     Text(if(secondsLeft>0)stringResource(R.string.resend_countdown,secondsLeft) else stringResource(R.string.resend_code))
                 }
             }
             item { TextButton(changePhone){Text(stringResource(R.string.change_phone))} }
-            if(state.loading)item{CircularProgressIndicator()}
+            if(state.loading)item{Row(verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp);Spacer(Modifier.width(10.dp));Text("Verifying…",color=MaterialTheme.colorScheme.onSurfaceVariant)}}
         }
     }
 }
@@ -559,18 +497,9 @@ private fun CountryPickerDialog(
 ){
     var query by rememberSaveable{mutableStateOf("")}
     val filtered=remember(countries,query){PhoneIdentity.search(countries,query)}
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest=onDismiss,
-        properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false),
-    ){
-        Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background){
-            Scaffold(
-                topBar={TopAppBar(
-                    title={Text(stringResource(R.string.choose_country),fontWeight=FontWeight.Black)},
-                    navigationIcon={IconButton(onDismiss){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))}},
-                )},
-            ){padding->
-                Column(Modifier.fillMaxSize().padding(padding).imePadding()){
+    ModalBottomSheet(onDismissRequest=onDismiss) {
+                Column(Modifier.fillMaxWidth().heightIn(max=620.dp).imePadding().padding(horizontal=18.dp)){
+                    Text(stringResource(R.string.choose_country),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Black)
                     OutlinedTextField(
                         value=query,
                         onValueChange={query=it},
@@ -579,7 +508,7 @@ private fun CountryPickerDialog(
                         leadingIcon={Icon(Icons.Default.Search,null)},
                         singleLine=true,
                     )
-                    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=24.dp)){
+                    LazyColumn(Modifier.fillMaxWidth().weight(1f),contentPadding=PaddingValues(bottom=24.dp)){
                         items(filtered,key={it.iso2}){item->
                             ListItem(
                                 modifier=Modifier.fillMaxWidth().clickable{onSelect(item.iso2)},
@@ -593,10 +522,7 @@ private fun CountryPickerDialog(
                     }
                 }
             }
-        }
-    }
 }
-
 private fun passkeyErrorString(error:PasskeyLoginError)=when(error){
     PasskeyLoginError.CANCELLED->R.string.passkey_login_cancelled
     PasskeyLoginError.UNAVAILABLE->R.string.passkey_login_unavailable

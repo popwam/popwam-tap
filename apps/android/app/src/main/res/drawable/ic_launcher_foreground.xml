@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#D4AF37" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M27,29 L75,29 C82,29 86,33 86,40 L86,68 C86,75 82,79 75,79 L46,79 M23,78 C17,76 14,72 14,66 L14,41 C14,33 18,29 27,29" />
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#D4AF37" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M31,45 L56,45 C66,45 72,50 72,58 C72,66 66,71 56,71 L41,71 L41,88" />
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#D4AF37" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M70,39 C77,39 82,44 82,51 M70,45 C74,45 77,48 77,52" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="1024" android:viewportHeight="1024">
+    <path android:strokeColor="#60A5FA" android:strokeWidth="94" android:strokeLineJoin="bevel" android:fillColor="@android:color/transparent" android:pathData="M97,260.4L507.9,256.73C507.9,256.73 695.06,272.74 695.06,485.2C695.06,697.66 499.99,711.45 499.99,711.45L381.43,710.3"/>
+    <path android:strokeColor="#60A5FA" android:strokeWidth="94" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M499.47,488.57C517.34,489.42 223.05,489.1 194.27,487.73L196.8,921.92"/>
+    <path android:strokeColor="#60A5FA" android:strokeWidth="38" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="@android:color/transparent" android:pathData="M702.86,51L902.14,136.78L926.84,329.9M678.82,193.52L756.95,227.15L766.63,302.87M691.33,119.36L832.5,180.13L849.99,316.94"/>
 </vector>
