@@ -24,7 +24,7 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "PUBLIC_BASE_URL", "\"$publicBaseUrl\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
-        buildConfigField("String", "CREDENTIAL_MANAGER_VERSION", "\"1.5.0\"")
+        buildConfigField("String", "CREDENTIAL_MANAGER_VERSION", "\"1.6.0\"")
         buildConfigField("Boolean", "FIREBASE_RUNTIME_ENABLED", firebaseAndroidIntegrationEnabled.toString())
         vectorDrawables { useSupportLibrary = true }
     }
@@ -51,8 +51,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("androidx.browser:browser:1.9.0")
-    implementation("androidx.credentials:credentials:1.5.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")

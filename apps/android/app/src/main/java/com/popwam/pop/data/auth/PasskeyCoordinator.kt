@@ -24,6 +24,7 @@ class PasskeyCoordinator(context:Context) {
             val validation=validatePasskeyCreationOptions(options,URI(BuildConfig.API_BASE_URL).host)
             AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_OPTIONS_VALIDATION,passkeyOptionsValidationOutcome(options,validation.valid))
             AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_CREATE_ENVIRONMENT,passkeyCreateEnvironmentOutcome(activity,options))
+            if(BuildConfig.DEBUG) AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_EFFECTIVE_OPTIONS,passkeyEffectiveOptionsOutcome(options))
             check(validation.valid) { "PASSKEY_CREATION_OPTIONS_INVALID" }
             val result=manager.createCredential(activity,CreatePublicKeyCredentialRequest(creationOptionsJson))
             val response=(result as CreatePublicKeyCredentialResponse).registrationResponseJson
@@ -71,6 +72,38 @@ internal fun passkeyCreateEnvironmentOutcome(context:Context,options:com.google.
     val selection=options.getAsJsonObject("authenticatorSelection")
     val eddsa=options.getAsJsonArray("pubKeyCredParams")?.any { it.asJsonObject.get("alg")?.asInt == -8 } ?: false
     return "manifest_association_present_${manifestAssociationPresent}_dal_configuration_not_runtime_verified_credential_manager_version_${BuildConfig.CREDENTIAL_MANAGER_VERSION}_provider_available_pending_request_credprops_${extensions?.has("credProps")==true}_timeout_${options.has("timeout")}_require_resident_${selection?.has("requireResidentKey")==true}_eddsa_${eddsa}"
+}
+
+/** Temporary debug-only, field-level dump. Never emits challenge, user handle, credential IDs, or user text. */
+internal fun passkeyEffectiveOptionsOutcome(options:com.google.gson.JsonObject):String {
+    fun type(value:com.google.gson.JsonElement?)=when {
+        value==null || value.isJsonNull -> "null"
+        value.isJsonObject -> "object"
+        value.isJsonArray -> "array"
+        value.isJsonPrimitive && value.asJsonPrimitive.isString -> "string"
+        value.isJsonPrimitive && value.asJsonPrimitive.isBoolean -> "boolean"
+        value.isJsonPrimitive && value.asJsonPrimitive.isNumber -> "number"
+        else -> "other"
+    }
+    fun bytes(value:com.google.gson.JsonElement?)=runCatching { java.util.Base64.getUrlDecoder().decode(value?.asString).size }.getOrDefault(0)
+    fun nameFacts(value:String?,display:Boolean):String {
+        val kind=when {
+            value.isNullOrEmpty() -> "unexpected"
+            display && value=="POP user" -> "fallback_pop_user"
+            value.contains('@') -> "fallback"
+            value.all { it.isLetterOrDigit() || it.isWhitespace() || it in "._-'" } -> "account_name"
+            else -> "synthetic_identifier"
+        }
+        return "${kind}_len_${value?.length?:0}_ws_${value?.any(Char::isWhitespace)==true}_at_${value?.contains('@')==true}_empty_${value.isNullOrEmpty()}_nonascii_${value?.any{it.code>127}==true}"
+    }
+    val rp=options.getAsJsonObject("rp")
+    val user=options.getAsJsonObject("user")
+    val selection=options.getAsJsonObject("authenticatorSelection")
+    val algs=options.getAsJsonArray("pubKeyCredParams")?.mapNotNull { it.asJsonObject.get("alg")?.asInt }?.joinToString(",") ?: "none"
+    val excludes=options.getAsJsonArray("excludeCredentials")
+    val transports=excludes?.flatMap { it.asJsonObject.getAsJsonArray("transports")?.mapNotNull { transport->transport.asString } ?: emptyList() }?.distinct()?.joinToString(",") ?: "none"
+    val extensions=options.getAsJsonObject("extensions")?.keySet()?.sorted()?.joinToString(",") ?: "none"
+    return "rp_id_${rp?.get("id")?.asString?:"missing"}_rp_name_${rp?.get("name")?.asString?:"missing"}_types_rpid_${type(rp?.get("id"))}_rpname_${type(rp?.get("name"))}_userid_${type(user?.get("id"))}_username_${type(user?.get("name"))}_display_${type(user?.get("displayName"))}_challenge_${type(options.get("challenge"))}_params_${type(options.get("pubKeyCredParams"))}_timeout_${type(options.get("timeout"))}_require_${type(selection?.get("requireResidentKey"))}_extensions_${type(options.get("extensions"))}_user_id_redacted_bytes_${bytes(user?.get("id"))}_challenge_redacted_bytes_${bytes(options.get("challenge"))}_user_name_${nameFacts(user?.get("name")?.asString,false)}_display_name_${nameFacts(user?.get("displayName")?.asString,true)}_algorithms_${algs}_timeout_value_${options.get("timeout")?.asString?:"missing"}_exclude_count_${excludes?.size()?:0}_exclude_transports_${transports}_resident_${selection?.get("residentKey")?.asString?:"missing"}_require_value_${selection?.get("requireResidentKey")?.asBoolean?:false}_uv_${selection?.get("userVerification")?.asString?:"missing"}_attachment_${selection?.get("authenticatorAttachment")?.asString?:"omitted"}_attestation_${options.get("attestation")?.asString?:"missing"}_extension_names_${extensions}"
 }
 
 internal fun passkeyOptionsValidationOutcome(options:com.google.gson.JsonObject,valid:Boolean):String {

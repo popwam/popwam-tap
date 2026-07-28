@@ -7,10 +7,13 @@ describe("Android Digital Asset Links", () => {
     target: { namespace: string; package_name: string; sha256_cert_fingerprints: string[] };
   }>;
 
-  it("delegates login credentials to the current physical debug package and certificate", () => {
+  it("declares App Links and login credentials for the current physical debug package and certificate", () => {
     expect(statements).toEqual([
       {
-        relation: ["delegate_permission/common.get_login_creds"],
+        relation: [
+          "delegate_permission/common.handle_all_urls",
+          "delegate_permission/common.get_login_creds",
+        ],
         target: {
           namespace: "android_app",
           package_name: "com.popwam.pop.debug",
