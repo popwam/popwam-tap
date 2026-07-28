@@ -501,6 +501,7 @@ data class MainUiState(
     val publishing: PublishingStatusResponse? = null,
     val profileSelector: ProfileSelectorResponse? = null,
     val profileEditor: ProfileEditorResponse? = null,
+    val profileTemplates: List<ProfileBootstrapTemplateDto> = emptyList(),
     val selectedProfileId: String? = null,
     val editorSaveState: String = "IDLE",
     val shareTargets: ShareTargetsResponse? = null,
@@ -1081,6 +1082,11 @@ class MainViewModel(
             else {_state.value=_state.value.copy(editorSaveState="FAILED");fail("REQUEST_FAILED")}
         }
     }
+
+    fun loadCompatibleProfileTemplates(category:String,kind:String,locale:String)=viewModelScope.launch { working {
+        val result=repo.profileTemplates(category,kind,locale)
+        if(result.ok)_state.value=_state.value.copy(profileTemplates=result.templates) else fail(result.error)
+    } }
 
     fun uploadEditorMedia(context:Context,uri:Uri,locale:String)=viewModelScope.launch {
         val editor=_state.value.profileEditor ?: return@launch

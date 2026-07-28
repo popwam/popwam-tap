@@ -203,6 +203,14 @@
     <string name="publish_media_visibility">Media visibility</string>
     <string name="publish_module_visibility">Module visibility</string>
     <string name="publish_field_visibility">Visible fields</string>
+    <string name="publishing_issue_template_required_title">Choose a template</string>
+    <string name="publishing_issue_template_required_description">Select a compatible template before publishing.</string>
+    <string name="publishing_issue_required_module_missing_title">Add required section</string>
+    <string name="publishing_issue_required_module_missing_description">Add the required profile section, then complete its public settings.</string>
+    <string name="publishing_issue_generic_title">Complete this requirement</string>
+    <string name="publishing_issue_generic_description">Open the relevant profile setting to continue.</string>
+    <string name="editor_template_picker">Choose template</string>
+    <string name="editor_template_picker_help">Choose a template compatible with this profile.</string>
     <string name="editor_home_title">Your POP profile</string>
     <string name="editor_home_description">Edit your private draft, see how it will look, and publish when it is ready.</string>
     <string name="editor_select_profile">Select profile</string>

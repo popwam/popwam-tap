@@ -42,6 +42,7 @@ type Tx = Prisma.TransactionClient;
 type EditorLocale = "ar" | "en";
 
 export type ProfileEditorAction =
+  | { type: "TEMPLATE_SELECT"; templateId?: unknown }
   | { type: "IDENTITY_SAVE"; displayLabel?: unknown; displayName?: unknown; displayNameAr?: unknown; displayNameEn?: unknown; jobTitleAr?: unknown; jobTitleEn?: unknown; organizationNameAr?: unknown; organizationNameEn?: unknown; primaryLanguage?: unknown }
   | { type: "ABOUT_SAVE"; title?: unknown; bio?: unknown; bioAr?: unknown; bioEn?: unknown; descriptionAr?: unknown; descriptionEn?: unknown }
   | { type: "CONTACT_SAVE"; phone?: unknown; alternatePhone?: unknown; email?: unknown; website?: unknown; whatsappBusiness?: unknown; whatsappPrivate?: unknown; locationText?: unknown; addressAr?: unknown; addressEn?: unknown; visibility?: unknown }
@@ -59,6 +60,13 @@ export type ProfileEditorAction =
   | { type: "MODULE_REORDER"; keys?: unknown }
   | { type: "MEDIA_VISIBILITY"; id?: unknown; visibility?: unknown }
   | { type: "MEDIA_REORDER"; ids?: unknown };
+
+const CORE_TEMPLATE_FALLBACK_MODULES = new Set(["IDENTITY", "ABOUT", "CONTACT", "LINKS"]);
+function templateAllowsModule(profile: { templateId: string | null; template?: { moduleRules: Array<{ moduleDefinition: { key: string }; allowed: boolean }> } | null }, key: string) {
+  if (!profile.templateId) return true;
+  const rules = profile.template?.moduleRules || [];
+  return rules.length === 0 ? CORE_TEMPLATE_FALLBACK_MODULES.has(key) : rules.some((rule) => rule.moduleDefinition.key === key && rule.allowed);
+}
 
 function bounded(value: unknown, maximum: number, required = false) {
   const result = String(value ?? "").trim();
@@ -249,7 +257,7 @@ export async function getProfileEditor(userId: string, profileId: string, locale
   const instances = new Map(profile.modules.map((module) => [module.moduleDefinition.key, module]));
   const addableModules = definitions
     .filter((definition) => !instances.has(definition.key))
-    .filter((definition) => !profile.templateId || allowedRules.get(definition.key)?.allowed)
+    .filter((definition) => templateAllowsModule(profile, definition.key))
     .map((definition) => ({ key: definition.key, name: localized(locale, definition.nameAr, definition.nameEn, definition.key) }));
   const changedSections = changedEditorSections(profile, published);
   const readiness = evaluateProfileReadiness(profile);
@@ -388,6 +396,24 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
     let auditMetadata: Prisma.InputJsonObject | undefined;
 
     switch (action.type) {
+      case "TEMPLATE_SELECT": {
+        const templateId = requiredId(action.templateId);
+        const template = await tx.profileTemplate.findFirst({
+          where: {
+            id: templateId,
+            isActive: true,
+            AND: [
+              { OR: [{ profileKind: null }, { profileKind: profile.profileKind! }] },
+              { OR: [{ categoryId: null }, { categoryId: profile.categoryId || undefined }] },
+            ],
+          },
+        });
+        if (!template) throw new Error("PROFILE_TEMPLATE_INCOMPATIBLE");
+        await tx.profile.update({ where: { id: profileId }, data: { templateId: template.id } });
+        auditOperation = "profile.template.selected";
+        auditMetadata = { templateId: template.id };
+        break;
+      }
       case "IDENTITY_SAVE": {
         const displayName = bounded(action.displayName, 120, true)!;
         const displayLabel = bounded(action.displayLabel, 80);
@@ -553,7 +579,7 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
         const rule = definition && profile.templateId
           ? profile.template?.moduleRules.find((item) => item.moduleDefinitionId === definition.id)
           : null;
-        const decision = moduleUpdateDecision({ key, supported: editorKeys.has(key), allowed: Boolean(definition?.isActive) && (!profile.templateId || Boolean(rule?.allowed)), required: Boolean(rule?.required), enabled: true });
+        const decision = moduleUpdateDecision({ key, supported: editorKeys.has(key), allowed: Boolean(definition?.isActive) && templateAllowsModule(profile, key), required: Boolean(rule?.required), enabled: true });
         if (!decision.allowed || !definition) throw new Error(decision.allowed ? "MODULE_NOT_FOUND" : decision.error);
         if (profile.modules.some((module) => module.moduleDefinitionId === definition.id)) throw new Error("MODULE_DUPLICATE");
         const maximum = profile.modules.reduce((value, module) => Math.max(value, module.sortOrder), -10);

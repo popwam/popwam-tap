@@ -203,6 +203,14 @@
     <string name="publish_media_visibility">خصوصية الصور</string>
     <string name="publish_module_visibility">خصوصية الأقسام</string>
     <string name="publish_field_visibility">الحقول الظاهرة</string>
+    <string name="publishing_issue_template_required_title">اختر قالبًا</string>
+    <string name="publishing_issue_template_required_description">اختر قالبًا متوافقًا قبل النشر.</string>
+    <string name="publishing_issue_required_module_missing_title">أضف قسمًا مطلوبًا</string>
+    <string name="publishing_issue_required_module_missing_description">أضف القسم المطلوب ثم أكمل إعداداته العامة.</string>
+    <string name="publishing_issue_generic_title">أكمل هذا المتطلب</string>
+    <string name="publishing_issue_generic_description">افتح إعداد الملف ذي الصلة للمتابعة.</string>
+    <string name="editor_template_picker">اختيار قالب</string>
+    <string name="editor_template_picker_help">اختر قالبًا متوافقًا مع هذا الملف.</string>
     <string name="editor_home_title">ملف POP الخاص بك</string>
     <string name="editor_home_description">عدّل مسودتك الخاصة، شاهد شكلها المتوقع، وانشرها عندما تصبح جاهزة.</string>
     <string name="editor_select_profile">اختيار الملف</string>

@@ -40,6 +40,17 @@ class ProfileHomePolicyTest {
         assertEquals("PUBLIC",ProfileHomePolicy.nextVisibility("ONLY_ME"))
     }
 
+    @Test fun `publish blockers map to actionable destinations`() {
+        assertEquals("TEMPLATE",ProfileHomePolicy.issueAction("TEMPLATE_REQUIRED",null))
+        assertEquals("MODULE_OR_ADD",ProfileHomePolicy.issueAction("REQUIRED_MODULE_MISSING","IDENTITY"))
+        assertEquals("MODULE_OR_ADD",ProfileHomePolicy.issueAction("REQUIRED_MODULE_MISSING","BOOKING"))
+    }
+
+    @Test fun `publish blocker copy is localized resource backed not backend code text`() {
+        assertNotEquals(0,ProfileHomePolicy.issueTitle("TEMPLATE_REQUIRED"))
+        assertNotEquals(0,ProfileHomePolicy.issueDescription("REQUIRED_MODULE_MISSING"))
+    }
+
     @Test fun `ordering is bounded and deterministic`() {
         assertEquals(listOf("ABOUT","IDENTITY","CONTACT"),ProfileHomePolicy.moved(listOf("IDENTITY","ABOUT","CONTACT"),0,1))
         assertEquals(listOf("IDENTITY","ABOUT"),ProfileHomePolicy.moved(listOf("IDENTITY","ABOUT"),0,-1))

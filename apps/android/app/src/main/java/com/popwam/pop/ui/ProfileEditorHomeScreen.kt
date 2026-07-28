@@ -46,6 +46,13 @@ object ProfileHomePolicy {
         if(index !in values.indices||target !in values.indices)return values
         return values.toMutableList().apply{val item=removeAt(index);add(target,item)}
     }
+    fun issueAction(code:String,module:String?)=when(code){
+        "TEMPLATE_REQUIRED","TEMPLATE_MISMATCH"->"TEMPLATE"
+        "REQUIRED_MODULE_MISSING"->"MODULE_OR_ADD"
+        else->"MODULE"
+    }
+    fun issueTitle(code:String)=when(code){"TEMPLATE_REQUIRED","TEMPLATE_MISMATCH"->R.string.publishing_issue_template_required_title;"REQUIRED_MODULE_MISSING"->R.string.publishing_issue_required_module_missing_title;else->R.string.publishing_issue_generic_title}
+    fun issueDescription(code:String)=when(code){"TEMPLATE_REQUIRED","TEMPLATE_MISMATCH"->R.string.publishing_issue_template_required_description;"REQUIRED_MODULE_MISSING"->R.string.publishing_issue_required_module_missing_description;else->R.string.publishing_issue_generic_description}
 }
 
 @Composable
@@ -87,6 +94,7 @@ fun ProfileEditorHomeScreen(state:MainUiState,vm:MainViewModel,navigate:(String)
     var selectorOpen by rememberSaveable{mutableStateOf(false)}
     var quotaOpen by rememberSaveable{mutableStateOf(false)}
     var addSectionOpen by rememberSaveable{mutableStateOf(false)}
+    var templatePickerOpen by rememberSaveable{mutableStateOf(false)}
     var activeModule by rememberSaveable{mutableStateOf<String?>(null)}
     LaunchedEffect(locale){vm.loadProfileHome(locale)}
 
@@ -118,6 +126,18 @@ fun ProfileEditorHomeScreen(state:MainUiState,vm:MainViewModel,navigate:(String)
             if(editor.addableModules.isEmpty())Text(stringResource(R.string.editor_unsupported),color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+    if(templatePickerOpen&&editor!=null)ModalBottomSheet({templatePickerOpen=false}){
+        Column(Modifier.padding(20.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(10.dp)){
+            Text(stringResource(R.string.editor_template_picker),Modifier.semantics{heading()},style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+            Text(stringResource(R.string.editor_template_picker_help),color=MaterialTheme.colorScheme.onSurfaceVariant)
+            state.profileTemplates.forEach{template->
+                Surface(Modifier.fillMaxWidth().clickable{vm.mutateProfileEditor(action("TEMPLATE_SELECT","templateId" to template.id),locale){templatePickerOpen=false}},shape=RoundedCornerShape(16.dp),color=Color.White){
+                    Column(Modifier.padding(16.dp)){Text(if(locale=="ar")template.nameAr?:template.nameEn.orEmpty() else template.nameEn?:template.nameAr.orEmpty(),fontWeight=FontWeight.Bold);Text(template.slug,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                }
+            }
+            if(state.profileTemplates.isEmpty())CircularProgressIndicator()
+        }
+    }
     activeModule?.let{key->editor?.let{ModuleEditorSheet(key,it,state,vm,locale,{activeModule=null})}}
 
     when{
@@ -147,7 +167,7 @@ fun ProfileEditorHomeScreen(state:MainUiState,vm:MainViewModel,navigate:(String)
                 Surface(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp),color=Color.White){
                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                         Text(if(editor.readiness.ready)stringResource(R.string.editor_ready) else stringResource(R.string.editor_finish_count,editor.readiness.issues.size),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
-                        editor.readiness.issues.forEach{issue->TextButton({activeModule=issue.module ?: when{issue.path.contains("displayName")->"IDENTITY";issue.path.contains("contact",true)->"CONTACT";else->null}},Modifier.fillMaxWidth()){Text(issue.code.replace('_',' '),Modifier.weight(1f));Icon(Icons.Default.ChevronRight,null)}}
+                        editor.readiness.issues.forEach{issue->TextButton({when(ProfileHomePolicy.issueAction(issue.code,issue.module)){"TEMPLATE"->{templatePickerOpen=true;vm.loadCompatibleProfileTemplates(editor.profile.categoryKey.orEmpty(),editor.profile.profileKind,locale)};"MODULE_OR_ADD"->if(editor.modules.any{it.key==issue.module})activeModule=issue.module else addSectionOpen=true;"ADD_MODULE"->addSectionOpen=true;else->activeModule=issue.module ?: when{issue.path.contains("displayName")->"IDENTITY";issue.path.contains("contact",true)->"CONTACT";else->null}}},Modifier.fillMaxWidth()){Column(Modifier.weight(1f)){Text(stringResource(ProfileHomePolicy.issueTitle(issue.code)));Text(stringResource(ProfileHomePolicy.issueDescription(issue.code)),style=MaterialTheme.typography.bodySmall)};Icon(Icons.Default.ChevronRight,null)}}
                         Button({navigate("profile-publish/${editor.profile.id}")},Modifier.fillMaxWidth().heightIn(min=52.dp),enabled=ProfileHomePolicy.canPublish(editor.readiness.ready,state.loading)){Text(stringResource(R.string.editor_publish_changes))}
                     }
                 }

@@ -12,6 +12,7 @@ class PopwamRepository(private val api:PopwamApi){
     suspend fun profiles()=api.profiles()
     suspend fun profileSelector(selected:String?=null)=api.profileSelector(selected)
     suspend fun profileEditor(id:String,locale:String)=api.profileEditor(id,locale)
+    suspend fun profileTemplates(category:String,kind:String,locale:String)=api.profileBootstrapTemplates(category,kind,locale)
     suspend fun mutateProfileEditor(id:String,draftRevision:Int,action:com.google.gson.JsonObject)=api.mutateProfileEditor(id,ProfileEditorMutationRequest(draftRevision,action))
     suspend fun publishingStatus(id:String,locale:String)=api.publishingStatus(id,locale)
     suspend fun publishingAction(id:String,action:String,draftRevision:Int?=null)=api.publishingAction(id,PublishingActionRequest(action,draftRevision))
