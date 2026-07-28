@@ -77,7 +77,8 @@ if (otpExpose && !staging) errors.push("OTP_EXPOSE_IN_RESPONSE=true is forbidden
 
 for (const name of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) required(name);
 httpsUrl("R2_ENDPOINT");
-httpsUrl("R2_PUBLIC_BASE_URL", "go.popwam.com");
+// This is the R2/CDN delivery origin used by getPublicUrl(), not the public-site host.
+httpsUrl("R2_PUBLIC_BASE_URL", "media.popwam.com");
 
 const googleId = value("GOOGLE_CLIENT_ID"); const googleSecret = value("GOOGLE_CLIENT_SECRET");
 if (Boolean(googleId) !== Boolean(googleSecret)) errors.push("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must either both be set or both be empty");
