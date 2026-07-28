@@ -60,4 +60,25 @@ describe.runIf(enabled)("dynamic onboarding database completion (transaction rol
         expect(await tx.profileModule.count({ where: { profileId: profile.id } })).toBe(0);
     });
   }, 20_000);
+
+  it("repairs legacy unscoped template state, then completes through the current engine", async () => {
+    await rollback(async (tx) => {
+      const professional = await tx.onboardingDefinition.findFirstOrThrow({ where: { key: "professional-v1", version: 1, status: "PUBLISHED" }, select: { id: true, key: true, categoryId: true } });
+      const user = await tx.user.create({ data: { email: `${testId}-legacy-template@example.test` } });
+      const legacyTemplate = await tx.profileTemplate.create({
+        data: { slug: `${testId}-legacy-template`, nameEn: "Legacy test template", nameAr: "قالب قديم", category: "legacy", minimumPlan: "FREE", configuration: {} },
+      });
+      const profile = await tx.profile.create({
+        data: { userId: user.id, displayName: "Initial name", profileKind: "PERSONAL", categoryId: professional.categoryId, templateId: legacyTemplate.id, lifecycle: "DRAFT", isPrimary: true, isPublic: false },
+      });
+      const progress = await tx.onboardingProgress.create({
+        data: { userId: user.id, profileId: profile.id, definitionId: professional.id, definitionVersion: 1, revision: 1, draftAnswers: answers[professional.key], initialAnswers: {} },
+      });
+      await expect(completeDynamicOnboardingInTransaction(tx, { userId: user.id, locale: "en", revision: 1 }))
+        .rejects.toMatchObject({ message: "ONBOARDING_MODULE_INCOMPATIBLE", status: 409 } satisfies Partial<OnboardingError>);
+      await tx.profile.update({ where: { id: profile.id }, data: { templateId: null } });
+      const result = await completeDynamicOnboardingInTransaction(tx, { userId: user.id, locale: "en", revision: progress.revision });
+      expect(result.state).toBe("ONBOARDING_COMPLETE");
+    });
+  }, 20_000);
 });

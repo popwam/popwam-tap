@@ -16,6 +16,7 @@
     "migrate:dev": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
     "seed:onboarding": "tsx prisma/onboarding-definitions.seed.ts",
+    "repair:onboarding-progress": "tsx prisma/repair-onboarding-progress.ts",
     "repair": "tsx prisma/repair.ts",
     "backfill:tap-upgrade": "tsx prisma/backfill-tap-upgrade.ts",
     "backfill:pop-upgrade": "tsx prisma/backfill-pop-upgrade.ts",
