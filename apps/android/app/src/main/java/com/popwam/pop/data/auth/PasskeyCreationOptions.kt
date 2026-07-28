@@ -31,16 +31,17 @@ internal fun validatePasskeyCreationOptions(options:JsonObject,expectedRpId:Stri
         val milliseconds=timeout.asDouble
         if(!milliseconds.isFinite()||milliseconds<0||milliseconds!=milliseconds.toLong().toDouble())return invalid("timeout_invalid")
     }
-    options.objectAt("authenticatorSelection")?.let { selection->
+    val selection=options.objectAt("authenticatorSelection") ?: return invalid("authenticator_selection_missing")
+    selection.let {
         val resident=selection.stringAt("residentKey")
         if(resident!=null&&resident !in setOf("required","preferred","discouraged"))return invalid("resident_key_invalid")
         val requireResident=selection.get("requireResidentKey")
         if(requireResident!=null&&(!requireResident.isJsonPrimitive||!requireResident.asJsonPrimitive.isBoolean))return invalid("require_resident_key_invalid")
-        if(requireResident?.asBoolean==true&&resident!=null&&resident!="required")return invalid("resident_key_conflict")
+        if(resident!="required"||requireResident?.asBoolean!=true)return invalid("discoverable_passkey_required")
         val verification=selection.stringAt("userVerification")
-        if(verification!=null&&verification !in setOf("required","preferred","discouraged"))return invalid("user_verification_invalid")
+        if(verification!="required")return invalid("user_verification_required")
         val attachment=selection.stringAt("authenticatorAttachment")
-        if(attachment!=null&&attachment !in setOf("platform","cross-platform"))return invalid("authenticator_attachment_invalid")
+        if(attachment!=null)return invalid("authenticator_attachment_not_neutral")
     }
     options.stringAt("attestation")?.let { if(it !in setOf("none","indirect","direct","enterprise"))return invalid("attestation_invalid") }
     options.arrayAt("excludeCredentials")?.let { credentials->if(credentials.any { credential->

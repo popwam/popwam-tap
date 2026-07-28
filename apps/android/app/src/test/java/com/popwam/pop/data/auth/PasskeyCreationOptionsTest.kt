@@ -12,7 +12,7 @@ class PasskeyCreationOptionsTest {
         add("rp",JsonObject().apply { addProperty("id","pop.popwam.com");addProperty("name","POP by POPWAM") })
         add("user",JsonObject().apply { addProperty("id","dXNlci0x");addProperty("name","user");addProperty("displayName","POP user") })
         add("pubKeyCredParams",JsonArray().apply { add(JsonObject().apply { addProperty("type","public-key");addProperty("alg",-7) }) })
-        add("authenticatorSelection",JsonObject().apply { addProperty("residentKey","preferred");addProperty("userVerification","required") })
+        add("authenticatorSelection",JsonObject().apply { addProperty("residentKey","required");addProperty("requireResidentKey",true);addProperty("userVerification","required") })
         addProperty("attestation","none")
     }
     @Test fun `raw server creation options are structurally valid for Credential Manager`() {
@@ -26,9 +26,9 @@ class PasskeyCreationOptionsTest {
         val options=validOptions();options.getAsJsonObject("user").addProperty("id","not base64url")
         assertEquals("user_id_invalid",validatePasskeyCreationOptions(options,"pop.popwam.com").classification)
     }
-    @Test fun `conflicting resident key options are rejected`() {
-        val options=validOptions();options.getAsJsonObject("authenticatorSelection").addProperty("requireResidentKey",true)
-        assertEquals("resident_key_conflict",validatePasskeyCreationOptions(options,"pop.popwam.com").classification)
+    @Test fun `non discoverable creation options are rejected`() {
+        val options=validOptions();options.getAsJsonObject("authenticatorSelection").addProperty("residentKey","preferred")
+        assertEquals("discoverable_passkey_required",validatePasskeyCreationOptions(options,"pop.popwam.com").classification)
     }
     @Test fun `platform DOM errors retain only their safe category`() {
         assertEquals("security_error",passkeyDomErrorClassification("SecurityError"))

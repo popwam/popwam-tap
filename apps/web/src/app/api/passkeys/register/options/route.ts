@@ -1,4 +1,4 @@
-import { generateRegistrationOptions } from "@simplewebauthn/server";
+import { generateRegistrationOptions, type PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/server";
 import { prisma } from "@popwam/db";
 import { csrfRejected, getCurrentPopSessionContext, isTrustedPopMutation, unauthorized } from "@/lib/api-auth";
 import { passkeyChallengeHash, passkeyConfig } from "@/lib/passkeys";
@@ -7,6 +7,18 @@ import { consumeStepUpGrant, StepUpRequiredError, stepUpGrantFromRequest } from 
 
 const safeExceptionName = (error: unknown) => error instanceof Error ? error.name.slice(0, 80) : "UnknownError";
 const runtime = (stage: string, fields: Record<string, string | boolean>) => console.info("PopAuthRuntime", { stage, ...fields });
+const passkeyAlgorithms = [-7, -8, -257] as const;
+
+/**
+ * SimpleWebAuthn 13.3.2 unconditionally emits credProps. POP requires discoverable
+ * credentials, so it has no registration-policy decision to make from that extension.
+ * Keep the shared server contract minimal; clients receive this unchanged.
+ */
+const withoutUnneededCreationExtensions = (options: PublicKeyCredentialCreationOptionsJSON): PublicKeyCredentialCreationOptionsJSON => {
+  const { credProps: _credProps, ...remainingExtensions } = options.extensions || {};
+  const { extensions: _extensions, ...rest } = options;
+  return Object.keys(remainingExtensions).length ? { ...rest, extensions: remainingExtensions } : rest;
+};
 
 export async function POST(request: Request) {
   if (!isTrustedPopMutation(request)) return csrfRejected();
@@ -18,16 +30,18 @@ export async function POST(request: Request) {
     where: { userId: context.user.id, revokedAt: null },
     select: { credentialId: true, transports: true },
   });
-  const options = await generateRegistrationOptions({
+  const generatedOptions = await generateRegistrationOptions({
     rpName: config.rpName,
     rpID: config.rpID,
     userID: Buffer.from(context.user.id),
     userName: context.user.name || context.user.email,
     userDisplayName: context.user.name || "POP user",
     attestationType: "none",
-    authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+    authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
+    supportedAlgorithmIDs: [...passkeyAlgorithms],
     excludeCredentials: existing.map(item => ({ id: item.credentialId, transports: item.transports as never })),
   });
+  const options = withoutUnneededCreationExtensions(generatedOptions);
   const eligibility = passkeyRegistrationEligibility({
     activePasskeyCount: existing.length,
     authMethod: context.authMethod,

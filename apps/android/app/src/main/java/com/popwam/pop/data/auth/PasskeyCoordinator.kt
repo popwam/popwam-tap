@@ -23,6 +23,7 @@ class PasskeyCoordinator(context:Context) {
             val options=JsonParser.parseString(creationOptionsJson).asJsonObject
             val validation=validatePasskeyCreationOptions(options,URI(BuildConfig.API_BASE_URL).host)
             AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_OPTIONS_VALIDATION,passkeyOptionsValidationOutcome(options,validation.valid))
+            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_CREATE_ENVIRONMENT,passkeyCreateEnvironmentOutcome(activity,options))
             check(validation.valid) { "PASSKEY_CREATION_OPTIONS_INVALID" }
             val result=manager.createCredential(activity,CreatePublicKeyCredentialRequest(creationOptionsJson))
             val response=(result as CreatePublicKeyCredentialResponse).registrationResponseJson
@@ -30,6 +31,7 @@ class PasskeyCoordinator(context:Context) {
             response
         } catch(error:CreatePublicKeyCredentialDomException) {
             val domError=error.domError.javaClass.simpleName
+            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_CREATE_ENVIRONMENT,"provider_available_response_received")
             AuthRuntimeDiagnostics.domFailure(AuthRuntimeStage.PASSKEY_CREATE_RESULT,error,domError,passkeyDomErrorClassification(domError))
             throw error
         } catch(error:Throwable) {
@@ -53,12 +55,22 @@ class PasskeyCoordinator(context:Context) {
 }
 
 internal fun passkeyDomErrorClassification(domError:String)=when(domError) {
+    "DataError" -> "data_error"
     "SecurityError" -> "security_error"
     "NotAllowedError" -> "not_allowed"
     "InvalidStateError" -> "invalid_state"
     "NotSupportedError" -> "not_supported"
     "UnknownError" -> "unknown_error"
     else -> "other_dom_error"
+}
+
+/** Safe, local-only facts. DAL network verification stays external because the app must not trust a self-check. */
+internal fun passkeyCreateEnvironmentOutcome(context:Context,options:com.google.gson.JsonObject):String {
+    val manifestAssociationPresent=context.resources.getIdentifier("asset_statements","string",context.packageName)!=0
+    val extensions=options.getAsJsonObject("extensions")
+    val selection=options.getAsJsonObject("authenticatorSelection")
+    val eddsa=options.getAsJsonArray("pubKeyCredParams")?.any { it.asJsonObject.get("alg")?.asInt == -8 } ?: false
+    return "manifest_association_present_${manifestAssociationPresent}_dal_configuration_not_runtime_verified_credential_manager_version_${BuildConfig.CREDENTIAL_MANAGER_VERSION}_provider_available_pending_request_credprops_${extensions?.has("credProps")==true}_timeout_${options.has("timeout")}_require_resident_${selection?.has("requireResidentKey")==true}_eddsa_${eddsa}"
 }
 
 internal fun passkeyOptionsValidationOutcome(options:com.google.gson.JsonObject,valid:Boolean):String {

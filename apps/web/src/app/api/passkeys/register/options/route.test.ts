@@ -64,14 +64,38 @@ describe("passkey registration options", () => {
     mocks.createChallenge.mockResolvedValue({ id: "challenge" });
     mocks.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => callback({ passkeyChallenge: { create: mocks.createChallenge } }));
     mocks.consumeStepUpGrant.mockResolvedValue({});
-    mocks.generateOptions.mockResolvedValue({ challenge: "not-logged", rp: { id: "pop.example" }, user: { id: "not-logged" }, pubKeyCredParams: [] });
+    mocks.generateOptions.mockResolvedValue({
+      challenge: "not-logged",
+      rp: { id: "pop.example" },
+      user: { id: "not-logged" },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+      authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
+      extensions: { credProps: true },
+    });
   });
 
   it("permits fresh OTP first-passkey registration without step-up", async () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+    });
+    expect(mocks.generateOptions).toHaveBeenCalledWith(expect.objectContaining({
+      authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
+      supportedAlgorithmIDs: [-7, -8, -257],
+      userID: Buffer.from("user-not-logged"),
+    }));
     expect(mocks.consumeStepUpGrant).not.toHaveBeenCalled();
     expect(mocks.createChallenge).toHaveBeenCalledOnce();
+  });
+
+  it("returns the canonical provider-neutral options without credProps rewriting on Android", async () => {
+    const response = await POST(request());
+    const options = await response.json();
+    expect(options.extensions).toBeUndefined();
+    expect(options.authenticatorSelection.authenticatorAttachment).toBeUndefined();
+    expect(options.user.id).toBe("not-logged");
   });
 
   it("returns 428 only when a stale session cannot satisfy ADD_PASSKEY step-up", async () => {

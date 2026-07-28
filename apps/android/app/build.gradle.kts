@@ -24,6 +24,7 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "PUBLIC_BASE_URL", "\"$publicBaseUrl\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
+        buildConfigField("String", "CREDENTIAL_MANAGER_VERSION", "\"1.5.0\"")
         buildConfigField("Boolean", "FIREBASE_RUNTIME_ENABLED", firebaseAndroidIntegrationEnabled.toString())
         vectorDrawables { useSupportLibrary = true }
     }
