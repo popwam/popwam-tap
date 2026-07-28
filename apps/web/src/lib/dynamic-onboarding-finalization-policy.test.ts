@@ -61,8 +61,9 @@ describe("dynamic onboarding finalization gate", () => {
   it("keeps mappings and completion inside one Prisma transaction", () => {
     const source = readFileSync(new URL("./dynamic-onboarding.ts", import.meta.url), "utf8");
     const completion = source.slice(source.indexOf("export async function completeDynamicOnboarding"));
+    const transactional = source.slice(source.indexOf("async function completeDynamicOnboardingInTransaction"));
     expect(completion).toContain("prisma.$transaction");
-    expect(completion.indexOf("await applyMapping")).toBeGreaterThan(completion.indexOf("prisma.$transaction"));
-    expect(completion.indexOf("const completedAt")).toBeGreaterThan(completion.indexOf("await applyMapping"));
+    expect(transactional.indexOf("await applyMapping")).toBeGreaterThan(transactional.indexOf("SELECT \"id\" FROM \"OnboardingProgress\""));
+    expect(transactional.indexOf("const completedAt")).toBeGreaterThan(transactional.indexOf("await applyMapping"));
   });
 });

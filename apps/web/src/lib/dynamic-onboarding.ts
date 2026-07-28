@@ -61,6 +61,9 @@ const record = (value: unknown): Record<string, unknown> =>
 
 const answersFrom = (value: unknown): OnboardingAnswers => record(value) as OnboardingAnswers;
 
+const hasAnswer = (value: OnboardingAnswers[string] | undefined) =>
+  value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length > 0);
+
 export function serializeOnboardingDefinition(definition: DefinitionRecord, locale: Locale): OnboardingDefinitionContract {
   return {
     id: definition.id,
@@ -340,6 +343,56 @@ async function ensureModuleForMapping(
   });
 }
 
+/**
+ * A step is a UI grouping, while moduleDefinition is the installable domain
+ * capability.  Resolve the latter only from answered questions; never from a
+ * step key or from an empty optional step.
+ */
+export function desiredOnboardingModules(
+  definition: DefinitionRecord,
+  answers: OnboardingAnswers,
+) {
+  const byId = new Map<string, NonNullable<DefinitionRecord["steps"][number]["moduleDefinition"]>>();
+  for (const step of definition.steps) {
+    if (!step.moduleDefinition || !step.questions.some((question) => hasAnswer(answers[question.key]))) continue;
+    byId.set(step.moduleDefinition.id, step.moduleDefinition);
+  }
+  return [...byId.values()];
+}
+
+async function validateDesiredOnboardingModules(
+  tx: Transaction,
+  profile: { id: string; templateId: string | null },
+  desiredModules: ReturnType<typeof desiredOnboardingModules>,
+) {
+  if (!desiredModules.length) return;
+  const moduleIds = desiredModules.map((module) => module.id);
+  const [installed, rules] = await Promise.all([
+    tx.profileModule.findMany({
+      where: { profileId: profile.id, moduleDefinitionId: { in: moduleIds }, instanceKey: "default" },
+      select: { moduleDefinitionId: true },
+    }),
+    profile.templateId
+      ? tx.profileTemplateModule.findMany({
+        where: { templateId: profile.templateId, moduleDefinitionId: { in: moduleIds } },
+        select: { moduleDefinitionId: true, allowed: true },
+      })
+      : Promise.resolve([]),
+  ]);
+  const installedIds = new Set(installed.map((module) => module.moduleDefinitionId));
+  const rulesByModuleId = new Map(rules.map((rule) => [rule.moduleDefinitionId, rule]));
+  for (const moduleDefinition of desiredModules) {
+    if (!onboardingModuleCompatible({
+      templateSelected: Boolean(profile.templateId),
+      moduleKey: moduleDefinition.key,
+      moduleAlreadyEnabled: installedIds.has(moduleDefinition.id),
+      explicitTemplateRule: rulesByModuleId.get(moduleDefinition.id),
+    })) {
+      throw new OnboardingError("ONBOARDING_MODULE_INCOMPATIBLE", 409);
+    }
+  }
+}
+
 const textAnswer = (answers: OnboardingAnswers, key: string) => {
   const value = answers[key];
   return typeof value === "string" ? value.trim() : "";
@@ -359,7 +412,7 @@ async function applyMapping(
   for (const step of input.definition.steps) {
     for (const question of step.questions) {
       const answer = input.answers[question.key];
-      if (answer === undefined || answer === null || answer === "" || (Array.isArray(answer) && !answer.length)) continue;
+      if (!hasAnswer(answer)) continue;
       await ensureModuleForMapping(tx, input.profile, step.moduleDefinition);
       const value = textAnswer(input.answers, question.key);
       const initialValue = textAnswer(input.initialAnswers, question.key);
@@ -500,12 +553,11 @@ async function applyMapping(
   }
 }
 
-export async function completeDynamicOnboarding(input: {
+async function completeDynamicOnboardingInTransaction(tx: Transaction, input: {
   userId: string;
   locale: Locale;
   revision: number;
 }) {
-  return prisma.$transaction(async (tx) => {
     await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "OnboardingProgress" WHERE "userId" = ${input.userId} FOR UPDATE`);
     const progress = await tx.onboardingProgress.findUnique({
       where: { userId: input.userId },
@@ -541,6 +593,8 @@ export async function completeDynamicOnboarding(input: {
     const contract = serializeOnboardingDefinition(progress.definition, input.locale);
     const errors = validateAnswerPayload(contract, answers, { complete: true });
     if (hasValidationErrors(errors)) throw new OnboardingError("ONBOARDING_VALIDATION_FAILED", 422, errors);
+    const desiredModules = desiredOnboardingModules(progress.definition, answers);
+    await validateDesiredOnboardingModules(tx, progress.profile, desiredModules);
     await applyMapping(tx, {
       userId: input.userId,
       locale: input.locale,
@@ -575,5 +629,17 @@ export async function completeDynamicOnboarding(input: {
       draftAnswers: {},
       completedAt,
     }, input.locale);
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
+
+export async function completeDynamicOnboarding(input: {
+  userId: string;
+  locale: Locale;
+  revision: number;
+}) {
+  return prisma.$transaction(
+    (tx) => completeDynamicOnboardingInTransaction(tx, input),
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
+}
+
+export { completeDynamicOnboardingInTransaction };
