@@ -278,7 +278,7 @@ class AuthViewModel(
                     if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.DYNAMIC_ONBOARDING)
                 }.onFailure { error->
                     if(fromPasskeySkip)passkeySkipRouteFailure(error,(error as? HttpException)?.code())
-                    else _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_START_FAILED")
+                    else _state.value=_state.value.copy(setupStage=AuthSetupStage.ONBOARDING_UNAVAILABLE,error="ONBOARDING_START_FAILED")
                 }
                 "ONBOARDING_IN_PROGRESS" -> {
                     analytics.track("onboarding_resumed",mapOf("platform" to "android","definition_version" to (current.definition?.version?.toString() ?: "0")))
@@ -291,14 +291,15 @@ class AuthViewModel(
                 }
                 else -> {
                     if(fromPasskeySkip)passkeySkipRouteFailure(safeError="ONBOARDING_STATUS_UNAVAILABLE")
-                    else _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_STATUS_UNAVAILABLE")
+                    else _state.value=_state.value.copy(setupStage=AuthSetupStage.ONBOARDING_UNAVAILABLE,error="ONBOARDING_STATUS_UNAVAILABLE")
                 }
             }
         }.onFailure { error->
             if(fromPasskeySkip)passkeySkipRouteFailure(error,(error as? HttpException)?.code())
-            else _state.value=_state.value.copy(setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error="ONBOARDING_STATUS_UNAVAILABLE")
+            else _state.value=_state.value.copy(setupStage=AuthSetupStage.ONBOARDING_UNAVAILABLE,error="ONBOARDING_STATUS_UNAVAILABLE")
         }
     }
+    fun retryOnboarding(locale:String)=refreshDynamicOnboarding(locale)
 
     fun setOnboardingAnswer(key:String,value:com.google.gson.JsonElement) {
         val current=_state.value.onboarding ?: return

@@ -37,6 +37,7 @@ fun PhaseCSetupScreen(state:AuthUiState, auth:AuthViewModel, locale:String) {
     when (state.setupStage) {
         AuthSetupStage.AUTHENTICATED_CHECKING -> SetupLoading(state,auth, locale)
         AuthSetupStage.SETUP_UNAVAILABLE -> SetupLoading(state.copy(error=state.error ?: "SETUP_STATUS_UNAVAILABLE"),auth,locale)
+        AuthSetupStage.ONBOARDING_UNAVAILABLE -> OnboardingUnavailable(auth,locale)
         AuthSetupStage.LEGAL_REQUIRED -> LegalConsentScreen(state, auth, locale)
         AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED -> ProfileBootstrapScreen(state, auth, locale)
         AuthSetupStage.PASSKEY_OFFER -> PasskeyOfferScreen(auth, locale)
@@ -45,6 +46,12 @@ fun PhaseCSetupScreen(state:AuthUiState, auth:AuthViewModel, locale:String) {
         AuthSetupStage.LEGACY_COMPATIBILITY -> LegacyCompatibilityScreen(auth)
         else -> SetupLoading(state,auth, locale)
     }
+}
+
+@Composable private fun OnboardingUnavailable(auth:AuthViewModel,locale:String)=SetupPage {
+    Text("We couldn't load your profile setup.",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black)
+    Text("Your account is signed in. Please try loading profile setup again.")
+    TextButton({auth.retryOnboarding(locale)}){Text(stringResource(R.string.retry))}
 }
 
 @Composable private fun SetupPage(content:@Composable ColumnScope.()->Unit) {

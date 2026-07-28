@@ -50,7 +50,11 @@ class AuthSetupRepository(private val api:PopwamApi) {
     suspend fun existingPasskeyAssertionOptions()=api.stepUpOptions(StepUpRequest("ADD_PASSKEY","PASSKEY")).options ?: throw IllegalStateException("PASSKEY_OPTIONS_INVALID")
     suspend fun verifyExistingPasskeyAssertion(assertion:JsonObject)=api.verifyStepUp(StepUpRequest("ADD_PASSKEY","PASSKEY",assertion=assertion))
     suspend fun saveOnboarding(body:OnboardingProgressRequest)=api.saveOnboarding(body)
-    suspend fun completeOnboarding(locale:String,revision:Int)=api.completeOnboarding(OnboardingCompleteRequest(locale,revision))
+    suspend fun completeOnboarding(locale:String,revision:Int):OnboardingCurrentResponse {
+        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ONBOARDING_COMPLETE_REQUEST)
+        return try { api.completeOnboarding(OnboardingCompleteRequest(locale,revision)).also { AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ONBOARDING_COMPLETE_RESPONSE,"success_http_200") } }
+        catch(error:HttpException) { AuthRuntimeDiagnostics.failure(AuthRuntimeStage.ONBOARDING_COMPLETE_RESPONSE,error,error.code(),safeOnboardingErrorCode(error.response()?.errorBody()?.string()));throw error }
+    }
     suspend fun uploadOnboardingImage(profileId:String,name:String,mime:String,bytes:ByteArray)=api.uploadDraftMedia(profileId,"ONBOARDING_IMAGE".toRequestBody("text/plain".toMediaTypeOrNull()),MultipartBody.Part.createFormData("file",name,bytes.toRequestBody(mime.toMediaTypeOrNull())))
     suspend fun passkeyOptions():JsonObject {
         AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_REGISTER_OPTIONS_REQUEST)
