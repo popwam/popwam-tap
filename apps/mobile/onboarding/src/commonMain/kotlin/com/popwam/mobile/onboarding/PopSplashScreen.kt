@@ -1,7 +1,6 @@
 package com.popwam.mobile.onboarding
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -26,9 +24,7 @@ import com.popwam.mobile.designsystem.PopIdentityStyle
 import com.popwam.mobile.designsystem.popSemanticColors
 import com.popwam.mobile.onboarding.generated.resources.Res
 import com.popwam.mobile.onboarding.generated.resources.pop_logo_description
-import com.popwam.mobile.onboarding.generated.resources.pop_mark
 import com.popwam.mobile.onboarding.generated.resources.splash_go_ahead
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -48,10 +44,9 @@ fun PopSplashScreen(
             SplashStage.FOUR -> SplashLogoBounds(92, 327, 207, 238)
             SplashStage.FIVE -> SplashLogoBounds(93, 188, 207, 238)
         }
-        Image(
-            painter = painterResource(Res.drawable.pop_mark),
+        PopMarkVector(
+            color = if (stage >= SplashStage.THREE) colors.textInverse else colors.brandPrimary,
             contentDescription = stringResource(Res.string.pop_logo_description),
-            colorFilter = ColorFilter.tint(if (stage >= SplashStage.THREE) colors.textInverse else colors.brandPrimary),
             modifier = Modifier
                 .offset(logoBounds.x.dp, logoBounds.y.dp)
                 .size(logoBounds.width.dp, logoBounds.height.dp),

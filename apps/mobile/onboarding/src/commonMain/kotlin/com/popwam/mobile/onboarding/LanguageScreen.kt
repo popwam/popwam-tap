@@ -1,6 +1,5 @@
 package com.popwam.mobile.onboarding
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +15,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -34,9 +32,7 @@ import com.popwam.mobile.onboarding.generated.resources.language_selected
 import com.popwam.mobile.onboarding.generated.resources.language_title_ar
 import com.popwam.mobile.onboarding.generated.resources.language_title_en
 import com.popwam.mobile.onboarding.generated.resources.pop_logo_description
-import com.popwam.mobile.onboarding.generated.resources.pop_mark
 import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -50,10 +46,9 @@ fun LanguageScreen(
     val supported = listOf("en", "ar", "fr").filter { it in availableLanguageTags }
         .ifEmpty { listOf("en", "ar") }
     ReferenceFrame(modifier.background(colors.backgroundPrimary)) {
-        Image(
-            painter = painterResource(Res.drawable.pop_mark),
+        PopMarkVector(
+            color = colors.brandPrimary,
             contentDescription = stringResource(Res.string.pop_logo_description),
-            colorFilter = ColorFilter.tint(colors.brandPrimary),
             modifier = Modifier.offset(102.dp, 95.dp).size(190.dp, 218.dp),
         )
         Column(

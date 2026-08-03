@@ -1,6 +1,5 @@
 package com.popwam.mobile.onboarding
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -39,7 +38,6 @@ import com.popwam.mobile.onboarding.generated.resources.palette_selected
 import com.popwam.mobile.onboarding.generated.resources.palette_solar
 import com.popwam.mobile.onboarding.generated.resources.palette_violet
 import com.popwam.mobile.onboarding.generated.resources.pop_logo_description
-import com.popwam.mobile.onboarding.generated.resources.pop_mark
 import com.popwam.mobile.onboarding.generated.resources.theme_continue
 import com.popwam.mobile.onboarding.generated.resources.theme_dark
 import com.popwam.mobile.onboarding.generated.resources.theme_light
@@ -47,9 +45,7 @@ import com.popwam.mobile.onboarding.generated.resources.theme_style
 import com.popwam.mobile.onboarding.generated.resources.theme_subtitle
 import com.popwam.mobile.onboarding.generated.resources.theme_system
 import com.popwam.mobile.onboarding.generated.resources.theme_title
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -67,10 +63,9 @@ fun ThemeScreen(
 ) {
     val colors = LocalPopSemanticColors.current
     ReferenceFrame(modifier.background(colors.backgroundPrimary)) {
-        Image(
-            painter = painterResource(Res.drawable.pop_mark),
+        PopMarkVector(
+            color = colors.brandPrimary,
             contentDescription = stringResource(Res.string.pop_logo_description),
-            colorFilter = ColorFilter.tint(colors.brandPrimary),
             modifier = Modifier.offset(107.dp, 68.dp).size(180.dp, 218.dp),
         )
         Column(Modifier.offset(27.dp, 363.dp).size(342.dp, 59.dp)) {
@@ -97,10 +92,9 @@ fun ThemeScreen(
                         }
                         .clickable { onSelectMode(mode) },
                 ) {
-                    Image(
-                        painter = painterResource(choice.icon),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(if (active) colors.onBrand else colors.textPrimary),
+                    ThemeModeVector(
+                        mode = mode,
+                        color = if (active) colors.onBrand else colors.textPrimary,
                         modifier = Modifier.size(48.dp),
                     )
                 }
@@ -169,10 +163,9 @@ private fun ThemeGallery(
                     .padding(horizontal = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Image(
-                    painterResource(Res.drawable.pop_mark),
-                    null,
-                    colorFilter = ColorFilter.tint(if (active) palette.soft else palette.primary),
+                PopMarkVector(
+                    color = if (active) palette.soft else palette.primary,
+                    contentDescription = null,
                     modifier = Modifier.size(42.dp, 48.dp),
                 )
                 Text(
@@ -191,12 +184,21 @@ private fun ThemeGallery(
     )
 }
 
-private data class ModeChoice(val icon: DrawableResource, val label: StringResource)
+@Composable
+private fun ThemeModeVector(mode: ThemeMode, color: Color, modifier: Modifier) {
+    when (mode) {
+        ThemeMode.SYSTEM -> ThemeSystemVector(color, modifier)
+        ThemeMode.LIGHT -> ThemeLightVector(color, modifier)
+        ThemeMode.DARK -> ThemeDarkVector(color, modifier)
+    }
+}
+
+private data class ModeChoice(val label: StringResource)
 
 private fun modeChoice(mode: ThemeMode): ModeChoice = when (mode) {
-    ThemeMode.SYSTEM -> ModeChoice(Res.drawable.theme_system, Res.string.theme_system)
-    ThemeMode.LIGHT -> ModeChoice(Res.drawable.theme_light, Res.string.theme_light)
-    ThemeMode.DARK -> ModeChoice(Res.drawable.theme_dark, Res.string.theme_dark)
+    ThemeMode.SYSTEM -> ModeChoice(Res.string.theme_system)
+    ThemeMode.LIGHT -> ModeChoice(Res.string.theme_light)
+    ThemeMode.DARK -> ModeChoice(Res.string.theme_dark)
 }
 
 private val galleryOrder = listOf(

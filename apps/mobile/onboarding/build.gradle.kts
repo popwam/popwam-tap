@@ -59,3 +59,25 @@ compose.resources {
     publicResClass = true
     packageOfResClass = "com.popwam.mobile.onboarding.generated.resources"
 }
+
+val verifyAndroidSafeOnboardingResources by tasks.registering {
+    val drawableResources = layout.projectDirectory.dir("src/commonMain/composeResources/drawable")
+    inputs.dir(drawableResources)
+    doLast {
+        val unsupported = drawableResources.asFile
+            .walkTopDown()
+            .filter { it.isFile && it.extension.equals("svg", ignoreCase = true) }
+            .map { it.relativeTo(projectDir).invariantSeparatorsPath }
+            .sorted()
+            .toList()
+        check(unsupported.isEmpty()) {
+            "Android onboarding cannot load SVG through Compose Multiplatform painterResource. " +
+                "Convert these resources to shared Canvas/ImageVector geometry or an Android-safe raster: " +
+                unsupported.joinToString()
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(verifyAndroidSafeOnboardingResources)
+}

@@ -24,7 +24,7 @@ import com.popwam.mobile.onboarding.WelcomeScreen
 import com.popwam.pop.ui.theme.popFontFamilies
 import java.io.File
 import java.io.FileOutputStream
-import org.junit.After
+import org.junit.AfterClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,8 +33,12 @@ import org.junit.runner.RunWith
 class Phase3ScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    @After fun restoreLocale() {
-        AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+    companion object {
+        @JvmStatic
+        @AfterClass
+        fun restoreLocale() {
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+        }
     }
 
     @Test fun firstSplashStage() = capture("splash-stage-1", "en", ThemeMode.LIGHT) {
@@ -89,13 +93,17 @@ class Phase3ScreenshotTest {
         content: @androidx.compose.runtime.Composable () -> Unit,
     ) {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language))
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         compose.setContent {
             Phase3OnboardingTheme(mode, IdentityPalette.MINT, isSystemInDarkTheme(), language, popFontFamilies(), content)
         }
         compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val directory = File(context.cacheDir, "phase3-screenshots").apply { mkdirs() }
+        val directory = File(
+            requireNotNull(context.getExternalFilesDir(null)) { "External test output directory unavailable" },
+            "phase3-screenshots",
+        ).apply { mkdirs() }
         FileOutputStream(File(directory, "$name.png")).use {
             check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }

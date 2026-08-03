@@ -25,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -50,7 +49,6 @@ import com.popwam.mobile.onboarding.generated.resources.Res
 import com.popwam.mobile.onboarding.generated.resources.all_in_one_art_description
 import com.popwam.mobile.onboarding.generated.resources.all_in_one_body
 import com.popwam.mobile.onboarding.generated.resources.all_in_one_title
-import com.popwam.mobile.onboarding.generated.resources.chevron
 import com.popwam.mobile.onboarding.generated.resources.get_started_art_description
 import com.popwam.mobile.onboarding.generated.resources.get_started_body
 import com.popwam.mobile.onboarding.generated.resources.get_started_title
@@ -67,11 +65,9 @@ import com.popwam.mobile.onboarding.generated.resources.personal_business_art_de
 import com.popwam.mobile.onboarding.generated.resources.personal_business_body
 import com.popwam.mobile.onboarding.generated.resources.personal_business_title
 import com.popwam.mobile.onboarding.generated.resources.pop_logo_description
-import com.popwam.mobile.onboarding.generated.resources.pop_mark
 import com.popwam.mobile.onboarding.generated.resources.share_your_way_art_description
 import com.popwam.mobile.onboarding.generated.resources.share_your_way_body
 import com.popwam.mobile.onboarding.generated.resources.share_your_way_title
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -145,10 +141,9 @@ private fun WelcomePageContent(
                 }
             }
         }
-        Image(
-            painterResource(Res.drawable.pop_mark),
-            stringResource(Res.string.pop_logo_description),
-            colorFilter = ColorFilter.tint(colors.brandPrimary),
+        PopMarkVector(
+            color = colors.brandPrimary,
+            contentDescription = stringResource(Res.string.pop_logo_description),
             modifier = Modifier.offset(307.dp, 36.dp).size(70.dp, 85.dp),
         )
         if (page != WelcomePage.GET_STARTED) {
@@ -250,10 +245,8 @@ internal fun PrimaryAction(text: String, onClick: () -> Unit, modifier: Modifier
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(text, color = colors.onBrand, fontSize = 24.sp, lineHeight = 29.sp, fontWeight = FontWeight.Medium)
-            Image(
-                painterResource(Res.drawable.chevron),
-                null,
-                colorFilter = ColorFilter.tint(colors.onBrand),
+            ChevronVector(
+                color = colors.onBrand,
                 modifier = Modifier.offset(x = if (rtl) (-82).dp else 82.dp).size(24.dp).graphicsLayer(scaleX = if (rtl) -1f else 1f),
             )
         }
