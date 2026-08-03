@@ -83,8 +83,8 @@ class FirstLaunchAndroidContractTest {
 
     @Test fun `typography is centrally script aware`() {
         val theme=source("src/main/java/com/popwam/pop/ui/theme/Theme.kt")
-        assertTrue(theme.contains("if(arabic) Cairo else ABeeZee"))
+        assertTrue(theme.contains("if(arabic) Cairo else Montserrat"))
         assertTrue(theme.contains("R.font.cairo"))
-        assertTrue(theme.contains("R.font.abeezee"))
+        assertTrue(theme.contains("R.font.montserrat"))
     }
 }

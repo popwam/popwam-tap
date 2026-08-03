@@ -36,7 +36,7 @@ private fun resolveColors(identity:PopIdentity,dark:Boolean):Pair<ColorScheme,Po
 }
 
 private val Cairo=FontFamily(Font(R.font.cairo,FontWeight.Normal),Font(R.font.cairo,FontWeight.Medium),Font(R.font.cairo,FontWeight.Bold),Font(R.font.cairo,FontWeight.Black))
-private val ABeeZee=FontFamily(Font(R.font.abeezee,FontWeight.Normal))
+private val Montserrat=FontFamily(Font(R.font.montserrat,FontWeight.Normal),Font(R.font.montserrat,FontWeight.Medium),Font(R.font.montserrat,FontWeight.SemiBold),Font(R.font.montserrat,FontWeight.Bold),Font(R.font.montserrat,FontWeight.Black))
 private val Base=Typography()
 private fun typography(font:FontFamily)=Typography(displayLarge=Base.displayLarge.copy(fontFamily=font),displayMedium=Base.displayMedium.copy(fontFamily=font),displaySmall=Base.displaySmall.copy(fontFamily=font),headlineLarge=Base.headlineLarge.copy(fontFamily=font),headlineMedium=Base.headlineMedium.copy(fontFamily=font),headlineSmall=Base.headlineSmall.copy(fontFamily=font),titleLarge=Base.titleLarge.copy(fontFamily=font),titleMedium=Base.titleMedium.copy(fontFamily=font),titleSmall=Base.titleSmall.copy(fontFamily=font),bodyLarge=Base.bodyLarge.copy(fontFamily=font),bodyMedium=Base.bodyMedium.copy(fontFamily=font),bodySmall=Base.bodySmall.copy(fontFamily=font),labelLarge=Base.labelLarge.copy(fontFamily=font),labelMedium=Base.labelMedium.copy(fontFamily=font),labelSmall=Base.labelSmall.copy(fontFamily=font))
 
@@ -44,5 +44,5 @@ private fun typography(font:FontFamily)=Typography(displayLarge=Base.displayLarg
     val dark=when(themeMode){"DARK"->true;"LIGHT"->false;else->isSystemInDarkTheme()}
     val (scheme,semantic)=resolveColors(PopIdentity.from(identityTheme),dark)
     val arabic=com.popwam.pop.ui.LocalePolicy.isRtl(com.popwam.pop.ui.currentLocale())
-    CompositionLocalProvider(LocalPopColors provides semantic) { MaterialTheme(colorScheme=scheme,typography=typography(if(arabic) Cairo else ABeeZee),shapes=Shapes(small=RoundedCornerShape(14.dp),medium=RoundedCornerShape(24.dp),large=RoundedCornerShape(32.dp)),content=content) }
+    CompositionLocalProvider(LocalPopColors provides semantic) { MaterialTheme(colorScheme=scheme,typography=typography(if(arabic) Cairo else Montserrat),shapes=Shapes(small=RoundedCornerShape(14.dp),medium=RoundedCornerShape(24.dp),large=RoundedCornerShape(32.dp)),content=content) }
 }

@@ -43,6 +43,8 @@ android {
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.06.00")
     implementation(composeBom)
+    implementation("com.popwam.mobile:foundation:0.1.0")
+    implementation("com.popwam.mobile:design-system:0.1.0")
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-compose:1.11.0")
