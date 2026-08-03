@@ -21,6 +21,14 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import com.popwam.mobile.authentication.KtorAuthenticationRemoteDataSource
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.header
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
 
 class TapApplication:Application(){lateinit var container:AppContainer;override fun onCreate(){super.onCreate();LocalizationAuthorityStore.configureCachedPolicy(this);val selected=AndroidLaunchStatePersistence.peekSelectedLanguage(this);if(selected!=null&&selected in com.popwam.pop.ui.LocalePolicy.availableLocales())applyPopLanguage(selected) else applyPopLanguage(com.popwam.pop.ui.LocalePolicy.resolve(null,""));container=AppContainer(this)}}
 class AppContainer(application:Application){
@@ -44,6 +52,13 @@ class AppContainer(application:Application){
     val pushTokens=FcmTokenBridge(application,api,sessions)
     val analytics=FirebasePopAnalytics(application)
     val firebasePhoneAuth=AndroidFirebasePhoneAuthGateway()
+    private val authenticationHttpClient=HttpClient(OkHttp) {
+        expectSuccess=false
+        defaultRequest { header("X-POP-App-Version",BuildConfig.VERSION_NAME.take(32)) }
+        install(ContentNegotiation) { json(Json { ignoreUnknownKeys=true;encodeDefaults=true }) }
+        engine { config { connectTimeout(15,TimeUnit.SECONDS);readTimeout(30,TimeUnit.SECONDS) } }
+    }
+    val authenticationRemote=KtorAuthenticationRemoteDataSource(authenticationHttpClient,BuildConfig.API_BASE_URL)
     init { sessions.setLifecycleHooks({
         // POP OTP persistence has already completed. Supplementary work must not delay setup routing.
         lifecycleScope.launch {

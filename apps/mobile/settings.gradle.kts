@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "POPMobile"
-include(":foundation", ":design-system", ":onboarding")
+include(":foundation", ":design-system", ":onboarding", ":authentication")

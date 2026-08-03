@@ -31,6 +31,14 @@ import com.popwam.pop.ui.launch.reducedMotionEnabled
 import com.popwam.pop.ui.theme.PopwamTheme
 import com.popwam.pop.ui.theme.AppearanceStore
 import com.popwam.pop.ui.theme.popFontFamilies
+import com.popwam.pop.ui.currentLocale
+import com.popwam.pop.ui.auth.AuthenticationFlowFactory
+import com.popwam.pop.ui.auth.AuthenticationFlowViewModel
+import com.popwam.pop.ui.auth.AuthenticationHost
+import com.popwam.mobile.foundation.launch.IdentityPalette
+import com.popwam.mobile.foundation.launch.ThemeMode
+import com.popwam.mobile.onboarding.Phase3OnboardingTheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.popwam.mobile.onboarding.LaunchCoordinator
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -41,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private var resumed = false
     private lateinit var appearanceStore: AppearanceStore
     private lateinit var launchViewModel: LaunchViewModel
+    private lateinit var authenticationViewModel: AuthenticationFlowViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,15 +81,35 @@ class MainActivity : AppCompatActivity() {
             ),
         )[LaunchViewModel::class.java]
         launchViewModel.acceptDeepLink(intent?.dataString)
+        authenticationViewModel = ViewModelProvider(
+            this,
+            AuthenticationFlowFactory(app.container.authenticationRemote,app.container.sessionStore,app.container.firebasePhoneAuth),
+        )[AuthenticationFlowViewModel::class.java]
         setContent {
             val appearance by appearanceStore.state.collectAsStateWithLifecycle()
             val localization by app.container.localization.state.collectAsStateWithLifecycle()
             LaunchExperience(launchViewModel,localization,popFontFamilies()) {
                 val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
+                val authState by auth.state.collectAsStateWithLifecycle()
                 val main: MainViewModel = viewModel(
                     factory = MainFactory(app.container.repository, app.container.sessions.role,app.container.analytics),
                 )
-                PopwamTheme(appearance.theme,appearance.font,appearance.identity) {
+                if(!authState.authenticated) {
+                    Phase3OnboardingTheme(
+                        ThemeMode.valueOf(appearance.theme),
+                        IdentityPalette.valueOf(appearance.identity),
+                        isSystemInDarkTheme(),
+                        currentLocale(),
+                        popFontFamilies(),
+                    ) {
+                        AuthenticationHost(
+                            authenticationViewModel,
+                            app.container.phoneCountries,
+                            onAuthenticated=auth::adoptPhase4Session,
+                            onProfileSetup={ destination -> launchViewModel.acceptProfileSetupHandoff(destination) },
+                        )
+                    }
+                } else PopwamTheme(appearance.theme,appearance.font,appearance.identity) {
                     PopwamApp(auth,main,NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,app.container.phoneCountries)
                 }
             }
@@ -105,6 +134,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if(::authenticationViewModel.isInitialized)authenticationViewModel.refreshBiometric(this)
         resumed = true
         updateNfcMode(NfcCoordinator.active.value)
     }

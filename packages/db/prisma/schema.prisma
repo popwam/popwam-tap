@@ -300,6 +300,36 @@ enum PasskeyChallengeType {
   STEP_UP
 }
 
+enum MobileAuthChallengeState {
+  OPEN
+  PHONE_VERIFIED
+  CONSUMED
+  REVOKED
+}
+
+enum MobileEnrollmentState {
+  PASSKEY_REQUIRED
+  BIOMETRIC_REQUIRED
+  READY_FOR_UPGRADE
+  COMPLETED
+  ABORTED
+}
+
+enum MobileBiometricPolicy {
+  REQUIRED_WHEN_AVAILABLE
+}
+
+enum MobileBiometricOutcome {
+  ENROLLED
+  UNAVAILABLE
+}
+
+enum DeviceCredentialStatus {
+  ACTIVE
+  REVOKED
+  INVALIDATED
+}
+
 enum UserThemePreference {
   SYSTEM
   LIGHT
@@ -326,6 +356,7 @@ enum LogicalDeviceType {
 enum SessionAuthMethod {
   OTP
   PASSKEY
+  DEVICE_CREDENTIAL
   PASSWORD
   LEGACY
 }
@@ -694,64 +725,64 @@ enum QuotaRequestStatus {
 }
 
 model User {
-  id                       String                   @id @default(cuid())
-  username                 String?                  @unique
+  id                       String                    @id @default(cuid())
+  username                 String?                   @unique
   name                     String?
-  email                    String                   @unique
+  email                    String                    @unique
   emailVerified            DateTime?
   image                    String?
   passwordHash             String?
-  phone                    String?                  @unique
-  phoneE164                String?                  @unique
+  phone                    String?                   @unique
+  phoneE164                String?                   @unique
   phoneCountryIso2         String?
   phoneCallingCode         String?
   phoneVerifiedAt          DateTime?
-  profession               ProfessionType           @default(PERSONAL)
+  profession               ProfessionType            @default(PERSONAL)
   customProfession         String?
-  backupProvider           BackupProviderType       @default(POP_CLOUD)
-  role                     SystemRole               @default(USER)
-  status                   AccountStatus            @default(ACTIVE)
+  backupProvider           BackupProviderType        @default(POP_CLOUD)
+  role                     SystemRole                @default(USER)
+  status                   AccountStatus             @default(ACTIVE)
   locale                   String?
-  shareActivityIdentity    Boolean                  @default(false)
-  allowNearbyDiscovery     Boolean                  @default(false)
+  shareActivityIdentity    Boolean                   @default(false)
+  allowNearbyDiscovery     Boolean                   @default(false)
   defaultSharingCardId     String?
   lastLoginAt              DateTime?
   sessionsRevokedBefore    DateTime?
-  createdAt                DateTime                 @default(now())
-  updatedAt                DateTime                 @updatedAt
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
   accounts                 Account[]
   sessions                 Session[]
   profiles                 Profile[]
   destinations             Destination[]
-  ownedTags                Tag[]                    @relation("TagOwner")
-  organizationsOwned       Organization[]           @relation("OrganizationOwner")
+  ownedTags                Tag[]                     @relation("TagOwner")
+  organizationsOwned       Organization[]            @relation("OrganizationOwner")
   memberships              Membership[]
   subscriptions            UserPlan[]
   limitOverride            UserLimitOverride?
   profileFields            ProfileField[]
-  uploads                  UploadedFile[]           @relation("UploadedBy")
+  uploads                  UploadedFile[]            @relation("UploadedBy")
   profileMediaAssets       ProfileMediaAsset[]
-  auditLogs                AuditLog[]               @relation("AuditActor")
-  ownedCards               Card[]                   @relation("CardOwner")
-  createdCardBatches       CardBatch[]              @relation("CardBatchCreator")
-  createdProductionBatches ProductionBatch[]        @relation("ProductionBatchCreator")
-  assignedProducedTags     ProducedTag[]            @relation("ProducedTagAssignee")
+  auditLogs                AuditLog[]                @relation("AuditActor")
+  ownedCards               Card[]                    @relation("CardOwner")
+  createdCardBatches       CardBatch[]               @relation("CardBatchCreator")
+  createdProductionBatches ProductionBatch[]         @relation("ProductionBatchCreator")
+  assignedProducedTags     ProducedTag[]             @relation("ProducedTagAssignee")
   virtualCards             VirtualCard[]
-  tagTransfersFrom         TagTransfer[]            @relation("TagTransferFrom")
-  tagTransfersTo           TagTransfer[]            @relation("TagTransferTo")
+  tagTransfersFrom         TagTransfer[]             @relation("TagTransferFrom")
+  tagTransfersTo           TagTransfer[]             @relation("TagTransferTo")
   onboardingProgress       OnboardingProgress?
-  inventoryMovements       InventoryMovement[]      @relation("InventoryMovementCreator")
-  createdPurchases         Purchase[]               @relation("PurchaseCreator")
-  createdExpenses          Expense[]                @relation("ExpenseCreator")
-  createdOrders            Order[]                  @relation("OrderCreator")
+  inventoryMovements       InventoryMovement[]       @relation("InventoryMovementCreator")
+  createdPurchases         Purchase[]                @relation("PurchaseCreator")
+  createdExpenses          Expense[]                 @relation("ExpenseCreator")
+  createdOrders            Order[]                   @relation("OrderCreator")
   customer                 Customer?
   activationClaims         ActivationClaimSession[]
   authTickets              AuthTicket[]
   mobileRefreshTokens      MobileRefreshToken[]
-  friendshipsA             Friendship[]             @relation("FriendshipUserA")
-  friendshipsB             Friendship[]             @relation("FriendshipUserB")
-  friendshipRequests       Friendship[]             @relation("FriendshipRequester")
-  friendshipBlocks         Friendship[]             @relation("FriendshipBlocker")
+  friendshipsA             Friendship[]              @relation("FriendshipUserA")
+  friendshipsB             Friendship[]              @relation("FriendshipUserB")
+  friendshipRequests       Friendship[]              @relation("FriendshipRequester")
+  friendshipBlocks         Friendship[]              @relation("FriendshipBlocker")
   friendRequestsSent       FriendRequest[]           @relation("FriendRequestRequester")
   friendRequestsReceived   FriendRequest[]           @relation("FriendRequestRecipient")
   friendPreferencesOwned   FriendPreference[]        @relation("FriendPreferenceOwner")
@@ -759,30 +790,30 @@ model User {
   friendsPreference        FriendsPreference?
   friendNotifications      FriendNotificationEvent[] @relation("FriendNotificationRecipient")
   friendNotificationActors FriendNotificationEvent[] @relation("FriendNotificationActor")
-  privacyRulesOwned        FriendPrivacyRule[]      @relation("PrivacyRuleOwner")
-  privacyRulesReceived     FriendPrivacyRule[]      @relation("PrivacyRuleFriend")
+  privacyRulesOwned        FriendPrivacyRule[]       @relation("PrivacyRuleOwner")
+  privacyRulesReceived     FriendPrivacyRule[]       @relation("PrivacyRuleFriend")
   chatMemberships          ChatMember[]
   sentMessages             Message[]
-  messageReports           MessageReport[]          @relation("MessageReporter")
-  moderatedMessageReports  MessageReport[]          @relation("MessageReportReviewer")
+  messageReports           MessageReport[]           @relation("MessageReporter")
+  moderatedMessageReports  MessageReport[]           @relation("MessageReportReviewer")
   featureRequests          FeatureRequest[]
   featureVotes             FeatureVote[]
   featureComments          FeatureComment[]
-  quotaIncreaseRequests    QuotaIncreaseRequest[]   @relation("QuotaRequestUser")
-  reviewedQuotaRequests    QuotaIncreaseRequest[]   @relation("QuotaRequestReviewer")
+  quotaIncreaseRequests    QuotaIncreaseRequest[]    @relation("QuotaRequestUser")
+  reviewedQuotaRequests    QuotaIncreaseRequest[]    @relation("QuotaRequestReviewer")
   contentEntries           ContentEntry[]
-  followsCreated           Follow[]                 @relation("FollowFollower")
-  followsReceived          Follow[]                 @relation("FollowFollowing")
-  blocksCreated            UserBlock[]              @relation("UserBlockOwner")
-  blocksReceived           UserBlock[]              @relation("UserBlocked")
-  reportsCreated           UserReport[]             @relation("UserReportReporter")
-  reportsReceived          UserReport[]             @relation("UserReportSubject")
-  moderatedUserReports     UserReport[]             @relation("UserReportReviewer")
+  followsCreated           Follow[]                  @relation("FollowFollower")
+  followsReceived          Follow[]                  @relation("FollowFollowing")
+  blocksCreated            UserBlock[]               @relation("UserBlockOwner")
+  blocksReceived           UserBlock[]               @relation("UserBlocked")
+  reportsCreated           UserReport[]              @relation("UserReportReporter")
+  reportsReceived          UserReport[]              @relation("UserReportSubject")
+  moderatedUserReports     UserReport[]              @relation("UserReportReviewer")
   nearbyPreference         NearbyPreference?
   nearbyPresence           NearbyPresence?
   nearbyRateLimitBuckets   NearbyRateLimitBucket[]
   deviceSessions           DeviceSession[]
-  productStatusHistory     ProductStatusHistory[]   @relation("ProductStatusActor")
+  productStatusHistory     ProductStatusHistory[]    @relation("ProductStatusActor")
   passkeys                 PasskeyCredential[]
   passkeyChallenges        PasskeyChallenge[]
   connectedAccounts        ConnectedAccount[]
@@ -790,12 +821,15 @@ model User {
   devicePushTokens         DevicePushToken[]
   externalIdentities       ExternalIdentity[]
   platformSuggestions      PlatformSuggestion[]
-  profileEntitlements      ProfileEntitlement[]     @relation("ProfileEntitlementUser")
+  profileEntitlements      ProfileEntitlement[]      @relation("ProfileEntitlementUser")
   legalConsents            UserLegalConsent[]
   preference               UserPreference?
   notificationPreference   NotificationPreference?
   stepUpGrants             StepUpGrant[]
   accountDeletionRequests  AccountDeletionRequest[]
+  mobileAuthChallenges     MobileAuthChallenge[]
+  mobileEnrollmentSessions MobileEnrollmentSession[]
+  mobileDeviceCredentials  MobileDeviceCredential[]
 }
 
 model Plan {
@@ -1062,8 +1096,8 @@ model Profile {
   revisions            ProfileRevision[]
   slugHistory          ProfileSlugHistory[]
   mediaAssets          ProfileMediaAsset[]
-  selectedForFriends   FriendsPreference[]          @relation("FriendsSocialProfile")
-  friendReports        UserReport[]                  @relation("UserReportProfile")
+  selectedForFriends   FriendsPreference[]  @relation("FriendsSocialProfile")
+  friendReports        UserReport[]         @relation("UserReportProfile")
 
   @@index([userId])
   @@index([userId, lifecycle])
@@ -1086,16 +1120,16 @@ model ProfilePublication {
 }
 
 model ProfileRevision {
-  id                   String                @id @default(cuid())
-  profileId            String
-  revisionNumber       Int
-  sourceDraftRevision  Int
-  draftFingerprint     String
-  status               ProfileRevisionStatus @default(PUBLISHED)
-  access               ProfileAccess
-  slug                 String?
-  displayName          String
-  displayLabel         String?
+  id                    String                       @id @default(cuid())
+  profileId             String
+  revisionNumber        Int
+  sourceDraftRevision   Int
+  draftFingerprint      String
+  status                ProfileRevisionStatus        @default(PUBLISHED)
+  access                ProfileAccess
+  slug                  String?
+  displayName           String
+  displayLabel          String?
   type                  ProfileType
   profileKind           ProfileKind?
   primaryLanguage       String
@@ -1152,17 +1186,17 @@ model ProfileRevision {
   allowInstallable      Boolean
   templateSlug          String?
   templateConfiguration Json?
-  publishedAt           DateTime              @default(now())
-  createdAt             DateTime              @default(now())
-  profile               Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  currentFor            ProfilePublication?   @relation("CurrentPublishedRevision")
+  publishedAt           DateTime                     @default(now())
+  createdAt             DateTime                     @default(now())
+  profile               Profile                      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  currentFor            ProfilePublication?          @relation("CurrentPublishedRevision")
   modules               ProfileRevisionModule[]
   fields                ProfileRevisionField[]
   destinations          ProfileRevisionDestination[]
   files                 ProfileRevisionFile[]
   services              ProfileRevisionService[]
   branches              ProfileRevisionBranch[]
-  media                  ProfileRevisionMedia[]
+  media                 ProfileRevisionMedia[]
 
   @@unique([profileId, revisionNumber])
   @@index([profileId, status, revisionNumber])
@@ -1268,14 +1302,14 @@ model ProfileRevisionBranch {
 }
 
 model ProfileRevisionMedia {
-  id         String          @id @default(cuid())
+  id         String                  @id @default(cuid())
   revisionId String
   mediaId    String
   purpose    ProfileMediaPurpose
   visibility ProfileModuleVisibility @default(PUBLIC)
   publicUrl  String
-  sortOrder  Int             @default(0)
-  revision   ProfileRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  sortOrder  Int                     @default(0)
+  revision   ProfileRevision         @relation(fields: [revisionId], references: [id], onDelete: Cascade)
 
   @@unique([revisionId, mediaId])
   @@index([revisionId, sortOrder])
@@ -1292,28 +1326,28 @@ model ProfileSlugHistory {
 }
 
 model ProfileMediaAsset {
-  id                 String              @id @default(cuid())
+  id                 String                  @id @default(cuid())
   userId             String
   profileId          String?
   purpose            ProfileMediaPurpose
-  state              ProfileMediaState   @default(TEMPORARY)
+  state              ProfileMediaState       @default(TEMPORARY)
   visibility         ProfileModuleVisibility @default(ONLY_ME)
-  storageKey         String              @unique
-  publicStorageKey   String?             @unique
+  storageKey         String                  @unique
+  publicStorageKey   String?                 @unique
   publicUrl          String?
   originalFilename   String
   mimeType           String
   sizeBytes          BigInt
   width              Int?
   height             Int?
-  sortOrder          Int                 @default(0)
+  sortOrder          Int                     @default(0)
   temporaryExpiresAt DateTime?
   orphanedAt         DateTime?
   deletedAt          DateTime?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profile            Profile?            @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile            Profile?                @relation(fields: [profileId], references: [id], onDelete: SetNull)
 
   @@index([userId, state, createdAt])
   @@index([profileId, state, sortOrder])
@@ -1420,23 +1454,23 @@ model ProfileEntitlement {
 }
 
 model LegalDocument {
-  id           String             @id @default(cuid())
-  documentType LegalDocumentType
-  version      String
-  locale       String
-  contentHash  String
-  slug         String             @default("")
-  title        String             @default("")
-  content      String             @default("")
-  status       LegalDocumentStatus @default(DRAFT)
-  requiresAcceptance Boolean       @default(true)
-  publishedAt  DateTime?
-  updatedAt    DateTime           @updatedAt
-  effectiveAt  DateTime
-  required     Boolean            @default(true)
-  isActive     Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  consents     UserLegalConsent[]
+  id                 String              @id @default(cuid())
+  documentType       LegalDocumentType
+  version            String
+  locale             String
+  contentHash        String
+  slug               String              @default("")
+  title              String              @default("")
+  content            String              @default("")
+  status             LegalDocumentStatus @default(DRAFT)
+  requiresAcceptance Boolean             @default(true)
+  publishedAt        DateTime?
+  updatedAt          DateTime            @updatedAt
+  effectiveAt        DateTime
+  required           Boolean             @default(true)
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  consents           UserLegalConsent[]
 
   @@unique([documentType, version, locale])
   @@index([documentType, isActive, effectiveAt])
@@ -1547,19 +1581,19 @@ model Friendship {
 }
 
 model FriendRequest {
-  id              String              @id @default(cuid())
+  id              String                    @id @default(cuid())
   pairKey         String
   requesterUserId String
   recipientUserId String
-  status          FriendRequestStatus @default(PENDING)
-  source          FriendRequestSource @default(SEARCH)
-  revision        Int                 @default(1)
-  createdAt       DateTime            @default(now())
+  status          FriendRequestStatus       @default(PENDING)
+  source          FriendRequestSource       @default(SEARCH)
+  revision        Int                       @default(1)
+  createdAt       DateTime                  @default(now())
   respondedAt     DateTime?
   cancelledAt     DateTime?
   expiresAt       DateTime?
-  requester       User                @relation("FriendRequestRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
-  recipient       User                @relation("FriendRequestRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  requester       User                      @relation("FriendRequestRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  recipient       User                      @relation("FriendRequestRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
   notifications   FriendNotificationEvent[]
 
   @@index([requesterUserId, status, createdAt])
@@ -1584,18 +1618,18 @@ model FriendPreference {
 }
 
 model FriendsPreference {
-  id                            String   @id @default(cuid())
-  userId                        String   @unique
-  socialKey                     String   @unique @default(cuid())
-  socialProfileId               String?
-  allowFriendRequests           Boolean  @default(true)
-  discoverableByProfileSearch   Boolean  @default(false)
-  profileConfiguredAt           DateTime?
-  privacyConfiguredAt           DateTime?
-  createdAt                     DateTime @default(now())
-  updatedAt                     DateTime @updatedAt
-  user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  socialProfile                 Profile? @relation("FriendsSocialProfile", fields: [socialProfileId], references: [id], onDelete: SetNull)
+  id                          String    @id @default(cuid())
+  userId                      String    @unique
+  socialKey                   String    @unique @default(cuid())
+  socialProfileId             String?
+  allowFriendRequests         Boolean   @default(true)
+  discoverableByProfileSearch Boolean   @default(false)
+  profileConfiguredAt         DateTime?
+  privacyConfiguredAt         DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+  user                        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  socialProfile               Profile?  @relation("FriendsSocialProfile", fields: [socialProfileId], references: [id], onDelete: SetNull)
 
   @@index([discoverableByProfileSearch, updatedAt])
   @@index([socialProfileId])
@@ -1853,13 +1887,13 @@ model CardBatch {
 }
 
 model Card {
-  id                        String                   @id @default(cuid())
-  serialNumber              String                   @unique
-  displayLabel              String?
-  publicSlug                String                   @unique
-  publicToken               String                   @unique
-  activationTokenHash       String                   @unique
-  activationTokenConsumedAt DateTime?
+  id                         String                   @id @default(cuid())
+  serialNumber               String                   @unique
+  displayLabel               String?
+  publicSlug                 String                   @unique
+  publicToken                String                   @unique
+  activationTokenHash        String                   @unique
+  activationTokenConsumedAt  DateTime?
   activationSecretHash       String?
   activationSecretState      ActivationSecretState    @default(LEGACY)
   activationSecretVersion    Int?
@@ -1867,37 +1901,37 @@ model Card {
   activationAttemptWindowAt  DateTime?
   activationFailedAttempts   Int                      @default(0)
   activationLockoutUntil     DateTime?
-  cardType                  CardType
-  batchId                   String?
-  ownerId                   String?
-  organizationId            String?
-  profileId                 String?
-  virtualCardId             String?
-  activeDestinationId       String?
-  assignmentStatus          AssignmentStatus         @default(UNASSIGNED)
-  cardStatus                CardStatus               @default(CREATED)
-  inventoryStatus           CardInventoryStatus      @default(AVAILABLE)
-  programmedAt              DateTime?
-  lockedAt                  DateTime?
-  assignedAt                DateTime?
-  activatedAt               DateTime?
-  lastOpenedAt              DateTime?
-  openCount                 Int                      @default(0)
-  createdAt                 DateTime                 @default(now())
-  updatedAt                 DateTime                 @updatedAt
-  batch                     CardBatch?               @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  owner                     User?                    @relation("CardOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  organization              Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  profile                   Profile?                 @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  virtualCard               VirtualCard?             @relation(fields: [virtualCardId], references: [id], onDelete: SetNull)
-  activeDestination         Destination?             @relation("CardActiveDestination", fields: [activeDestinationId], references: [id], onDelete: SetNull)
-  dailyOpens                CardOpenDaily[]
-  orderItems                OrderItem[]
-  activationClaims          ActivationClaimSession[]
-  activationAttempts        ActivationAttempt[]
-  producedTag               ProducedTag?
-  transfers                 TagTransfer[]
-  statusHistory             ProductStatusHistory[]
+  cardType                   CardType
+  batchId                    String?
+  ownerId                    String?
+  organizationId             String?
+  profileId                  String?
+  virtualCardId              String?
+  activeDestinationId        String?
+  assignmentStatus           AssignmentStatus         @default(UNASSIGNED)
+  cardStatus                 CardStatus               @default(CREATED)
+  inventoryStatus            CardInventoryStatus      @default(AVAILABLE)
+  programmedAt               DateTime?
+  lockedAt                   DateTime?
+  assignedAt                 DateTime?
+  activatedAt                DateTime?
+  lastOpenedAt               DateTime?
+  openCount                  Int                      @default(0)
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  batch                      CardBatch?               @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  owner                      User?                    @relation("CardOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  organization               Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  profile                    Profile?                 @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  virtualCard                VirtualCard?             @relation(fields: [virtualCardId], references: [id], onDelete: SetNull)
+  activeDestination          Destination?             @relation("CardActiveDestination", fields: [activeDestinationId], references: [id], onDelete: SetNull)
+  dailyOpens                 CardOpenDaily[]
+  orderItems                 OrderItem[]
+  activationClaims           ActivationClaimSession[]
+  activationAttempts         ActivationAttempt[]
+  producedTag                ProducedTag?
+  transfers                  TagTransfer[]
+  statusHistory              ProductStatusHistory[]
 
   @@index([batchId])
   @@index([ownerId])
@@ -1976,7 +2010,7 @@ model ActivationAttempt {
   failureClass           String?
   success                Boolean
   createdAt              DateTime @default(now())
-  card                    Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  card                   Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId, createdAt])
   @@index([actorId, createdAt])
@@ -1985,26 +2019,26 @@ model ActivationAttempt {
 }
 
 model OtpChallenge {
-  id                String                  @id @default(cuid())
-  phone             String
-  purpose           OtpPurpose
-  claimSessionId    String?
-  otpHash           String
-  expiresAt         DateTime
-  attempts          Int                     @default(0)
-  maxAttempts       Int                     @default(5)
-  consumedAt        DateTime?
-  deliveryStatus    OtpDeliveryStatus       @default(PENDING)
-  provider          String
-  channel           PhoneOtpChannel         @default(SMS)
-  providerMessageId String?
-  requestIpHash     String?
-  securityUserId    String?
-  stepUpPurpose     StepUpPurpose?
+  id                 String                  @id @default(cuid())
+  phone              String
+  purpose            OtpPurpose
+  claimSessionId     String?
+  otpHash            String
+  expiresAt          DateTime
+  attempts           Int                     @default(0)
+  maxAttempts        Int                     @default(5)
+  consumedAt         DateTime?
+  deliveryStatus     OtpDeliveryStatus       @default(PENDING)
+  provider           String
+  channel            PhoneOtpChannel         @default(SMS)
+  providerMessageId  String?
+  requestIpHash      String?
+  securityUserId     String?
+  stepUpPurpose      StepUpPurpose?
   sessionBindingHash String?
-  lastSentAt        DateTime                @default(now())
-  createdAt         DateTime                @default(now())
-  claimSession      ActivationClaimSession? @relation(fields: [claimSessionId], references: [id], onDelete: Cascade)
+  lastSentAt         DateTime                @default(now())
+  createdAt          DateTime                @default(now())
+  claimSession       ActivationClaimSession? @relation(fields: [claimSessionId], references: [id], onDelete: Cascade)
 
   @@index([phone, createdAt])
   @@index([requestIpHash, createdAt])
@@ -2028,14 +2062,14 @@ model OtpSendLog {
 }
 
 model AuthTicket {
-  id         String    @id @default(cuid())
-  tokenHash  String    @unique
+  id         String            @id @default(cuid())
+  tokenHash  String            @unique
   userId     String
   authMethod SessionAuthMethod @default(OTP)
   expiresAt  DateTime
   consumedAt DateTime?
-  createdAt  DateTime  @default(now())
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime          @default(now())
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
 }
@@ -2136,25 +2170,25 @@ model ProductionBatch {
 }
 
 model ProducedTag {
-  id                  String            @id @default(cuid())
-  batchId             String
-  cardId              String?           @unique
-  immutableToken      String            @unique
-  shortCode           String?
-  permanentUrl        String            @unique
-  activationCode      String            @unique
-  activationTokenHash String            @unique
+  id                            String            @id @default(cuid())
+  batchId                       String
+  cardId                        String?           @unique
+  immutableToken                String            @unique
+  shortCode                     String?
+  permanentUrl                  String            @unique
+  activationCode                String            @unique
+  activationTokenHash           String            @unique
   scratchSecretExportCiphertext String?
-  scratchSecretExportedAt DateTime?
-  activationSecretVersion Int?
-  status              ProducedTagStatus @default(UNASSIGNED)
-  assignedUserId      String?
-  activatedAt         DateTime?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  batch               ProductionBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  card                Card?             @relation(fields: [cardId], references: [id], onDelete: SetNull)
-  assignedUser        User?             @relation("ProducedTagAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  scratchSecretExportedAt       DateTime?
+  activationSecretVersion       Int?
+  status                        ProducedTagStatus @default(UNASSIGNED)
+  assignedUserId                String?
+  activatedAt                   DateTime?
+  createdAt                     DateTime          @default(now())
+  updatedAt                     DateTime          @updatedAt
+  batch                         ProductionBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  card                          Card?             @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  assignedUser                  User?             @relation("ProducedTagAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
 
   @@index([batchId, status])
   @@index([assignedUserId, status])
@@ -2223,41 +2257,126 @@ model LinkPlatform {
 }
 
 model PasskeyCredential {
-  id           String    @id @default(cuid())
-  userId       String
-  credentialId String    @unique
-  publicKey    Bytes
-  counter      BigInt    @default(0)
-  transports   String[]  @default([])
-  deviceType   String?
-  backedUp     Boolean   @default(false)
-  name         String?
-  createdAt    DateTime  @default(now())
-  lastUsedAt   DateTime?
-  revokedAt    DateTime?
+  id              String         @id @default(cuid())
+  userId          String
+  credentialId    String         @unique
+  publicKey       Bytes
+  counter         BigInt         @default(0)
+  transports      String[]       @default([])
+  deviceType      String?
+  backedUp        Boolean        @default(false)
+  name            String?
+  createdAt       DateTime       @default(now())
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
   deviceSessionId String?
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceSession DeviceSession? @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession   DeviceSession? @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
 
   @@index([userId, revokedAt])
   @@index([deviceSessionId, revokedAt])
 }
 
 model PasskeyChallenge {
-  id            String               @id @default(cuid())
-  userId        String?
-  challengeHash String               @unique
-  type          PasskeyChallengeType
-  expiresAt     DateTime
-  consumedAt    DateTime?
-  stepUpPurpose StepUpPurpose?
-  sessionBindingHash String?
-  createdAt     DateTime             @default(now())
-  user          User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String                   @id @default(cuid())
+  userId              String?
+  challengeHash       String                   @unique
+  type                PasskeyChallengeType
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  stepUpPurpose       StepUpPurpose?
+  sessionBindingHash  String?
+  enrollmentSessionId String?
+  createdAt           DateTime                 @default(now())
+  user                User?                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollmentSession   MobileEnrollmentSession? @relation(fields: [enrollmentSessionId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, expiresAt])
   @@index([userId, stepUpPurpose, expiresAt])
+  @@index([enrollmentSessionId, type, expiresAt])
   @@index([expiresAt])
+}
+
+model MobileAuthChallenge {
+  id                        String                   @id @default(cuid())
+  userId                    String?
+  phoneHash                 String
+  accountState              String
+  allowedMethods            String[]                 @default([])
+  preferredMethod           String
+  otpLength                 Int                      @default(6)
+  otpResendAfterSeconds     Int                      @default(60)
+  otpExpiresAfterSeconds    Int                      @default(300)
+  otpMaximumAttempts        Int                      @default(5)
+  biometricPolicy           MobileBiometricPolicy    @default(REQUIRED_WHEN_AVAILABLE)
+  state                     MobileAuthChallengeState @default(OPEN)
+  firebaseSubjectHash       String?
+  deviceChallengeHash       String?
+  deviceChallengeExpiresAt  DateTime?
+  deviceChallengeConsumedAt DateTime?
+  expiresAt                 DateTime
+  consumedAt                DateTime?
+  revokedAt                 DateTime?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  user                      User?                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollmentSession         MobileEnrollmentSession?
+
+  @@index([phoneHash, state, expiresAt])
+  @@index([userId, state, expiresAt])
+  @@index([expiresAt])
+}
+
+model MobileEnrollmentSession {
+  id                        String                  @id @default(cuid())
+  tokenHash                 String                  @unique
+  challengeId               String                  @unique
+  userId                    String
+  state                     MobileEnrollmentState   @default(PASSKEY_REQUIRED)
+  biometricPolicy           MobileBiometricPolicy   @default(REQUIRED_WHEN_AVAILABLE)
+  biometricOutcome          MobileBiometricOutcome?
+  passkeyCredentialId       String?
+  deviceChallengeHash       String?
+  deviceChallengeExpiresAt  DateTime?
+  deviceChallengeConsumedAt DateTime?
+  expiresAt                 DateTime
+  completedAt               DateTime?
+  completionKeyHash         String?
+  completedDeviceSessionId  String?
+  completionRetriedAt       DateTime?
+  abortedAt                 DateTime?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+  challenge                 MobileAuthChallenge     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user                      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passkeyChallenges         PasskeyChallenge[]
+  deviceCredential          MobileDeviceCredential?
+
+  @@index([userId, state, expiresAt])
+  @@index([expiresAt])
+}
+
+model MobileDeviceCredential {
+  id                  String                  @id @default(cuid())
+  credentialId        String                  @unique
+  userId              String
+  enrollmentSessionId String                  @unique
+  deviceSessionId     String?                 @unique
+  publicKey           Bytes
+  algorithm           String                  @default("ES256")
+  platform            String                  @default("ANDROID")
+  biometricType       String
+  status              DeviceCredentialStatus  @default(ACTIVE)
+  createdAt           DateTime                @default(now())
+  lastUsedAt          DateTime?
+  invalidatedAt       DateTime?
+  revokedAt           DateTime?
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollmentSession   MobileEnrollmentSession @relation(fields: [enrollmentSessionId], references: [id], onDelete: Cascade)
+  deviceSession       DeviceSession?          @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([deviceSessionId, status])
 }
 
 model ConnectedAccount {
@@ -2341,17 +2460,17 @@ model CardImportedField {
 }
 
 model DevicePushToken {
-  id             String    @id @default(cuid())
-  userId         String
-  platform       String
-  tokenHash      String    @unique
-  tokenEncrypted Bytes
-  createdAt      DateTime  @default(now())
-  lastSeenAt     DateTime  @default(now())
-  revokedAt      DateTime?
+  id              String         @id @default(cuid())
+  userId          String
+  platform        String
+  tokenHash       String         @unique
+  tokenEncrypted  Bytes
+  createdAt       DateTime       @default(now())
+  lastSeenAt      DateTime       @default(now())
+  revokedAt       DateTime?
   deviceSessionId String?
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceSession  DeviceSession? @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceSession   DeviceSession? @relation(fields: [deviceSessionId], references: [id], onDelete: SetNull)
 
   @@index([userId, platform, revokedAt])
   @@index([deviceSessionId, revokedAt])
@@ -2608,25 +2727,25 @@ model UserBlock {
 }
 
 model UserReport {
-  id             String              @id @default(cuid())
-  reporterId     String
-  subjectId      String?
+  id              String              @id @default(cuid())
+  reporterId      String
+  subjectId       String?
   targetProfileId String?
-  reason         String
-  category       UserReportCategory?
-  source         UserReportSource      @default(FRIENDS)
-  details        String?
-  status         UserReportStatus    @default(OPEN)
-  reviewedById   String?
-  reviewedAt     DateTime?
-  reviewNote     String?
-  resolutionCode String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  reporter       User                @relation("UserReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
-  subject        User?               @relation("UserReportSubject", fields: [subjectId], references: [id], onDelete: SetNull)
-  targetProfile  Profile?            @relation("UserReportProfile", fields: [targetProfileId], references: [id], onDelete: SetNull)
-  reviewedBy     User?               @relation("UserReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reason          String
+  category        UserReportCategory?
+  source          UserReportSource    @default(FRIENDS)
+  details         String?
+  status          UserReportStatus    @default(OPEN)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  resolutionCode  String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  reporter        User                @relation("UserReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  subject         User?               @relation("UserReportSubject", fields: [subjectId], references: [id], onDelete: SetNull)
+  targetProfile   Profile?            @relation("UserReportProfile", fields: [targetProfileId], references: [id], onDelete: SetNull)
+  reviewedBy      User?               @relation("UserReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
   @@index([subjectId])
@@ -2635,78 +2754,79 @@ model UserReport {
 }
 
 model NearbyPreference {
-  id             String    @id @default(cuid())
-  userId         String    @unique
-  enabled        Boolean   @default(false)
-  discoverable   Boolean   @default(false)
-  generation     Int       @default(0)
-  activatedAt    DateTime?
-  disabledAt     DateTime?
-  visibleUntil   DateTime?
-  virtualCardId  String?
-  audience       String    @default("EVERYONE_OPTED_IN")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  enabled       Boolean   @default(false)
+  discoverable  Boolean   @default(false)
+  generation    Int       @default(0)
+  activatedAt   DateTime?
+  disabledAt    DateTime?
+  visibleUntil  DateTime?
+  virtualCardId String?
+  audience      String    @default("EVERYONE_OPTED_IN")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([enabled, discoverable, updatedAt])
   @@index([enabled, visibleUntil])
 }
 
 model NearbyPresence {
-  id                    String               @id @default(cuid())
-  userId                String               @unique
-  coarseCell            String
-  cellVersion           Int                  @default(1)
-  generation            Int
-  sessionHash           String               @unique
-  source                NearbyPresenceSource
-  cellWindowStartedAt   DateTime
-  cellChangesInWindow   Int                  @default(0)
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  expiresAt             DateTime
-  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String               @id @default(cuid())
+  userId              String               @unique
+  coarseCell          String
+  cellVersion         Int                  @default(1)
+  generation          Int
+  sessionHash         String               @unique
+  source              NearbyPresenceSource
+  cellWindowStartedAt DateTime
+  cellChangesInWindow Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  expiresAt           DateTime
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([coarseCell, expiresAt])
   @@index([expiresAt])
 }
 
 model NearbyRateLimitBucket {
-  id            String              @id @default(cuid())
-  userId        String
-  kind          NearbyRateLimitKind
-  windowStart   DateTime
-  count         Int                 @default(0)
-  updatedAt     DateTime            @updatedAt
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String              @id @default(cuid())
+  userId      String
+  kind        NearbyRateLimitKind
+  windowStart DateTime
+  count       Int                 @default(0)
+  updatedAt   DateTime            @updatedAt
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, kind])
   @@index([kind, windowStart])
 }
 
 model DeviceSession {
-  id                  String            @id @default(cuid())
+  id                  String                   @id @default(cuid())
   userId              String
-  tokenFamilyHash     String            @unique
-  deviceType          LogicalDeviceType @default(MOBILE_APP)
+  tokenFamilyHash     String                   @unique
+  deviceType          LogicalDeviceType        @default(MOBILE_APP)
   deviceName          String?
   userLabel           String?
   platform            String
   browserName         String?
   appName             String?
   appVersion          String?
-  authMethod          SessionAuthMethod @default(LEGACY)
-  lastSeenAt          DateTime          @default(now())
+  authMethod          SessionAuthMethod        @default(LEGACY)
+  lastSeenAt          DateTime                 @default(now())
   lastAuthenticatedAt DateTime?
   revokedAt           DateTime?
-  createdAt           DateTime          @default(now())
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime                 @default(now())
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   webSessions         Session[]
   mobileRefreshTokens MobileRefreshToken[]
   pushTokens          DevicePushToken[]
   passkeys            PasskeyCredential[]
   stepUpGrants        StepUpGrant[]
+  deviceCredentials   MobileDeviceCredential[]
 
   @@index([userId, revokedAt, lastSeenAt])
   @@index([userId, deviceType, revokedAt])

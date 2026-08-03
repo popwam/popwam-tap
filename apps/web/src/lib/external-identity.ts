@@ -11,6 +11,13 @@ import {
   isRetryableFirebasePhoneResolutionError,
   planFirebasePhoneResolution,
 } from "./firebase/phone-policy";
+import {
+  createRestrictedEnrollment,
+  mobileChallengeView,
+  mobileFirebaseSubjectHash,
+  requirePhoneChallenge,
+} from "./mobile-enrollment";
+import { MOBILE_AUTH_CONTRACT_VERSION } from "./mobile-auth-contract-v2";
 export {
   ExternalIdentityError,
   isRetryableFirebasePhoneResolutionError,
@@ -32,10 +39,14 @@ async function resolveFirebasePhoneOnce(
   proof: VerifiedPhoneProof,
   deviceName?: string,
   appVersion?: string,
+  options: { contractVersion?: number; challengeId?: string } = {},
 ) {
   const normalized = normalizePhone(proof.phoneNumber);
   if (!normalized.valid || normalized.e164 !== proof.phoneNumber) throw new ExternalIdentityError("FIREBASE_PHONE_INVALID");
   return prisma.$transaction(async (tx) => {
+    const v2Challenge = options.contractVersion === MOBILE_AUTH_CONTRACT_VERSION
+      ? await requirePhoneChallenge(tx, options.challengeId || "", normalized.e164)
+      : null;
     const identity = await tx.externalIdentity.findUnique({
       where: firebaseWhere(proof.uid),
       select: { id: true, userId: true, status: true },
@@ -121,12 +132,31 @@ async function resolveFirebasePhoneOnce(
         metadata: { provider: "FIREBASE", newUser: isNewUser },
       },
     });
-    const session = await issueMobileSession(tx, user, deviceName, undefined, {
+    const enrollment = isNewUser && v2Challenge
+      ? await createRestrictedEnrollment(tx, { challengeId: v2Challenge.id, userId: user.id, firebaseSubject: proof.uid })
+      : null;
+    const session = enrollment ? null : await issueMobileSession(tx, user, deviceName, undefined, {
       authMethod: "OTP",
       appVersion,
     });
+    if (v2Challenge && !enrollment) {
+      await tx.mobileAuthChallenge.update({
+        where: { id: v2Challenge.id },
+        data: {
+          userId: user.id,
+          accountState: "RETURNING",
+          state: "CONSUMED",
+          firebaseSubjectHash: mobileFirebaseSubjectHash(proof.uid),
+          consumedAt: now,
+        },
+      });
+    }
     return {
       session,
+      enrollment,
+      authentication: v2Challenge && !enrollment
+        ? mobileChallengeView(v2Challenge, { nextAction: "AUTHENTICATED", sessionScope: "FULL" })
+        : null,
       isNewUser,
       user: {
         id: user.id,
@@ -152,11 +182,12 @@ export async function resolveFirebasePhoneSession(
   proof: VerifiedPhoneProof,
   deviceName?: string,
   appVersion?: string,
+  options: { contractVersion?: number; challengeId?: string } = {},
 ) {
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await resolveFirebasePhoneOnce(proof, deviceName, appVersion);
+      return await resolveFirebasePhoneOnce(proof, deviceName, appVersion, options);
     } catch (error) {
       lastError = error;
       if (!isRetryableFirebasePhoneResolutionError(error)) throw error;

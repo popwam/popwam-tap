@@ -1,6 +1,6 @@
-# Mobile authentication contract v2 proposal
+# Mobile authentication contract v2
 
-Status: proposal only. No backend route or production authentication behavior is changed in Phase 2.
+Status: implemented for the Phase 4 mobile authentication feature. Version 1 remains available during the controlled client rollout; version 2 is selected explicitly with `contractVersion: 2`.
 
 ## Security decisions
 
@@ -14,29 +14,31 @@ Status: proposal only. No backend route or production authentication behavior is
 
 `POST /api/mobile/auth/firebase/phone/exchange` currently returns normal access and refresh tokens immediately. Existing passkey registration routes require that normal session. This makes passkey enrollment optional from the server's perspective.
 
-Contract v2 should be negotiated by sending `contractVersion: 2` to the existing phone exchange route. Version 1 must remain available during migration.
+Contract v2 is negotiated by sending `contractVersion: 2` plus the typed `challengeId` to the Firebase phone exchange route. Version 1 remains available during migration.
 
-## Proposed exchange response
+## Exchange response
 
 ```json
 {
   "ok": true,
   "contractVersion": 2,
-  "transactionId": "opaque-id",
+  "challengeId": "opaque-id",
   "accountState": "NEW",
   "allowedMethods": ["PHONE_OTP"],
   "preferredMethod": "PHONE_OTP",
-  "requiredEnrollments": ["PASSKEY", "LOCAL_BIOMETRIC_AUTHORIZATION", "PROFILE_SETUP"],
-  "nextStep": "CREATE_PASSKEY",
+  "passkeyRequirement": "REQUIRED",
+  "biometricEnrollmentPolicy": "REQUIRED_WHEN_AVAILABLE",
+  "sessionScope": "ENROLLMENT",
+  "nextAction": "ENROLL_PASSKEY",
   "enrollmentSession": {
     "token": "short-lived-bound-token",
     "expiresAt": "RFC-3339 timestamp",
-    "permittedActions": ["CREATE_PASSKEY", "AUTHORIZE_LOCAL_BIOMETRICS"]
+    "expiresAt": "RFC-3339 timestamp"
   }
 }
 ```
 
-The enrollment token must be short-lived, device-session-bound, replay-resistant, non-refreshable, and unusable against normal profile, sharing, NFC, Home, or Settings APIs.
+The enrollment token is short-lived, HMAC-hashed at rest, replay-resistant, non-refreshable, accepted only with the `Enrollment` authorization scheme, and unusable against normal Bearer-authenticated APIs.
 
 ## Enrollment sequence
 
@@ -102,4 +104,3 @@ Responses must remain `cache-control: no-store` and must not log phone numbers, 
 - Observe completion, expiration, and recovery rates without logging sensitive values.
 - Keep v1 for existing production clients until minimum supported versions have adopted v2.
 - Remove v1 new-account unrestricted issuance only after rollback metrics and support procedures are approved.
-

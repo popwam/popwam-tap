@@ -16,6 +16,8 @@ enum class OverlayKey {
     THEME_GALLERY,
     OTP,
     AUTHENTICATION_STATUS,
+    VERIFIED,
+    BIOMETRIC_AUTHORIZATION,
     PROFILE_SWITCHER,
     QR_CODE,
     WALLET_UNDER_DEVELOPMENT,
@@ -48,4 +50,3 @@ class OverlayCoordinator {
         return true
     }
 }
-

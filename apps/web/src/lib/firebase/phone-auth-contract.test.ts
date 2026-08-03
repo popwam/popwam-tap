@@ -25,7 +25,7 @@ describe("Firebase phone exchange security contract", () => {
   });
 
   it("has race-safe unique canonical phone and provider subject constraints", () => {
-    expect(schema).toContain("phoneE164                String?                  @unique");
+    expect(schema).toMatch(/phoneE164\s+String\?\s+@unique/);
     expect(schema).toContain("@@unique([provider, providerSubject])");
     expect(externalIdentity).toContain("Prisma.TransactionIsolationLevel.Serializable");
     expect(phonePolicy).toContain('code === "P2002" || code === "P2034"');

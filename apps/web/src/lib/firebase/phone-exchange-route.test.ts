@@ -31,6 +31,8 @@ describe("Firebase phone exchange route", () => {
     mocks.resolve.mockResolvedValue({
       session: { accessToken: "pop-access", refreshToken: "pop-refresh", expiresIn: 900 },
       user: { id: "pop-user", role: "USER", phone: "+201001234567" },
+      enrollment: null,
+      authentication: null,
       isNewUser: false,
     });
   });
@@ -58,7 +60,36 @@ describe("Firebase phone exchange route", () => {
       { uid: "firebase-phone-subject", phoneNumber: "+201001234567" },
       "Motorola moto g85 5G",
       "0.0.12-debug",
+      { contractVersion: 1, challengeId: undefined },
     );
+  });
+
+  it("returns only a restricted enrollment credential for a new v2 account", async () => {
+    mocks.resolve.mockResolvedValue({
+      session: null,
+      enrollment: {
+        contractVersion: 2,
+        challengeId: "challenge-v2",
+        accountState: "NEW",
+        allowedMethods: ["PHONE_OTP"],
+        preferredMethod: "PHONE_OTP",
+        sessionScope: "ENROLLMENT",
+        nextAction: "ENROLL_PASSKEY",
+        enrollmentSession: { token: "restricted-token", expiresAt: "2026-08-03T12:00:00.000Z" },
+      },
+      authentication: null,
+      user: { id: "pop-user", role: "USER", phone: "+201001234567" },
+      isNewUser: true,
+    });
+    const response = await POST(new Request("https://pop.popwam.com/api/mobile/auth/firebase/phone/exchange", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-firebase-id-token": "header.payload.signature" },
+      body: JSON.stringify({ contractVersion: 2, challengeId: "challenge-v2" }),
+    }));
+    const body = await response.json();
+    expect(body).toMatchObject({ sessionScope: "ENROLLMENT", nextAction: "ENROLL_PASSKEY" });
+    expect(body.accessToken).toBeUndefined();
+    expect(body.refreshToken).toBeUndefined();
   });
 
   it("does not require an existing POP bearer or cookie", async () => {

@@ -57,6 +57,12 @@ class LaunchViewModel(
         else viewModelScope.launch { coordinator.preservePendingDestination(parsed) }
     }
 
+    /** Phase 4 terminates at this typed boundary. Phase 5 will consume it and
+     * render Profile Setup; this phase deliberately does not create that UI. */
+    fun acceptProfileSetupHandoff(destination: PopDestination.ProfileSetup) {
+        savedStateHandle["phase4_profile_setup_handoff"] = destination.step.name
+    }
+
     fun continueFromFirstLaunchStage() = viewModelScope.launch {
         coordinator.continueFromFirstLaunchStage()
     }

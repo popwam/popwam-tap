@@ -134,6 +134,14 @@ class AuthViewModel(
 
     init { if (sessions.authenticated) refreshSetup("en") }
 
+    /** Phase 4 has already committed a full session atomically. This bridge only
+     * lets retained post-auth code observe that fact; it owns no enrollment state. */
+    fun adoptPhase4Session() {
+        if(_state.value.authenticated)return
+        _state.value=_state.value.copy(authenticated=true,setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error=null)
+        refreshSetup("en")
+    }
+
     fun startPhoneVerification(
         activity:ComponentActivity,
         phoneE164:String,

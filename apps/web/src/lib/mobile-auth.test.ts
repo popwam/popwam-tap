@@ -1,6 +1,6 @@
 import {afterEach,describe,expect,it,vi} from "vitest";
 vi.mock("server-only",()=>({}));
-import {hashMobileRefreshToken,issueMobileSession,verifyMobileAccessToken} from "./mobile-auth";
+import {getMobileAuthContext,hashMobileRefreshToken,issueMobileSession,verifyMobileAccessToken} from "./mobile-auth";
 
 const previousSecret=process.env.MOBILE_TOKEN_SECRET;
 afterEach(()=>{if(previousSecret===undefined)delete process.env.MOBILE_TOKEN_SECRET;else process.env.MOBILE_TOKEN_SECRET=previousSecret});
@@ -22,5 +22,11 @@ describe("shared POP mobile session issuance",()=>{
     expect(records[0].tokenHash).toBe(hashMobileRefreshToken(session.refreshToken));
     expect(records[0]).not.toHaveProperty("refreshToken");
     expect(records[0].familyId).toBeTruthy();
+  });
+  it("never accepts a restricted enrollment credential on normal Bearer middleware",async()=>{
+    process.env.MOBILE_TOKEN_SECRET="m".repeat(48);
+    const request=new Request("https://pop.popwam.com/api/mobile/profile",{headers:{authorization:`Enrollment ${"r".repeat(64)}`}});
+    await expect(getMobileAuthContext(request)).resolves.toBeNull();
+    expect(verifyMobileAccessToken("r".repeat(64))).toBeNull();
   });
 });

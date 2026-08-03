@@ -25,8 +25,8 @@ try {
   if (!/^postgres(ql)?:$/.test(database.protocol)) errors.push("DATABASE_URL must be PostgreSQL");
 } catch { errors.push("DATABASE_URL must be a valid PostgreSQL URL"); }
 
-for (const name of ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "OTP_PEPPER", "ACTIVATION_SCRATCH_PEPPER", "ACTIVATION_RATE_LIMIT_PEPPER"]) strongSecret(name);
-const secretNames = ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "OTP_PEPPER", "ACTIVATION_SCRATCH_PEPPER", "ACTIVATION_RATE_LIMIT_PEPPER"];
+for (const name of ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "MOBILE_ENROLLMENT_SECRET", "OTP_PEPPER", "ACTIVATION_SCRATCH_PEPPER", "ACTIVATION_RATE_LIMIT_PEPPER"]) strongSecret(name);
+const secretNames = ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "MOBILE_ENROLLMENT_SECRET", "OTP_PEPPER", "ACTIVATION_SCRATCH_PEPPER", "ACTIVATION_RATE_LIMIT_PEPPER"];
 const secrets = secretNames.map(value).filter(Boolean);
 if (new Set(secrets).size !== secrets.length) errors.push(`${secretNames.join(", ")} must be distinct`);
 

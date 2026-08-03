@@ -43,6 +43,7 @@ interface FirebasePhoneAuthGateway {
     )
     fun verifyCode(code:String, callback:(FirebasePhoneEvent)->Unit)
     fun reset()
+    fun restoreVerificationId(verificationId:String)
     fun signOut()
 }
 
@@ -79,6 +80,8 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
     private var verificationId:String?=null
     private var resendToken:PhoneAuthProvider.ForceResendingToken?=null
     private var generation=0
+
+    override fun restoreVerificationId(verificationId:String){this.verificationId=verificationId}
 
     override fun start(
         activity:ComponentActivity,

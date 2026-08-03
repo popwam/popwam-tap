@@ -11,6 +11,10 @@ sealed interface PopDestination {
     @Serializable @SerialName("theme") data object Theme : PopDestination
     @Serializable @SerialName("welcome") data class Welcome(val page: WelcomePage = WelcomePage.ALL_IN_ONE) : PopDestination
     @Serializable @SerialName("phone_auth") data object PhoneAuth : PopDestination
+    @Serializable @SerialName("otp") data object Otp : PopDestination
+    @Serializable @SerialName("passkey_setup") data object PasskeySetup : PopDestination
+    @Serializable @SerialName("biometric_setup") data object BiometricSetup : PopDestination
+    @Serializable @SerialName("account_created") data object AccountCreated : PopDestination
     @Serializable @SerialName("profile_setup") data class ProfileSetup(val step: ProfileSetupStep) : PopDestination
 
     @Serializable @SerialName("home") data object Home : PopDestination
@@ -91,6 +95,10 @@ object LegacyDestinationCodec {
         PopDestination.Theme -> "theme"
         is PopDestination.Welcome -> "welcome/${destination.page.name.lowercase().replace('_', '-')}"
         PopDestination.PhoneAuth -> "phone-auth"
+        PopDestination.Otp -> "auth/otp"
+        PopDestination.PasskeySetup -> "auth/passkey-setup"
+        PopDestination.BiometricSetup -> "auth/biometric-setup"
+        PopDestination.AccountCreated -> "auth/account-created"
         is PopDestination.ProfileSetup -> "profile-setup/${destination.step.name.lowercase()}"
         PopDestination.Home -> "home"
         PopDestination.Share -> "share"

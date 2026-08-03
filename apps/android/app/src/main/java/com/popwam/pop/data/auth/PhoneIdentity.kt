@@ -4,9 +4,19 @@ import android.content.Context
 import android.telephony.TelephonyManager
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import java.util.Locale
+import java.text.Normalizer
 
 data class CountryOption(val iso2:String,val callingCode:String,val name:String,val flag:String,val placeholder:String="")
 data class PhoneCountryConfig(val iso2:String,val enabled:Boolean=true,val displayOrder:Int=0,val placeholder:String="",val name:String="",val flag:String="",val dialCode:String="")
+sealed interface PhoneParseResult {
+    data class Valid(val e164:String):PhoneParseResult
+    data object Empty:PhoneParseResult
+    data object Incomplete:PhoneParseResult
+    data object InvalidCountry:PhoneParseResult
+    data object Impossible:PhoneParseResult
+    data object InvalidLength:PhoneParseResult
+    data object Invalid:PhoneParseResult
+}
 object PhoneIdentity {
     private val util=PhoneNumberUtil.getInstance()
     fun countries(locale:Locale):List<CountryOption> = util.supportedRegions.map { iso ->
@@ -31,15 +41,38 @@ object PhoneIdentity {
         }.sortedBy { option->effective.first { it.iso2==option.iso2 }.displayOrder }
     }
     fun search(countries:List<CountryOption>,query:String):List<CountryOption> {
-        val normalized=query.trim()
+        val normalized=searchKey(query)
         if(normalized.isBlank())return countries
         return countries.filter {
-            it.name.contains(normalized,ignoreCase=true) ||
+            searchKey(it.name).contains(normalized,ignoreCase=true) ||
                 it.iso2.contains(normalized,ignoreCase=true) ||
                 it.callingCode.contains(normalized.replace(" ",""))
         }
     }
-    fun normalize(value:String,countryIso2:String):String? = runCatching { util.parse(value,countryIso2).takeIf(util::isValidNumber)?.let { util.format(it,PhoneNumberUtil.PhoneNumberFormat.E164) } }.getOrNull()
+    fun parse(value:String,countryIso2:String):PhoneParseResult {
+        if(value.isBlank())return PhoneParseResult.Empty
+        if(countryIso2 !in util.supportedRegions)return PhoneParseResult.InvalidCountry
+        val number=try{util.parse(value,countryIso2)}catch(error:com.google.i18n.phonenumbers.NumberParseException){
+            return when(error.errorType){
+                com.google.i18n.phonenumbers.NumberParseException.ErrorType.TOO_SHORT_AFTER_IDD,
+                com.google.i18n.phonenumbers.NumberParseException.ErrorType.TOO_SHORT_NSN -> PhoneParseResult.Incomplete
+                com.google.i18n.phonenumbers.NumberParseException.ErrorType.TOO_LONG -> PhoneParseResult.InvalidLength
+                com.google.i18n.phonenumbers.NumberParseException.ErrorType.INVALID_COUNTRY_CODE -> PhoneParseResult.InvalidCountry
+                else -> PhoneParseResult.Invalid
+            }
+        }
+        when(util.isPossibleNumberWithReason(number)) {
+            PhoneNumberUtil.ValidationResult.TOO_SHORT -> return PhoneParseResult.Incomplete
+            PhoneNumberUtil.ValidationResult.TOO_LONG -> return PhoneParseResult.InvalidLength
+            PhoneNumberUtil.ValidationResult.INVALID_COUNTRY_CODE -> return PhoneParseResult.InvalidCountry
+            PhoneNumberUtil.ValidationResult.IS_POSSIBLE,
+            PhoneNumberUtil.ValidationResult.IS_POSSIBLE_LOCAL_ONLY -> Unit
+            else -> return PhoneParseResult.Impossible
+        }
+        if(!util.isValidNumber(number))return PhoneParseResult.Invalid
+        return PhoneParseResult.Valid(util.format(number,PhoneNumberUtil.PhoneNumberFormat.E164))
+    }
+    fun normalize(value:String,countryIso2:String):String?=(parse(value,countryIso2) as? PhoneParseResult.Valid)?.e164
     fun mask(phoneE164:String):String {
         val digits=phoneE164.filter(Char::isDigit)
         if(digits.length<7)return "***"
@@ -53,4 +86,5 @@ object PhoneIdentity {
         if(normalized.length!=2||normalized.any{it !in 'A'..'Z'})return ""
         return normalized.map { letter -> String(Character.toChars(0x1F1E6+(letter-'A'))) }.joinToString("")
     }
+    private fun searchKey(value:String)=Normalizer.normalize(value.trim(),Normalizer.Form.NFD).replace(Regex("\\p{M}+"),"")
 }
