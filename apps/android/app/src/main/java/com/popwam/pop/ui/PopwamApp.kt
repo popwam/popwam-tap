@@ -65,7 +65,6 @@ import com.popwam.pop.data.auth.PasskeyCoordinator
 import com.popwam.pop.data.auth.AuthRuntimeDiagnostics
 import com.popwam.pop.data.auth.AuthRuntimeStage
 import com.popwam.pop.data.auth.biometricUnlockEligibility
-import com.popwam.pop.data.localization.LocalizationAuthoritySnapshot
 import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.nfc.NfcCoordinator
 import com.popwam.pop.ui.theme.AppearanceStore
@@ -80,54 +79,13 @@ import com.google.gson.JsonParser
     main:MainViewModel,
     initialRoute:String="home",
     appearanceStore:AppearanceStore,
-    preAuthStore:PreAuthStore,
-    localization:LocalizationAuthoritySnapshot,
     phoneCountries:PhoneCountryStore,
-    coldLaunchReady:Boolean,
 ){
     val authState by auth.state.collectAsStateWithLifecycle()
-    val preAuthState by preAuthStore.state.collectAsStateWithLifecycle()
-    val appearance by appearanceStore.state.collectAsStateWithLifecycle()
     LaunchedEffect(phoneCountries) { phoneCountries.refresh() }
     var destination by rememberSaveable { mutableStateOf(UnauthenticatedDestination.PHONE_AUTH.name) }
     var pendingRoute by rememberSaveable { mutableStateOf(initialRoute) }
     var pendingActivation by rememberSaveable { mutableStateOf("") }
-    if(!coldLaunchReady){SplashScreen();return}
-    val availableLanguages=localization.availableLocales.map { it.code }.toSet()
-    LaunchedEffect(localization.translationVersion,localization.defaultLocale) {
-        preAuthStore.reconcileLanguage(availableLanguages,localization.defaultLocale)
-    }
-    LaunchedEffect(authState.authenticated) {
-        if(authState.authenticated)preAuthStore.adoptAuthenticatedInstallation(currentLocale(),appearance.theme)
-    }
-    when(resolvePreAuthStage(preAuthState,authState.authenticated,availableLanguages)){
-        PreAuthStage.LANGUAGE -> {
-            LanguageSelectionScreen(localization.availableLocales) { language ->
-                preAuthStore.selectLanguage(language,availableLanguages)
-                applyPopLanguage(language)
-            }
-            return
-        }
-        PreAuthStage.APPEARANCE -> {
-            AppearanceSelectionScreen(
-                onBack=preAuthStore::clearLanguage,
-                onComplete={ selected, identity ->
-                    appearanceStore.setTheme(selected)
-                    appearanceStore.setIdentity(identity)
-                    preAuthStore.completeAppearance(selected)
-                },
-            )
-            return
-        }
-        PreAuthStage.INTRO -> {
-            ProductIntroScreen(
-                onBack=preAuthStore::clearAppearance,
-                onComplete={preAuthStore.completeIntro()},
-            )
-            return
-        }
-        PreAuthStage.AUTH -> Unit
-    }
     if(!authState.authenticated){
         when(UnauthenticatedDestination.valueOf(destination)){
             UnauthenticatedDestination.PHONE_AUTH -> LoginScreen(
@@ -158,8 +116,6 @@ fun currentLocale():String{
     return LocalePolicy.resolve(selected.substringBefore('-'),selected)
 }
 
-@Composable private fun SplashScreen(){PopSystemBars(MaterialTheme.colorScheme.background.red < .2f);Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background){Box(Modifier.fillMaxSize().safeDrawingPadding(),contentAlignment=Alignment.Center){Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)){Icon(painterResource(R.drawable.pop_logo),"POP",Modifier.size(108.dp),tint=MaterialTheme.colorScheme.primary);Text(stringResource(R.string.app_name),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black);CircularProgressIndicator(Modifier.size(28.dp),strokeWidth=2.dp,color=MaterialTheme.colorScheme.primary)}}}}
-
 @Composable private fun WelcomeScreen(activate:()->Unit,scan:()->Unit,login:()->Unit){
     val context=LocalContext.current;val online=rememberOnline();var details by rememberSaveable{mutableStateOf(false)}
     PopSystemBars(false)
@@ -185,7 +141,7 @@ fun toggleLanguage(context:Context?=null){
     val available=LocalePolicy.availableLocales()
     val currentIndex=available.indexOf(currentLocale()).coerceAtLeast(0)
     val next=available[(currentIndex+1)%available.size]
-    context?.let{PreAuthStore.persistLaterLanguageChoice(it,next)}
+    context?.let { persistPopLanguageChoice(it,next) }
     applyPopLanguage(next)
 }
 fun openWeb(context:Context,path:String){CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context,Uri.parse("${BuildConfig.API_BASE_URL.trimEnd('/')}/$path"))}

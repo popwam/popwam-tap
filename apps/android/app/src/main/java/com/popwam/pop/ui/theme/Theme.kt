@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.unit.dp
 import com.popwam.pop.R
+import com.popwam.mobile.designsystem.PopFontFamilies
 
 /** Appearance controls surfaces; identity controls the POP personality. */
 data class PopIdentityPalette(val backgroundDay:Color=Color(0xFFF8FAFC),val backgroundNight:Color=Color(0xFF0B1220),val surfaceDay:Color=Color.White,val surfaceNight:Color=Color(0xFF121B2A),val primaryDay:Color,val primaryNight:Color,val accentDay:Color,val accentNight:Color,val titleDay:Color=Color(0xFF0F172A),val titleNight:Color=Color(0xFFF8FAFC),val bodyDay:Color=Color(0xFF334155),val bodyNight:Color=Color(0xFFCBD5E1),val mutedDay:Color=Color(0xFF64748B),val mutedNight:Color=Color(0xFFCBD5E1),val outlineDay:Color=Color(0xFF94A3B8),val outlineNight:Color=Color(0xFF64748B),val selectedSurfaceDay:Color,val selectedSurfaceNight:Color,val selectedContentDay:Color,val selectedContentNight:Color,val onPrimaryDay:Color=Color.White,val onPrimaryNight:Color=Color.White)
@@ -37,6 +38,7 @@ private fun resolveColors(identity:PopIdentity,dark:Boolean):Pair<ColorScheme,Po
 
 private val Cairo=FontFamily(Font(R.font.cairo,FontWeight.Normal),Font(R.font.cairo,FontWeight.Medium),Font(R.font.cairo,FontWeight.Bold),Font(R.font.cairo,FontWeight.Black))
 private val Montserrat=FontFamily(Font(R.font.montserrat,FontWeight.Normal),Font(R.font.montserrat,FontWeight.Medium),Font(R.font.montserrat,FontWeight.SemiBold),Font(R.font.montserrat,FontWeight.Bold),Font(R.font.montserrat,FontWeight.Black))
+fun popFontFamilies()=PopFontFamilies(englishMontserrat=Montserrat,arabicCairo=Cairo)
 private val Base=Typography()
 private fun typography(font:FontFamily)=Typography(displayLarge=Base.displayLarge.copy(fontFamily=font),displayMedium=Base.displayMedium.copy(fontFamily=font),displaySmall=Base.displaySmall.copy(fontFamily=font),headlineLarge=Base.headlineLarge.copy(fontFamily=font),headlineMedium=Base.headlineMedium.copy(fontFamily=font),headlineSmall=Base.headlineSmall.copy(fontFamily=font),titleLarge=Base.titleLarge.copy(fontFamily=font),titleMedium=Base.titleMedium.copy(fontFamily=font),titleSmall=Base.titleSmall.copy(fontFamily=font),bodyLarge=Base.bodyLarge.copy(fontFamily=font),bodyMedium=Base.bodyMedium.copy(fontFamily=font),bodySmall=Base.bodySmall.copy(fontFamily=font),labelLarge=Base.labelLarge.copy(fontFamily=font),labelMedium=Base.labelMedium.copy(fontFamily=font),labelSmall=Base.labelSmall.copy(fontFamily=font))
 

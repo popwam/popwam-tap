@@ -45,6 +45,7 @@ dependencies {
     implementation(composeBom)
     implementation("com.popwam.mobile:foundation:0.1.0")
     implementation("com.popwam.mobile:design-system:0.1.0")
+    implementation("com.popwam.mobile:onboarding:0.1.0")
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-compose:1.11.0")
@@ -84,6 +85,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 tasks.register("validateReleaseConfiguration") {

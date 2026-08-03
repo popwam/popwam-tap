@@ -6,5 +6,6 @@ includeBuild("../mobile") {
     dependencySubstitution {
         substitute(module("com.popwam.mobile:foundation")).using(project(":foundation"))
         substitute(module("com.popwam.mobile:design-system")).using(project(":design-system"))
+        substitute(module("com.popwam.mobile:onboarding")).using(project(":onboarding"))
     }
 }

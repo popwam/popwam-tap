@@ -122,7 +122,7 @@ fun SecuritySettingsScreen(
                         when(it){
                             "en","ar"->vm.updateAppearancePreference("language",if(it=="ar")"ARABIC" else "ENGLISH")
                         }
-                        PreAuthStore.persistLaterLanguageChoice(context,it)
+                        persistPopLanguageChoice(context,it)
                         applyPopLanguage(it)
                     }}
                     item{Text(stringResource(R.string.settings_font),fontWeight=FontWeight.Bold);Text(if(LocalePolicy.isRtl(currentLocale()))"Cairo" else "ABeeZee",color=MaterialTheme.colorScheme.onSurfaceVariant)}

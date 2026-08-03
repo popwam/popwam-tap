@@ -46,6 +46,56 @@ class PersistedLaunchStateStoreTest {
         assertFalse(updated.hasCompletedProfileSetup)
     }
 
+    @Test
+    fun migratesSchemaOneFieldNamesWithoutLosingSelections() = runTest {
+        val persistence = FakePersistence().apply {
+            value = """{
+                "schemaVersion":1,
+                "hasCompletedFirstLaunchSplash":true,
+                "hasSelectedLanguage":true,
+                "selectedLanguageTag":"ar",
+                "hasSelectedTheme":true,
+                "selectedThemeMode":"DARK",
+                "selectedIdentityPalette":"CORAL",
+                "hasCompletedWelcome":true,
+                "welcomeVersionSeen":1
+            }""".trimIndent()
+        }
+
+        val restored = PersistedLaunchStateStore(persistence).initialize()
+
+        assertEquals(CURRENT_LAUNCH_STATE_SCHEMA, restored.schemaVersion)
+        assertTrue(restored.hasSeenFirstLaunchStage)
+        assertTrue(restored.hasSelectedBaseTheme)
+        assertEquals(ThemeMode.DARK, restored.selectedBaseTheme)
+        assertEquals(IdentityPalette.CORAL, restored.selectedPopStyle)
+        assertTrue(restored.hasCompletedWelcome)
+    }
+
+    @Test
+    fun corruptedStateFallsBackToSafeFirstLaunch() = runTest {
+        val restored = PersistedLaunchStateStore(FakePersistence().apply { value = "{not-json" }).initialize()
+        assertEquals(LaunchState(), restored)
+        assertFalse(restored.hasCompletedWelcome)
+    }
+
+    @Test
+    fun unsupportedPersistedLanguageCannotKeepWelcomeComplete() = runTest {
+        val store = PersistedLaunchStateStore(FakePersistence())
+        val updated = store.update {
+            it.copy(
+                hasSeenFirstLaunchStage = true,
+                hasSelectedLanguage = true,
+                selectedLanguageTag = "zz",
+                hasSelectedBaseTheme = true,
+                hasCompletedWelcome = true,
+                welcomeVersionSeen = CURRENT_WELCOME_VERSION,
+            )
+        }
+        assertFalse(updated.hasSelectedLanguage)
+        assertFalse(updated.hasCompletedWelcome)
+    }
+
     private class FakePersistence : LaunchStatePersistence {
         var value: String? = null
         override suspend fun read(): String? = value
@@ -53,4 +103,3 @@ class PersistedLaunchStateStoreTest {
         override suspend fun clear() { value = null }
     }
 }
-

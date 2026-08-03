@@ -58,7 +58,7 @@ Phase 2 integration is deliberately narrow:
 - `apps/android/settings.gradle.kts` includes the mobile build.
 - `apps/android/app/build.gradle.kts` consumes the two local module coordinates.
 - The existing `PopwamTheme` API remains intact.
-- English typography changes from ABeeZee to the approved Montserrat variable font.
+- English typography changes from ABeeZee to the approved Montserrat variable font. This is an intentional, controlled visual migration that affects existing English production screens; it is not a claim that presentation remains visually unchanged.
 - Existing routes, screens, ViewModels, Retrofit repositories, SharedPreferences, and DataStore behavior remain active.
 
 Future feature migrations can use shared `PopTheme` within the migrated feature boundary. Switching the complete legacy UI to the new type scale in one change is prohibited.
@@ -112,4 +112,3 @@ On macOS:
 ```
 
 The exact framework link task may change when the Xcode export module is added. The CI job must query `tasks` and pin the verified task name rather than silently skipping it.
-

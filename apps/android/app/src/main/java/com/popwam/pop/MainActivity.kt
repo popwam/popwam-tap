@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.nfc.NfcAdapter
 import android.nfc.cardemulation.CardEmulation
 import android.os.Bundle
+import android.content.Intent
 import android.view.WindowManager
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -13,6 +14,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModelProvider
 import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.hce.PopwamHostApduService
 import com.popwam.pop.nfc.NfcCoordinator
@@ -21,20 +23,24 @@ import com.popwam.pop.ui.AuthFactory
 import com.popwam.pop.ui.AuthViewModel
 import com.popwam.pop.ui.MainFactory
 import com.popwam.pop.ui.MainViewModel
-import com.popwam.pop.ui.PreAuthStore
 import com.popwam.pop.ui.PopwamApp
-import com.popwam.pop.ui.RuntimeLaunchViewModel
+import com.popwam.pop.ui.launch.LaunchExperience
+import com.popwam.pop.ui.launch.LaunchViewModel
+import com.popwam.pop.ui.launch.LaunchViewModelFactory
+import com.popwam.pop.ui.launch.reducedMotionEnabled
 import com.popwam.pop.ui.theme.PopwamTheme
 import com.popwam.pop.ui.theme.AppearanceStore
-import androidx.compose.runtime.remember
+import com.popwam.pop.ui.theme.popFontFamilies
+import com.popwam.mobile.onboarding.LaunchCoordinator
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val adapter by lazy { NfcAdapter.getDefaultAdapter(this) }
     private var resumed = false
+    private lateinit var appearanceStore: AppearanceStore
+    private lateinit var launchViewModel: LaunchViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,26 +57,50 @@ class MainActivity : AppCompatActivity() {
                 NfcCoordinator.active.collect(::updateNfcMode)
             }
         }
+        val app = application as TapApplication
+        appearanceStore = AppearanceStore(applicationContext)
+        launchViewModel = ViewModelProvider(
+            this,
+            LaunchViewModelFactory(
+                coordinator = LaunchCoordinator(app.container.launchState),
+                migrator = app.container.launchMigrator,
+                sessions = app.container.sessions,
+                localization = app.container.localization,
+                appearanceStore = appearanceStore,
+                reducedMotion = reducedMotionEnabled(this),
+                afterSessionInitialized = { app.container.pushTokens.uploadPendingIfAuthenticated() },
+            ),
+        )[LaunchViewModel::class.java]
+        launchViewModel.acceptDeepLink(intent?.dataString)
         setContent {
-            val app = application as TapApplication
-            val appearanceStore=remember{AppearanceStore(applicationContext)}
-            val preAuthStore=remember{PreAuthStore(applicationContext)}
             val appearance by appearanceStore.state.collectAsStateWithLifecycle()
-            val preAuth by preAuthStore.state.collectAsStateWithLifecycle()
             val localization by app.container.localization.state.collectAsStateWithLifecycle()
-            val launch:RuntimeLaunchViewModel=viewModel()
-            val coldLaunchReady by launch.ready.collectAsStateWithLifecycle()
-            LaunchedEffect(launch) { launch.begin { app.container.localization.refresh() } }
-            val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
-            val authState by auth.state.collectAsStateWithLifecycle()
-            val main: MainViewModel = viewModel(
-                factory = MainFactory(app.container.repository, app.container.sessions.role,app.container.analytics),
-            )
-            val firstLaunchTheme = if (!authState.authenticated && preAuth.appearance == null) "LIGHT" else appearance.theme
-            PopwamTheme(firstLaunchTheme,appearance.font,appearance.identity) {
-                PopwamApp(auth, main, NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,preAuthStore,localization,app.container.phoneCountries,coldLaunchReady)
+            LaunchExperience(launchViewModel,localization,popFontFamilies()) {
+                val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
+                val main: MainViewModel = viewModel(
+                    factory = MainFactory(app.container.repository, app.container.sessions.role,app.container.analytics),
+                )
+                PopwamTheme(appearance.theme,appearance.font,appearance.identity) {
+                    PopwamApp(auth,main,NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,app.container.phoneCountries)
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        launchViewModel.acceptDeepLink(intent.dataString)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (::launchViewModel.isInitialized) launchViewModel.setForeground(true)
+    }
+
+    override fun onStop() {
+        if (::launchViewModel.isInitialized) launchViewModel.setForeground(false)
+        super.onStop()
     }
 
     override fun onResume() {

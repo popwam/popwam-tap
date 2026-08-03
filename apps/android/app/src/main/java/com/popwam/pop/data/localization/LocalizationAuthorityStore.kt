@@ -7,8 +7,8 @@ import com.popwam.pop.data.api.AuthApi
 import com.popwam.pop.data.api.LocalizationBootstrapResponse
 import com.popwam.pop.data.api.LocalizationLocaleDto
 import com.popwam.pop.ui.LocalePolicy
-import com.popwam.pop.ui.PreAuthStore
 import com.popwam.pop.ui.applyPopLanguage
+import com.popwam.mobile.foundation.launch.LaunchStateStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -21,6 +21,7 @@ data class LocalizationAuthoritySnapshot(
 class LocalizationAuthorityStore(
     context:Context,
     private val api:AuthApi,
+    private val launchStateStore:LaunchStateStore,
 ) {
     private val appContext=context.applicationContext
     private val preferences=appContext.getSharedPreferences(PREFERENCES,Context.MODE_PRIVATE)
@@ -54,7 +55,7 @@ class LocalizationAuthorityStore(
         val locales=value?.availableLocales.orEmpty()
             .filter { it.code in BUNDLED_FALLBACK_CAPABILITIES }
             .distinctBy { it.code }
-        val available=if(locales.any { it.code=="en" })locales else listOf(LocalizationLocaleDto())+locales
+        val available=requiredFallbackLocales().filter { fallback -> locales.none { it.code==fallback.code } }+locales
         val default=value?.defaultLocale?.takeIf { candidate -> available.any { it.code==candidate } } ?: "en"
         return LocalizationAuthoritySnapshot(default,value?.translationVersion?.coerceAtLeast(0) ?: 0,available)
     }
@@ -63,12 +64,13 @@ class LocalizationAuthorityStore(
         LocalePolicy.configure(snapshot.defaultLocale,snapshot.availableLocales.map { it.code },snapshot.availableLocales.filter { it.rtl }.map { it.code }.toSet())
     }
 
-    private fun reconcilePersistedSelection(snapshot:LocalizationAuthoritySnapshot) {
-        val selected=PreAuthStore.persistedLanguage(appContext)
+    private suspend fun reconcilePersistedSelection(snapshot:LocalizationAuthoritySnapshot) {
+        val persisted=launchStateStore.state.value
+        val selected=persisted.selectedLanguageTag?.takeIf { persisted.hasSelectedLanguage }
         val allowed=snapshot.availableLocales.map { it.code }.toSet()
         val resolved=selected?.takeIf { it in allowed } ?: snapshot.defaultLocale
         if(selected!=null&&selected !in allowed) {
-            PreAuthStore.clearLaterLanguageChoice(appContext)
+            launchStateStore.update { it.copy(hasSelectedLanguage=true,selectedLanguageTag=resolved) }
         }
         // POP's server-authoritative locale must always override the device locale.
         applyPopLanguage(resolved)
@@ -85,9 +87,14 @@ class LocalizationAuthorityStore(
                 runCatching { Gson().fromJson(it,LocalizationAuthoritySnapshot::class.java) }.getOrNull()
             }
             val locales=cached?.availableLocales.orEmpty().filter { it.code in BUNDLED_FALLBACK_CAPABILITIES }
-            val available=if(locales.any { it.code=="en" })locales else listOf(LocalizationLocaleDto())
+            val available=requiredFallbackLocales().filter { fallback -> locales.none { it.code==fallback.code } }+locales
             val default=cached?.defaultLocale?.takeIf { candidate -> available.any { it.code==candidate } } ?: "en"
             LocalePolicy.configure(default,available.map { it.code },available.filter { it.rtl }.map { it.code }.toSet())
         }
+
+        private fun requiredFallbackLocales()=listOf(
+            LocalizationLocaleDto(),
+            LocalizationLocaleDto(code="ar",name="Arabic",nativeName="العربية",rtl=true),
+        )
     }
 }

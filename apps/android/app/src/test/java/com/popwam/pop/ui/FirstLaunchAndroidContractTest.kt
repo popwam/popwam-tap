@@ -8,32 +8,31 @@ import org.junit.Test
 class FirstLaunchAndroidContractTest {
     private fun source(path:String)=File(path).readText()
 
-    @Test fun `startup is pre auth gated and no longer jumps to login on a timer`() {
-        val app=source("src/main/java/com/popwam/pop/ui/PopwamApp.kt")
-        assertTrue(app.contains("resolvePreAuthStage(preAuthState,authState.authenticated,availableLanguages)"))
-        assertTrue(app.contains("PreAuthStage.LANGUAGE"))
-        assertTrue(app.contains("PreAuthStage.APPEARANCE"))
-        assertTrue(app.contains("PreAuthStage.INTRO"))
-        assertFalse(app.contains("delay(650)"))
-        assertFalse(app.contains("entry=EntryScreen.LOGIN"))
+    @Test fun `startup is owned by one feature scoped coordinator`() {
+        val activity=source("src/main/java/com/popwam/pop/MainActivity.kt")
+        val launch=source("src/main/java/com/popwam/pop/ui/launch/LaunchViewModel.kt")
+        assertTrue(activity.contains("LaunchCoordinator(app.container.launchState)"))
+        assertTrue(activity.contains("LaunchExperience(launchViewModel"))
+        assertTrue(launch.contains("SplashStage.ONE"))
+        assertTrue(launch.contains("SplashStage.FOUR"))
+        assertFalse(File("src/main/java/com/popwam/pop/ui/RuntimeLaunchViewModel.kt").exists())
     }
 
-    @Test fun `first launch persistence is versioned and never stores auth authority`() {
-        val source=source("src/main/java/com/popwam/pop/ui/PreAuthExperience.kt")
-        assertTrue(source.contains("\"pop_pre_auth\""))
-        assertTrue(source.contains("\"language\""))
-        assertTrue(source.contains("\"appearance\""))
-        assertTrue(source.contains("\"intro_version_seen\""))
-        assertFalse(source.contains("accessToken"))
-        assertFalse(source.contains("refreshToken"))
-        assertFalse(source.contains("FirebaseAuth"))
+    @Test fun `first launch persistence is versioned and legacy is read only for migration`() {
+        val persistence=source("src/main/java/com/popwam/pop/data/launch/AndroidLaunchStatePersistence.kt")
+        val migration=source("src/main/java/com/popwam/pop/data/launch/LegacyLaunchStateMigration.kt")
+        assertTrue(persistence.contains("pop_launch_state"))
+        assertTrue(migration.contains("pop_pre_auth"))
+        assertTrue(migration.contains("MIGRATION_VERSION = 2"))
+        assertFalse(persistence.contains("accessToken"))
+        assertFalse(persistence.contains("refreshToken"))
     }
 
     @Test fun `appearance reuses Phase H store and themes the whole app`() {
         val activity=source("src/main/java/com/popwam/pop/MainActivity.kt")
         val appearance=source("src/main/java/com/popwam/pop/ui/theme/AppearanceStore.kt")
         assertTrue(activity.contains("AppearanceStore(applicationContext)"))
-        assertTrue(activity.contains("PopwamTheme(firstLaunchTheme,appearance.font,appearance.identity)"))
+        assertTrue(activity.contains("Phase3OnboardingTheme" ) || source("src/main/java/com/popwam/pop/ui/launch/LaunchExperience.kt").contains("Phase3OnboardingTheme"))
         assertTrue(appearance.contains("putString(\"theme\",value)"))
         assertTrue(appearance.contains("setOf(\"SYSTEM\",\"LIGHT\",\"DARK\")"))
     }
@@ -71,14 +70,14 @@ class FirstLaunchAndroidContractTest {
         assertTrue(locales.contains("android:name=\"fr\""))
     }
 
-    @Test fun `server localization authority and cold splash gate startup`() {
-        val activity=source("src/main/java/com/popwam/pop/MainActivity.kt")
+    @Test fun `server localization and session restore run asynchronously beside splash`() {
+        val application=source("src/main/java/com/popwam/pop/TapApplication.kt")
         val authority=source("src/main/java/com/popwam/pop/data/localization/LocalizationAuthorityStore.kt")
-        val launch=source("src/main/java/com/popwam/pop/ui/RuntimeLaunchViewModel.kt")
-        assertTrue(activity.contains("container.localization.refresh()"))
+        val launch=source("src/main/java/com/popwam/pop/ui/launch/LaunchViewModel.kt")
         assertTrue(authority.contains("api.localizationBootstrap()"))
-        assertTrue(authority.contains("listOf(LocalizationLocaleDto())"))
-        assertTrue(launch.contains("POP_COLD_SPLASH_MILLIS=3_000L"))
+        assertTrue(launch.contains("sessions.initialize()"))
+        assertTrue(launch.contains("localization.refresh()"))
+        assertFalse(application.contains("runBlocking"))
     }
 
     @Test fun `typography is centrally script aware`() {
