@@ -178,6 +178,7 @@ class AndroidFirebasePhoneAuthGateway:FirebasePhoneAuthGateway {
                 val token=tokenTask.result?.token
                 if(tokenTask.isSuccessful&&!token.isNullOrBlank()) {
                     AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ID_TOKEN_FETCH,"success")
+                    AuthRuntimeDiagnostics.mark(AuthRuntimeStage.FIREBASE_TOKEN_READY)
                     callback(FirebasePhoneEvent.Verified(token,automatic))
                 } else {
                     AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ID_TOKEN_FETCH,"failed")

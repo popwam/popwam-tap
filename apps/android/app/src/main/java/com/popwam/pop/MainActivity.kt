@@ -10,6 +10,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -35,8 +36,6 @@ import com.popwam.pop.ui.currentLocale
 import com.popwam.pop.ui.auth.AuthenticationFlowFactory
 import com.popwam.pop.ui.auth.AuthenticationFlowViewModel
 import com.popwam.pop.ui.auth.AuthenticationHost
-import com.popwam.mobile.foundation.launch.IdentityPalette
-import com.popwam.mobile.foundation.launch.ThemeMode
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.popwam.mobile.onboarding.LaunchCoordinator
@@ -52,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var authenticationViewModel: AuthenticationFlowViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val app = application as TapApplication
-        appearanceStore = AppearanceStore(applicationContext)
+        appearanceStore = AppearanceStore()
         launchViewModel = ViewModelProvider(
             this,
             LaunchViewModelFactory(
@@ -75,7 +75,6 @@ class MainActivity : AppCompatActivity() {
                 migrator = app.container.launchMigrator,
                 sessions = app.container.sessions,
                 localization = app.container.localization,
-                appearanceStore = appearanceStore,
                 reducedMotion = reducedMotionEnabled(this),
                 afterSessionInitialized = { app.container.pushTokens.uploadPendingIfAuthenticated() },
             ),
@@ -86,8 +85,11 @@ class MainActivity : AppCompatActivity() {
             AuthenticationFlowFactory(app.container.authenticationRemote,app.container.sessionStore,app.container.firebasePhoneAuth),
         )[AuthenticationFlowViewModel::class.java]
         setContent {
-            val appearance by appearanceStore.state.collectAsStateWithLifecycle()
+            val launchState by launchViewModel.state.collectAsStateWithLifecycle()
             val localization by app.container.localization.state.collectAsStateWithLifecycle()
+            androidx.compose.runtime.LaunchedEffect(launchState.persisted.selectedBaseTheme, launchState.persisted.selectedPopStyle) {
+                appearanceStore.synchronize(launchState.persisted.selectedBaseTheme.name, launchState.persisted.selectedPopStyle.name)
+            }
             LaunchExperience(launchViewModel,localization,popFontFamilies()) {
                 val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
                 val authState by auth.state.collectAsStateWithLifecycle()
@@ -96,8 +98,8 @@ class MainActivity : AppCompatActivity() {
                 )
                 if(!authState.authenticated) {
                     Phase3OnboardingTheme(
-                        ThemeMode.valueOf(appearance.theme),
-                        IdentityPalette.valueOf(appearance.identity),
+                        launchState.persisted.selectedBaseTheme,
+                        launchState.persisted.selectedPopStyle,
                         isSystemInDarkTheme(),
                         currentLocale(),
                         popFontFamilies(),
@@ -109,8 +111,12 @@ class MainActivity : AppCompatActivity() {
                             onProfileSetup={ destination -> launchViewModel.acceptProfileSetupHandoff(destination) },
                         )
                     }
-                } else PopwamTheme(appearance.theme,appearance.font,appearance.identity) {
-                    PopwamApp(auth,main,NfcDeepLinkPolicy.route(intent?.dataString),appearanceStore,app.container.phoneCountries)
+                } else PopwamTheme(launchState.persisted.selectedBaseTheme.name,"DEFAULT",launchState.persisted.selectedPopStyle.name) {
+                    PopwamApp(
+                        auth, main, NfcDeepLinkPolicy.route(intent?.dataString), appearanceStore, app.container.phoneCountries,
+                        onThemeModeSelected = launchViewModel::selectBaseTheme,
+                        onPaletteSelected = launchViewModel::selectPopStyle,
+                    )
                 }
             }
         }

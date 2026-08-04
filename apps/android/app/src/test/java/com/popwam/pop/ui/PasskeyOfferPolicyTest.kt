@@ -50,7 +50,7 @@ class PasskeyOfferPolicyTest {
 
     @Test fun `skip delegates the next destination to the bootstrap resolver`() {
         val viewModel=File("src/main/java/com/popwam/pop/ui/AppViewModels.kt").readText()
-        val skip=viewModel.substringAfter("fun skipPasskey(locale:String)").substringBefore("fun continueLegacyCompatibility")
+        val skip=viewModel.substringAfter("fun skipPasskey(locale:String)").substringBefore("private fun completePasskeySkipRouteResolve")
         assertTrue(skip.contains("refreshSetup(locale)"))
         assertFalse(skip.contains("refreshDynamicOnboarding(locale)"))
     }

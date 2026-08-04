@@ -37,7 +37,7 @@ fun LaunchExperience(
     val theme = if (destination == PopDestination.Language || destination == PopDestination.Launch || destination == PopDestination.FirstLaunchFinalStage) {
         ThemeMode.LIGHT
     } else state.persisted.selectedBaseTheme
-    val style = if (destination == PopDestination.Theme) state.previewPopStyle else state.persisted.selectedPopStyle
+    val style = state.persisted.selectedPopStyle
     val availableLanguages = buildList {
         add("en")
         add("ar")
@@ -46,25 +46,32 @@ fun LaunchExperience(
     Phase3OnboardingTheme(theme, style, isSystemInDarkTheme(), language, fonts) {
         PopSystemBars(theme == ThemeMode.DARK || theme == ThemeMode.SYSTEM && isSystemInDarkTheme())
         when (destination) {
-            PopDestination.Launch -> PopSplashScreen(state.splashStage, onGoAhead = {})
-            PopDestination.FirstLaunchFinalStage -> PopSplashScreen(state.splashStage, viewModel::continueFromFirstLaunchStage)
+            PopDestination.Launch -> PopSplashScreen(
+                progress = state.splashProgress,
+                showGoAhead = false,
+                onGoAhead = {},
+            )
+            PopDestination.FirstLaunchFinalStage -> PopSplashScreen(
+                progress = 1f,
+                showGoAhead = true,
+                onGoAhead = viewModel::continueFromFirstLaunchStage,
+            )
             PopDestination.Language -> LanguageScreen(
                 availableLanguageTags = availableLanguages,
                 selectedLanguageTag = state.persisted.selectedLanguageTag,
                 onSelect = { viewModel.selectLanguage(it, ::applyPopLanguage) },
             )
             PopDestination.Theme -> {
-                BackHandler(enabled = overlay.active?.key == OverlayKey.THEME_GALLERY) { viewModel.cancelPopStyle() }
+                BackHandler(enabled = overlay.active?.key == OverlayKey.THEME_GALLERY) { viewModel.dismissThemeGallery() }
                 ThemeScreen(
                     selectedMode = state.persisted.selectedBaseTheme,
-                    selectedStyle = state.previewPopStyle,
+                    selectedStyle = state.persisted.selectedPopStyle,
                     galleryVisible = overlay.active?.key == OverlayKey.THEME_GALLERY,
                     onSelectMode = viewModel::selectBaseTheme,
                     onContinue = viewModel::completeTheme,
                     onOpenGallery = viewModel::openThemeGallery,
-                    onPreviewStyle = viewModel::previewPopStyle,
-                    onConfirmStyle = viewModel::confirmPopStyle,
-                    onCancelStyle = viewModel::cancelPopStyle,
+                    onSelectStyle = viewModel::selectPopStyle,
+                    onDismissGallery = viewModel::dismissThemeGallery,
                 )
             }
             is PopDestination.Welcome -> {

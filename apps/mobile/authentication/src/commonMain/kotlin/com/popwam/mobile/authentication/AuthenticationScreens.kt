@@ -2,6 +2,7 @@ package com.popwam.mobile.authentication
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -26,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -57,6 +58,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.popwam.mobile.authentication.generated.resources.*
@@ -86,6 +88,8 @@ data class AuthenticationCallbacks(
     val countrySearchChanged: (String) -> Unit,
     val continuePhone: () -> Unit,
     val requestPhoneHint: () -> Unit,
+    val openTerms: () -> Unit,
+    val openPrivacy: () -> Unit,
     val otpChanged: (String) -> Unit,
     val verifyOtp: () -> Unit,
     val resendOtp: () -> Unit,
@@ -127,29 +131,31 @@ fun AuthenticationExperience(
 
 @Composable
 private fun PhoneScreen(state: AuthenticationUiState, country: AuthenticationCountry?, callbacks: AuthenticationCallbacks) {
+    val colors = LocalPopSemanticColors.current
     AuthPage {
+        // Deliberately lower than the legacy phone entry while remaining scrollable when
+        // the IME is visible.
+        Spacer(Modifier.height(64.dp))
         PopAuthenticationMark(
-            color = MaterialTheme.colorScheme.primary,
+            color = colors.logoPrimary,
             description = stringResource(Res.string.auth_pop_logo),
             modifier = Modifier.size(width = 144.dp, height = 174.dp),
         )
         Spacer(Modifier.height(24.dp))
-        Text(stringResource(Res.string.auth_welcome_back), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
-        Text(stringResource(Res.string.auth_phone_help), style = MaterialTheme.typography.bodyLarge, color = LocalPopSemanticColors.current.textSecondary, modifier = Modifier.fillMaxWidth())
+        Text(stringResource(Res.string.auth_welcome_back), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Text(stringResource(Res.string.auth_phone_help), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = colors.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(PopSpacing.xl))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PopSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(
-                onClick = callbacks.countryOpened,
-                modifier = Modifier.heightIn(min = 56.dp),
-                contentPadding = PaddingValues(horizontal = PopSpacing.md),
-            ) {
-                Text(country?.flag.orEmpty())
-                Spacer(Modifier.width(PopSpacing.xs))
-                CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Ltr) {
+        CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides NumericInputLayoutDirection) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PopSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = callbacks.countryOpened,
+                    modifier = Modifier.heightIn(min = 56.dp),
+                    contentPadding = PaddingValues(horizontal = PopSpacing.md),
+                ) {
+                    Text(country?.flag.orEmpty())
+                    Spacer(Modifier.width(PopSpacing.xs))
                     Text(country?.callingCode ?: "+", fontWeight = FontWeight.SemiBold)
                 }
-            }
-            CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Ltr) {
                 OutlinedTextField(
                     value = state.phoneInput,
                     onValueChange = callbacks.phoneChanged,
@@ -157,6 +163,7 @@ private fun PhoneScreen(state: AuthenticationUiState, country: AuthenticationCou
                     singleLine = true,
                     placeholder = { Text(country?.placeholder ?: stringResource(Res.string.auth_phone_number)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Ltr),
                 )
             }
         }
@@ -171,8 +178,15 @@ private fun PhoneScreen(state: AuthenticationUiState, country: AuthenticationCou
             if (state.operation == AuthenticationOperation.SUBMITTING) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
             else Text(stringResource(Res.string.auth_continue), style = MaterialTheme.typography.titleLarge)
         }
-        Text(stringResource(Res.string.auth_legal), style = MaterialTheme.typography.bodySmall, color = LocalPopSemanticColors.current.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = PopSpacing.xs))
-        Spacer(Modifier.weight(1f))
+        Column(Modifier.fillMaxWidth().padding(top = PopSpacing.xs), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(stringResource(Res.string.auth_legal_prefix), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary, textAlign = TextAlign.Center)
+            Row(horizontalArrangement = Arrangement.spacedBy(PopSpacing.xxs), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = callbacks.openTerms) { Text(stringResource(Res.string.auth_terms), color = colors.brandPrimary, fontWeight = FontWeight.SemiBold) }
+                Text(stringResource(Res.string.auth_legal_joiner), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                TextButton(onClick = callbacks.openPrivacy) { Text(stringResource(Res.string.auth_privacy), color = colors.brandPrimary, fontWeight = FontWeight.SemiBold) }
+            }
+        }
+        Spacer(Modifier.height(PopSpacing.lg))
         TextButton(onClick = callbacks.retry, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.auth_need_help)) }
     }
 }
@@ -240,27 +254,30 @@ private fun OtpSheet(state: AuthenticationUiState, callbacks: AuthenticationCall
 
 @Composable
 private fun OtpField(value: String, length: Int, onChange: (String) -> Unit, enabled: Boolean) {
-    BasicTextField(
-        value = value,
-        onValueChange = { onChange(it.filter(Char::isDigit).take(length)) },
-        enabled = enabled,
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        decorationBox = { inner ->
-            Box(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    repeat(length) { index ->
-                        Box(
-                            Modifier.weight(1f).height(54.dp).clip(RoundedCornerShape(PopRadius.small)).background(LocalPopSemanticColors.current.surfaceSecondary),
-                            contentAlignment = Alignment.Center,
-                        ) { Text(value.getOrNull(index)?.toString().orEmpty(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+    CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides NumericInputLayoutDirection) {
+        BasicTextField(
+            value = value,
+            onValueChange = { onChange(it.filter(Char::isDigit).take(length)) },
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            textStyle = MaterialTheme.typography.titleLarge.copy(textDirection = TextDirection.Ltr),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            decorationBox = { inner ->
+                Box(Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        repeat(length) { index ->
+                            Box(
+                                Modifier.weight(1f).height(54.dp).clip(RoundedCornerShape(PopRadius.small)).background(LocalPopSemanticColors.current.surfaceSecondary),
+                                contentAlignment = Alignment.Center,
+                            ) { Text(value.getOrNull(index)?.toString().orEmpty(), style = MaterialTheme.typography.titleLarge.copy(textDirection = TextDirection.Ltr), fontWeight = FontWeight.Bold) }
+                        }
                     }
+                    Box(Modifier.size(1.dp)) { inner() }
                 }
-                Box(Modifier.size(1.dp)) { inner() }
-            }
-        },
-    )
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -411,7 +428,11 @@ private fun SecurityBenefit(title: String, body: String) {
 @Composable
 private fun AuthPage(content: @Composable ColumnScope.() -> Unit) {
     Surface(Modifier.fillMaxSize(), color = LocalPopSemanticColors.current.backgroundTertiary) {
-        Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 31.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally, content = content)
+        Column(
+            Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 31.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            content = content,
+        )
     }
 }
 
@@ -419,6 +440,10 @@ private fun AuthPage(content: @Composable ColumnScope.() -> Unit) {
 private fun AuthError(error: AuthenticationError) {
     val text = when (error) {
         AuthenticationError.OFFLINE -> Res.string.auth_offline
+        AuthenticationError.SERVER_UNREACHABLE -> Res.string.auth_server_unreachable
+        AuthenticationError.PHONE_VERIFICATION_FAILED -> Res.string.auth_phone_verification_failed
+        AuthenticationError.SERVER_CONFIGURATION_INCOMPLETE -> Res.string.auth_server_configuration_incomplete
+        AuthenticationError.ACCOUNT_PREPARATION_FAILED -> Res.string.auth_account_preparation_failed
         AuthenticationError.RATE_LIMITED -> Res.string.auth_rate_limited
         AuthenticationError.EMPTY_PHONE,
         AuthenticationError.INCOMPLETE_PHONE,

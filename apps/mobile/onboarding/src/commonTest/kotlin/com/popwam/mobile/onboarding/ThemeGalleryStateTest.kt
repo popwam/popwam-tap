@@ -12,18 +12,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ThemeGalleryStateTest {
-    @Test fun cancelRestoresConfirmedStyleAndConfirmPersistsPreview() = runTest {
+    @Test fun paletteTapCommitsTheLiveThemeImmediatelyAndDismissDoesNotRevertIt() = runTest {
         val coordinator = LaunchCoordinator(PersistedLaunchStateStore(MemoryPersistence()))
         coordinator.restore()
         coordinator.openThemeGallery()
-        coordinator.previewPopStyle(IdentityPalette.VIOLET)
-        coordinator.cancelPopStyle()
-        assertEquals(IdentityPalette.MINT, coordinator.state.value.previewPopStyle)
-
-        coordinator.openThemeGallery()
-        coordinator.previewPopStyle(IdentityPalette.GRAPHITE)
-        coordinator.confirmPopStyle()
-        assertEquals(IdentityPalette.GRAPHITE, coordinator.state.value.persisted.selectedPopStyle)
+        coordinator.selectPopStyle(IdentityPalette.VIOLET)
+        assertEquals(IdentityPalette.VIOLET, coordinator.state.value.persisted.selectedPopStyle)
+        coordinator.dismissThemeGallery()
+        assertEquals(IdentityPalette.VIOLET, coordinator.state.value.persisted.selectedPopStyle)
     }
 
     @Test fun allSixRuntimeStylesAreCanonical() {
@@ -43,5 +39,17 @@ class ThemeGalleryStateTest {
         assertTrue(resolveDarkTheme(ThemeMode.DARK, systemDark = false))
         assertFalse(resolveDarkTheme(ThemeMode.SYSTEM, systemDark = false))
         assertTrue(resolveDarkTheme(ThemeMode.SYSTEM, systemDark = true))
+    }
+
+    @Test fun continueOnlyAdvancesOnboardingAndDoesNotChangeTheSelectedTheme() = runTest {
+        val coordinator = LaunchCoordinator(PersistedLaunchStateStore(MemoryPersistence()))
+        coordinator.restore()
+        coordinator.selectBaseTheme(ThemeMode.DARK)
+        coordinator.selectPopStyle(IdentityPalette.GRAPHITE)
+
+        coordinator.completeThemeSelection()
+
+        assertEquals(ThemeMode.DARK, coordinator.state.value.persisted.selectedBaseTheme)
+        assertEquals(IdentityPalette.GRAPHITE, coordinator.state.value.persisted.selectedPopStyle)
     }
 }

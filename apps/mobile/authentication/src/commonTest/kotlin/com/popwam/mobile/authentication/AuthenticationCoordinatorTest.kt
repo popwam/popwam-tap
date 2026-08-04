@@ -51,6 +51,40 @@ class AuthenticationCoordinatorTest {
         assertEquals(AuthenticationStage.BIOMETRIC, coordinator.state.value.stage)
     }
 
+    @Test fun `manual otp result is exchanged once and advances a new user to verified`() = runTest {
+        val vault = FakeVault()
+        val remote = FakeRemote()
+        val coordinator = AuthenticationCoordinator(remote, vault)
+
+        coordinator.startChallenge("+201001234567", "masked", null)
+        coordinator.phoneCodeSent("provider-handle")
+        coordinator.updateOtp("123456")
+        assertTrue(coordinator.beginOtpVerification())
+
+        assertNotNull(coordinator.exchangeFirebaseProof("firebase-proof", "device"))
+        assertNull(coordinator.exchangeFirebaseProof("duplicate-proof", "device"))
+        assertEquals(1, remote.phoneExchangeCalls)
+        assertEquals(AuthenticationStage.VERIFIED, coordinator.state.value.stage)
+        assertEquals(AuthenticationNextAction.ENROLL_PASSKEY, coordinator.state.value.pendingServerAction)
+        assertEquals("restricted-token", vault.restricted)
+    }
+
+    @Test fun `existing full session from otp becomes authenticated without enrollment`() = runTest {
+        val vault = FakeVault()
+        val remote = FakeRemote().apply { phoneExchangeAction = AuthenticationNextAction.AUTHENTICATED }
+        val coordinator = AuthenticationCoordinator(remote, vault)
+
+        coordinator.startChallenge("+201001234567", "masked", null)
+        coordinator.phoneCodeSent("provider-handle")
+        coordinator.updateOtp("123456")
+        assertTrue(coordinator.beginOtpVerification())
+        coordinator.exchangeFirebaseProof("firebase-proof", "device")
+
+        assertEquals(AuthenticationStage.AUTHENTICATED, coordinator.state.value.stage)
+        assertNotNull(vault.full)
+        assertNull(vault.restricted)
+    }
+
     @Test fun `phone fallback is permitted only by an unauthenticated server challenge`() = runTest {
         val coordinator = AuthenticationCoordinator(FakeRemote(), FakeVault())
         coordinator.startChallenge("+201001234567", "masked", null)
@@ -78,6 +112,8 @@ private class FakeVault(var restricted: String? = null) : AuthenticationSessionV
 
 private class FakeRemote : AuthenticationRemoteDataSource {
     var passkeyCallbacks = 0
+    var phoneExchangeCalls = 0
+    var phoneExchangeAction = AuthenticationNextAction.ENROLL_PASSKEY
     val deviceProof = DeviceBindingProof("challenge", "credential_123456789", "public", "signature", com.popwam.mobile.foundation.platform.BiometricCapability.FINGERPRINT)
     private fun envelope(action: AuthenticationNextAction, enrollment: Boolean = true) = AuthenticationEnvelope(
         ok = true,
@@ -99,7 +135,11 @@ private class FakeRemote : AuthenticationRemoteDataSource {
         user = if (enrollment) null else AuthenticationUser("user", "USER"),
     )
     override suspend fun createChallenge(phoneE164: String, deviceCredentialId: String?) = AuthenticationApiResult.Success(envelope(AuthenticationNextAction.VERIFY_OTP).copy(accountState = AccountState.UNKNOWN, sessionScope = SessionScope.NONE, enrollmentSession = null))
-    override suspend fun exchangeFirebaseProof(challengeId: String, idToken: String, deviceName: String) = AuthenticationApiResult.Success(envelope(AuthenticationNextAction.ENROLL_PASSKEY))
+    override suspend fun exchangeFirebaseProof(challengeId: String, idToken: String, deviceName: String): AuthenticationApiResult<AuthenticationEnvelope> {
+        phoneExchangeCalls += 1
+        val enrollment = phoneExchangeAction != AuthenticationNextAction.AUTHENTICATED
+        return AuthenticationApiResult.Success(envelope(phoneExchangeAction, enrollment))
+    }
     override suspend fun passkeyAuthenticationOptions() = AuthenticationApiResult.Success(JsonObject(emptyMap()))
     override suspend fun verifyPasskeyAuthentication(challengeId: String, assertion: JsonObject, deviceName: String) = AuthenticationApiResult.Success(envelope(AuthenticationNextAction.AUTHENTICATED, false))
     override suspend fun enrollmentStatus(enrollmentToken: String) = AuthenticationApiResult.Success(envelope(AuthenticationNextAction.ENROLL_PASSKEY))

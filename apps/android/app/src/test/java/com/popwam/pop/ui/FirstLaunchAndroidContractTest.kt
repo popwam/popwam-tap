@@ -13,8 +13,8 @@ class FirstLaunchAndroidContractTest {
         val launch=source("src/main/java/com/popwam/pop/ui/launch/LaunchViewModel.kt")
         assertTrue(activity.contains("LaunchCoordinator(app.container.launchState)"))
         assertTrue(activity.contains("LaunchExperience(launchViewModel"))
-        assertTrue(launch.contains("SplashStage.ONE"))
-        assertTrue(launch.contains("SplashStage.FOUR"))
+        assertTrue(launch.contains("advanceSplashTimeline"))
+        assertTrue(launch.contains("KEY_SPLASH_STARTED_AT"))
         assertFalse(File("src/main/java/com/popwam/pop/ui/RuntimeLaunchViewModel.kt").exists())
     }
 
@@ -28,13 +28,13 @@ class FirstLaunchAndroidContractTest {
         assertFalse(persistence.contains("refreshToken"))
     }
 
-    @Test fun `appearance reuses Phase H store and themes the whole app`() {
+    @Test fun `launch state is the sole persisted theme authority`() {
         val activity=source("src/main/java/com/popwam/pop/MainActivity.kt")
         val appearance=source("src/main/java/com/popwam/pop/ui/theme/AppearanceStore.kt")
-        assertTrue(activity.contains("AppearanceStore(applicationContext)"))
+        assertTrue(activity.contains("AppearanceStore()"))
         assertTrue(activity.contains("Phase3OnboardingTheme" ) || source("src/main/java/com/popwam/pop/ui/launch/LaunchExperience.kt").contains("Phase3OnboardingTheme"))
-        assertTrue(appearance.contains("putString(\"theme\",value)"))
-        assertTrue(appearance.contains("setOf(\"SYSTEM\",\"LIGHT\",\"DARK\")"))
+        assertTrue(appearance.contains("Compatibility mirror"))
+        assertFalse(appearance.contains("getSharedPreferences"))
     }
 
     @Test fun `auth legal actions are native and contain no browser or WebView`() {

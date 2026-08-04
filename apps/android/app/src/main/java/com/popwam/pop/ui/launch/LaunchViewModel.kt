@@ -15,28 +15,22 @@ import com.popwam.mobile.foundation.navigation.WelcomePage
 import com.popwam.mobile.foundation.overlay.OverlayState
 import com.popwam.mobile.onboarding.LaunchCoordinator
 import com.popwam.mobile.onboarding.LaunchUiState
-import com.popwam.mobile.onboarding.SplashStage
 import com.popwam.mobile.onboarding.SplashTiming
 import com.popwam.pop.data.auth.SessionRepository
 import com.popwam.pop.data.launch.LegacyLaunchStateMigrator
 import com.popwam.pop.data.localization.LocalizationAuthorityStore
-import com.popwam.pop.ui.theme.AppearanceStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlin.math.min
 
 class LaunchViewModel(
     private val coordinator: LaunchCoordinator,
     private val migrator: LegacyLaunchStateMigrator,
     private val sessions: SessionRepository,
     private val localization: LocalizationAuthorityStore,
-    private val appearanceStore: AppearanceStore,
     private val savedStateHandle: SavedStateHandle,
     val reducedMotion: Boolean,
     private val afterSessionInitialized: suspend () -> Unit,
@@ -74,18 +68,13 @@ class LaunchViewModel(
 
     fun selectBaseTheme(mode: ThemeMode) = viewModelScope.launch {
         coordinator.selectBaseTheme(mode)
-        appearanceStore.setTheme(mode.name)
     }
 
     fun completeTheme() = viewModelScope.launch { coordinator.completeThemeSelection() }
 
     fun openThemeGallery() = coordinator.openThemeGallery()
-    fun previewPopStyle(style: IdentityPalette) = coordinator.previewPopStyle(style)
-    fun cancelPopStyle() = coordinator.cancelPopStyle()
-    fun confirmPopStyle() = viewModelScope.launch {
-        coordinator.confirmPopStyle()
-        appearanceStore.setIdentity(coordinator.state.value.persisted.selectedPopStyle.name)
-    }
+    fun selectPopStyle(style: IdentityPalette) = viewModelScope.launch { coordinator.selectPopStyle(style) }
+    fun dismissThemeGallery() = coordinator.dismissThemeGallery()
 
     fun nextWelcome(page: WelcomePage) {
         coordinator.nextWelcome(page)
@@ -118,14 +107,12 @@ class LaunchViewModel(
             }
             launch { runCatching { localization.refresh() } }
 
-            coordinator.showSplashStage(SplashStage.ONE)
-            activeDelay(timing.stageOneMillis)
-            coordinator.showSplashStage(SplashStage.TWO)
-            activeDelay(timing.stageTwoMillis)
-            coordinator.showSplashStage(SplashStage.THREE)
-            activeDelay(timing.stageThreeMillis)
-            coordinator.showSplashStage(SplashStage.FOUR)
-            activeDelay(timing.stageFourMinimumMillis)
+            // SavedStateHandle survives configuration and normal process recreation.  The
+            // timeline is calculated from its original clock, rather than re-created by a
+            // composable or replayed as a set of static screens.
+            val startedAt = savedStateHandle.get<Long>(KEY_SPLASH_STARTED_AT)
+                ?: System.currentTimeMillis().also { savedStateHandle[KEY_SPLASH_STARTED_AT] = it }
+            advanceSplashTimeline(startedAt, timing)
 
             val authenticated = startup.await().first
             coordinator.restore()
@@ -142,13 +129,18 @@ class LaunchViewModel(
         }
     }
 
-    private suspend fun activeDelay(durationMillis: Long) {
-        var remaining = durationMillis
-        while (remaining > 0) {
-            foreground.filter { it }.first()
-            val slice = min(remaining, 20)
-            delay(slice)
-            if (foreground.value) remaining -= slice
+    private suspend fun advanceSplashTimeline(startedAt: Long, timing: SplashTiming) {
+        if (timing.totalMillis == 0L) {
+            coordinator.showSplashProgress(1f)
+            return
+        }
+        while (true) {
+            val progress = ((System.currentTimeMillis() - startedAt).toFloat() / timing.totalMillis).coerceIn(0f, 1f)
+            coordinator.showSplashProgress(progress)
+            if (progress >= 1f) return
+            // Pausing updates while backgrounded avoids invisible work.  Progress is still
+            // derived from the original clock, so returning never restarts the animation.
+            if (foreground.value) delay(16) else delay(100)
         }
     }
 
@@ -160,7 +152,10 @@ class LaunchViewModel(
     private fun savedWelcomePage(): WelcomePage? = savedStateHandle.get<String>(KEY_WELCOME_PAGE)
         ?.let { runCatching { WelcomePage.valueOf(it) }.getOrNull() }
 
-    companion object { private const val KEY_WELCOME_PAGE = "phase3_welcome_page" }
+    companion object {
+        private const val KEY_WELCOME_PAGE = "phase3_welcome_page"
+        private const val KEY_SPLASH_STARTED_AT = "phase3_splash_started_at"
+    }
 }
 
 class LaunchViewModelFactory(
@@ -168,7 +163,6 @@ class LaunchViewModelFactory(
     private val migrator: LegacyLaunchStateMigrator,
     private val sessions: SessionRepository,
     private val localization: LocalizationAuthorityStore,
-    private val appearanceStore: AppearanceStore,
     private val reducedMotion: Boolean,
     private val afterSessionInitialized: suspend () -> Unit,
 ) : ViewModelProvider.Factory {
@@ -180,7 +174,6 @@ class LaunchViewModelFactory(
             migrator,
             sessions,
             localization,
-            appearanceStore,
             extras.createSavedStateHandle(),
             reducedMotion,
             afterSessionInitialized,

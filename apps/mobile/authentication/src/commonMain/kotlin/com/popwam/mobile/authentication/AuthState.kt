@@ -20,6 +20,9 @@ enum class AuthenticationStage {
 
 enum class AuthenticationOperation { IDLE, SUBMITTING, WAITING_FOR_NATIVE_UI, VERIFYING, RECOVERING }
 
+/** Numeric controls remain left-to-right even when their surrounding screen is Arabic. */
+internal val NumericInputLayoutDirection = androidx.compose.ui.unit.LayoutDirection.Ltr
+
 enum class AuthenticationError {
     EMPTY_PHONE,
     INCOMPLETE_PHONE,
@@ -29,6 +32,10 @@ enum class AuthenticationError {
     INVALID_PHONE,
     RATE_LIMITED,
     OFFLINE,
+    SERVER_UNREACHABLE,
+    PHONE_VERIFICATION_FAILED,
+    SERVER_CONFIGURATION_INCOMPLETE,
+    ACCOUNT_PREPARATION_FAILED,
     SERVER_FAILURE,
     CHALLENGE_EXPIRED,
     SESSION_EXPIRED,
@@ -71,6 +78,8 @@ data class AuthenticationUiState(
     val pendingDestination: PopDestination? = null,
     val pendingServerAction: AuthenticationNextAction? = null,
     val error: AuthenticationError? = null,
+    /** One Firebase credential can initiate at most one POP phone exchange. */
+    val otpResultConsumed: Boolean = false,
     val navigationConsumed: Boolean = false,
 )
 

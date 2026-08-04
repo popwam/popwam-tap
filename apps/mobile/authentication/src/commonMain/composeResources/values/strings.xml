@@ -4,7 +4,10 @@
     <string name="auth_phone_help">Sign in with your phone number to continue</string>
     <string name="auth_continue">Continue</string>
     <string name="auth_need_help">Need help?</string>
-    <string name="auth_legal">By continuing, you agree to our Terms of Service and Privacy Policy.</string>
+    <string name="auth_legal_prefix">By continuing, you agree to our</string>
+    <string name="auth_legal_joiner">and</string>
+    <string name="auth_terms">Terms of Service</string>
+    <string name="auth_privacy">Privacy Policy</string>
     <string name="auth_phone_number">Phone number</string>
     <string name="auth_use_phone_hint">Use a number from this device</string>
     <string name="auth_choose_country">Choose country</string>
@@ -37,6 +40,10 @@
     <string name="auth_account_ready">Your account is ready&#10;Welcome to POP</string>
     <string name="auth_generic_error">The request could not be completed. Please try again.</string>
     <string name="auth_offline">You appear to be offline. Reconnect and try again.</string>
+    <string name="auth_server_unreachable">We couldn’t reach the server. Check your connection and try again.</string>
+    <string name="auth_phone_verification_failed">We couldn’t verify this phone number. Please try again.</string>
+    <string name="auth_server_configuration_incomplete">Server setup is incomplete. Please try again later.</string>
+    <string name="auth_account_preparation_failed">Something went wrong while preparing your account.</string>
     <string name="auth_rate_limited">Too many attempts. Please wait before trying again.</string>
     <string name="auth_invalid_phone">Enter a valid phone number.</string>
     <string name="auth_passkey_cancelled">Passkey setup is required. Try again when you’re ready.</string>

@@ -45,7 +45,7 @@ import org.junit.runner.RunWith
 class Phase4ScreenshotTest {
     @get:Rule val compose=createComposeRule()
     private val country=AuthenticationCountry("EG","+20","Egypt","🇪🇬","00 000 0000 00")
-    private val callbacks=AuthenticationCallbacks({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+    private val callbacks=AuthenticationCallbacks({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
 
     companion object {
         @JvmStatic @AfterClass fun restoreLocale(){AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())}

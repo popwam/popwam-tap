@@ -1,17 +1,26 @@
 package com.popwam.mobile.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +31,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +58,7 @@ import com.popwam.mobile.onboarding.generated.resources.theme_title
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ThemeScreen(
     selectedMode: ThemeMode,
@@ -56,9 +67,8 @@ fun ThemeScreen(
     onSelectMode: (ThemeMode) -> Unit,
     onContinue: () -> Unit,
     onOpenGallery: () -> Unit,
-    onPreviewStyle: (IdentityPalette) -> Unit,
-    onConfirmStyle: () -> Unit,
-    onCancelStyle: () -> Unit,
+    onSelectStyle: (IdentityPalette) -> Unit,
+    onDismissGallery: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalPopSemanticColors.current
@@ -66,14 +76,17 @@ fun ThemeScreen(
         PopMarkVector(
             color = colors.brandPrimary,
             contentDescription = stringResource(Res.string.pop_logo_description),
-            modifier = Modifier.offset(107.dp, 68.dp).size(180.dp, 218.dp),
+            modifier = Modifier.offset(107.dp, 144.dp).size(180.dp, 218.dp),
         )
-        Column(Modifier.offset(27.dp, 363.dp).size(342.dp, 59.dp)) {
-            Text(stringResource(Res.string.theme_title), color = colors.textPrimary, fontSize = 28.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold)
-            Text(stringResource(Res.string.theme_subtitle), color = colors.textPrimary, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
+        Column(
+            Modifier.offset(27.dp, 390.dp).size(342.dp, 72.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(stringResource(Res.string.theme_title), color = colors.textPrimary, fontSize = 28.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Text(stringResource(Res.string.theme_subtitle), color = colors.textSecondary, fontSize = 15.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
         Row(
-            Modifier.offset(63.1306.dp, 500.dp).size(267.7388.dp, 63.9474.dp),
+            Modifier.offset(63.1306.dp, 516.dp).size(267.7388.dp, 63.9474.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ThemeMode.entries.forEach { mode ->
@@ -108,7 +121,7 @@ fun ThemeScreen(
             fontWeight = FontWeight.SemiBold,
             textDecoration = TextDecoration.Underline,
             modifier = Modifier
-                .offset(85.dp, 604.dp)
+                .offset(85.dp, 620.dp)
                 .size(222.dp, 40.dp)
                 .semantics { role = Role.Button }
                 .clickable(onClick = onOpenGallery),
@@ -118,70 +131,71 @@ fun ThemeScreen(
             onClick = onContinue,
             modifier = Modifier.offset(74.dp, 744.dp).size(246.3158.dp, 63.9474.dp),
         )
-        if (galleryVisible) {
-            ThemeGallery(
-                selectedStyle = selectedStyle,
-                onPreviewStyle = onPreviewStyle,
-                onConfirmStyle = onConfirmStyle,
-                onCancel = onCancelStyle,
-            )
-        }
+    }
+    if (galleryVisible) {
+        ThemeGallery(
+            selectedStyle = selectedStyle,
+            onSelectStyle = onSelectStyle,
+            onDismiss = onDismissGallery,
+        )
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ThemeGallery(
     selectedStyle: IdentityPalette,
-    onPreviewStyle: (IdentityPalette) -> Unit,
-    onConfirmStyle: () -> Unit,
-    onCancel: () -> Unit,
+    onSelectStyle: (IdentityPalette) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val colors = LocalPopSemanticColors.current
-    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .5f)).clickable(onClick = onCancel))
-    Column(
-        Modifier.offset(0.dp, 422.dp).size(393.dp, 430.dp).background(colors.surfaceElevated).padding(start = 34.dp, top = 46.6886.dp, end = 33.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = colors.surfaceElevated,
+        contentColor = colors.textPrimary,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {
-        galleryOrder.forEach { style ->
-            val palette = PopIdentityStyle.valueOf(style.name)
-            val active = selectedStyle == style
-            val label = stringResource(paletteLabel(style))
-            val description = if (active) stringResource(Res.string.palette_selected, label) else label
-            Row(
-                modifier = Modifier
-                    .size(326.dp, 56.dp)
-                    .background(if (active) palette.primary else colors.surfaceElevated)
-                    .semantics {
-                        role = Role.RadioButton
-                        selected = active
-                        contentDescription = description
-                    }
-                    .clickable {
-                        onPreviewStyle(style)
-                        onConfirmStyle()
-                    }
-                    .padding(horizontal = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PopMarkVector(
-                    color = if (active) palette.soft else palette.primary,
-                    contentDescription = null,
-                    modifier = Modifier.size(42.dp, 48.dp),
-                )
-                Text(
-                    label,
-                    color = if (active) palette.soft else palette.primary,
-                    fontSize = 16.sp,
-                    lineHeight = 21.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(start = 12.dp),
-                )
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().heightIn(max = 560.dp).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            galleryOrder.forEach { style ->
+                val palette = PopIdentityStyle.valueOf(style.name)
+                val active = selectedStyle == style
+                val label = stringResource(paletteLabel(style))
+                val description = if (active) stringResource(Res.string.palette_selected, label) else label
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp)
+                        .background(if (active) colors.brandPrimary.copy(alpha = .12f) else colors.surfaceElevated, RoundedCornerShape(14.dp))
+                        .border(BorderStroke(1.dp, if (active) colors.brandPrimary else colors.borderDefault), RoundedCornerShape(14.dp))
+                        .semantics {
+                            role = Role.RadioButton
+                            selected = active
+                            contentDescription = description
+                        }
+                        .clickable { onSelectStyle(style) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PopMarkVector(
+                        color = palette.primary,
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp, 42.dp),
+                    )
+                    Text(
+                        label,
+                        color = colors.textPrimary,
+                        fontSize = 16.sp,
+                        lineHeight = 21.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
             }
         }
     }
-    Box(
-        Modifier.offset(168.728.dp, 441.254.dp).size(55.544.dp, 1.dp).background(colors.borderStrong),
-    )
 }
 
 @Composable

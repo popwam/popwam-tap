@@ -17,9 +17,9 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class LaunchUiState(
     val destination: PopDestination = PopDestination.Launch,
-    val splashStage: SplashStage = SplashStage.ONE,
+    /** Monotonic progress for the single, continuous splash composition. */
+    val splashProgress: Float = 0f,
     val persisted: LaunchState = LaunchState(),
-    val previewPopStyle: IdentityPalette = IdentityPalette.MINT,
     val finalNavigationCommitted: Boolean = false,
 )
 
@@ -32,23 +32,20 @@ class LaunchCoordinator(
 
     suspend fun restore(): LaunchState {
         val restored = store.initialize()
-        mutableState.value = mutableState.value.copy(
-            persisted = restored,
-            previewPopStyle = restored.selectedPopStyle,
-        )
+        mutableState.value = mutableState.value.copy(persisted = restored)
         return restored
     }
 
-    fun showSplashStage(stage: SplashStage) {
+    fun showSplashProgress(progress: Float) {
         if (mutableState.value.destination != PopDestination.Launch) return
-        mutableState.value = mutableState.value.copy(splashStage = stage)
+        mutableState.value = mutableState.value.copy(splashProgress = progress.coerceIn(0f, 1f))
     }
 
     fun finishInitialSplash(authenticated: Boolean) {
         val destination = requiredDestination(mutableState.value.persisted, authenticated)
         mutableState.value = mutableState.value.copy(
             destination = destination,
-            splashStage = if (destination == PopDestination.FirstLaunchFinalStage) SplashStage.FIVE else SplashStage.FOUR,
+            splashProgress = 1f,
         )
     }
 
@@ -65,6 +62,12 @@ class LaunchCoordinator(
     }
 
     suspend fun selectBaseTheme(mode: ThemeMode) {
+        // The state exposed to Compose is the same persisted state that is about
+        // to be written.  This makes the selection visible on tap without a
+        // separate preview value that could disagree with the application theme.
+        mutableState.value = mutableState.value.copy(
+            persisted = mutableState.value.persisted.copy(selectedBaseTheme = mode),
+        )
         val updated = store.update { it.copy(selectedBaseTheme = mode) }
         mutableState.value = mutableState.value.copy(persisted = updated)
     }
@@ -78,7 +81,6 @@ class LaunchCoordinator(
     }
 
     fun openThemeGallery() {
-        mutableState.value = mutableState.value.copy(previewPopStyle = mutableState.value.persisted.selectedPopStyle)
         overlays.present(
             OverlayEntry(
                 id = THEME_GALLERY_OVERLAY_ID,
@@ -88,21 +90,18 @@ class LaunchCoordinator(
         )
     }
 
-    fun previewPopStyle(style: IdentityPalette) {
-        mutableState.value = mutableState.value.copy(previewPopStyle = style)
-    }
-
-    suspend fun confirmPopStyle() {
-        val selected = mutableState.value.previewPopStyle
-        val updated = store.update { it.copy(selectedPopStyle = selected) }
+    suspend fun selectPopStyle(style: IdentityPalette) {
+        // Palette selection is not a draft: it is the live application theme
+        // and is persisted immediately.  Continue only advances onboarding.
+        mutableState.value = mutableState.value.copy(
+            persisted = mutableState.value.persisted.copy(selectedPopStyle = style),
+        )
+        val updated = store.update { it.copy(selectedPopStyle = style) }
         mutableState.value = mutableState.value.copy(persisted = updated)
         overlays.dismiss(THEME_GALLERY_OVERLAY_ID)
     }
 
-    fun cancelPopStyle() {
-        mutableState.value = mutableState.value.copy(
-            previewPopStyle = mutableState.value.persisted.selectedPopStyle,
-        )
+    fun dismissThemeGallery() {
         overlays.dismiss(THEME_GALLERY_OVERLAY_ID)
     }
 

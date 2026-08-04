@@ -469,8 +469,6 @@ class AuthViewModel(
             error=null,
         )
     }
-    fun continueLegacyCompatibility() { _state.value=_state.value.copy(setupStage=AuthSetupStage.READY) }
-
     fun logout() = viewModelScope.launch {
         sessions.logout()
         firebasePhoneAuth.signOut()

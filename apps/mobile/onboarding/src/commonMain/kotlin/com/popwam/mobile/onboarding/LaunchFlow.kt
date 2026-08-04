@@ -5,21 +5,18 @@ import com.popwam.mobile.foundation.launch.LaunchState
 import com.popwam.mobile.foundation.navigation.PopDestination
 import com.popwam.mobile.foundation.navigation.WelcomePage
 
-enum class SplashStage { ONE, TWO, THREE, FOUR, FIVE }
-
 data class SplashTiming(
-    val stageOneMillis: Long,
-    val stageTwoMillis: Long,
-    val stageThreeMillis: Long,
-    val stageFourMinimumMillis: Long,
+    val totalMillis: Long,
 ) {
     init {
-        require(stageOneMillis >= 0 && stageTwoMillis >= 0 && stageThreeMillis >= 0 && stageFourMinimumMillis >= 0)
+        require(totalMillis >= 0)
     }
 
     companion object {
-        val Standard = SplashTiming(180, 180, 220, 260)
-        val ReducedMotion = SplashTiming(40, 40, 40, 80)
+        /** One timeline, with the Figma stages retained only as visual keyframes. */
+        val Standard = SplashTiming(totalMillis = 840)
+        /** Reduced Motion deliberately skips intermediate movement. */
+        val ReducedMotion = SplashTiming(totalMillis = 0)
     }
 }
 

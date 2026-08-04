@@ -165,8 +165,8 @@ private fun WelcomePageContent(
             color = colors.textPrimary,
             fontSize = 28.sp,
             lineHeight = 42.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Start,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
             modifier = Modifier.offset(45.dp, 553.dp).size(304.dp, 84.dp),
         )
         Text(
@@ -174,8 +174,8 @@ private fun WelcomePageContent(
             color = colors.textSecondary,
             fontSize = 16.sp,
             lineHeight = 26.sp,
-            fontWeight = FontWeight.Normal,
-            textAlign = TextAlign.Start,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
             modifier = Modifier.offset(
                 if (page == WelcomePage.ALL_IN_ONE) 53.dp else 45.dp,
                 when {

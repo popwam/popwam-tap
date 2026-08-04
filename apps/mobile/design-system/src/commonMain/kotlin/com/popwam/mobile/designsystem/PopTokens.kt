@@ -59,6 +59,12 @@ enum class PopIdentityStyle(
 data class PopSemanticColors(
     val brandPrimary: Color,
     val onBrand: Color,
+    /** Explicit artwork roles. Consumers must not recolor logo paths blindly. */
+    val logoPrimary: Color,
+    val logoSecondary: Color,
+    val logoAccent: Color,
+    val logoOnPrimary: Color,
+    val logoOnDark: Color,
     val backgroundPrimary: Color,
     val backgroundSecondary: Color,
     val backgroundTertiary: Color,
@@ -93,6 +99,11 @@ fun popSemanticColors(identity: PopIdentityStyle, dark: Boolean): PopSemanticCol
     if (!dark) return PopSemanticColors(
         brandPrimary = identity.primary,
         onBrand = identity.onPrimary,
+        logoPrimary = Color(0xFF111817),
+        logoSecondary = Color(0xFF111817),
+        logoAccent = identity.primary,
+        logoOnPrimary = identity.onPrimary,
+        logoOnDark = Color.White,
         backgroundPrimary = Color(0xFFFFFFFF),
         backgroundSecondary = Color(0xFFF7F9F9),
         backgroundTertiary = Color(0xFFEEF3F2),
@@ -128,6 +139,11 @@ fun popSemanticColors(identity: PopIdentityStyle, dark: Boolean): PopSemanticCol
     return PopSemanticColors(
         brandPrimary = darkBrand,
         onBrand = darkOnBrand,
+        logoPrimary = Color(0xFFF4F7F6),
+        logoSecondary = Color(0xFFF4F7F6),
+        logoAccent = darkBrand,
+        logoOnPrimary = darkOnBrand,
+        logoOnDark = Color.White,
         backgroundPrimary = Color(0xFF0B0F0F),
         backgroundSecondary = Color(0xFF111716),
         backgroundTertiary = Color(0xFF17201F),
@@ -158,4 +174,3 @@ fun popSemanticColors(identity: PopIdentityStyle, dark: Boolean): PopSemanticCol
         disabledBorder = Color(0xFF303937),
     )
 }
-

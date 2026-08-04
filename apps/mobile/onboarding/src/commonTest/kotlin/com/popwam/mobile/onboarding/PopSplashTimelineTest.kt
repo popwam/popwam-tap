@@ -1,0 +1,25 @@
+package com.popwam.mobile.onboarding
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
+
+class PopSplashTimelineTest {
+    @Test fun `splash logo and shape interpolate continuously between visual keyframes`() {
+        val start = splashFrame(0f)
+        val middle = splashFrame(.5f)
+        val end = splashFrame(1f)
+
+        assertNotEquals(start.circleCenterY, middle.circleCenterY)
+        assertNotEquals(middle.circleRadius, end.circleRadius)
+        assertTrue(middle.logoOnPrimaryAlpha in 0f..1f)
+        assertEquals(207f, end.logoX + 114f, "the logo retains a stable visual width and optical center basis")
+    }
+
+    @Test fun `reusing an externally owned progress value never restarts the timeline`() {
+        val restoredProgress = .63f
+        assertEquals(splashFrame(restoredProgress), splashFrame(restoredProgress))
+        assertTrue(splashFrame(restoredProgress).circleRadius > splashFrame(.48f).circleRadius)
+    }
+}

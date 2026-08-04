@@ -14,10 +14,12 @@ class PopIdentityThemeTest {
         assertEquals(Color(0xFFF59E0B),PopIdentity.SOLAR.primary)
         assertEquals(Color(0xFF334155),PopIdentity.GRAPHITE.primary)
     }
-    @Test fun `logo resolver uses identity primary by day and accent by night`() {
-        assertEquals(Color(0xFF1E5BFF),logoColor(PopIdentity.PULSE,false))
-        assertEquals(Color(0xFF60A5FA),logoColor(PopIdentity.PULSE,true))
-        assertEquals(Color(0xFFCBD5E1),logoColor(PopIdentity.GRAPHITE,true))
+    @Test fun `logo resolver uses explicit semantic artwork roles`() {
+        assertEquals(Color(0xFF111817),logoColor(PopIdentity.PULSE,false))
+        assertEquals(Color(0xFFF4F7F6),logoColor(PopIdentity.PULSE,true))
+        assertEquals(Color(0xFFF4F7F6),logoColor(PopIdentity.GRAPHITE,true))
     }
-    @Test fun `pro remains a prepared premium identity`() { assertFalse(PopIdentity.PULSE.proOnly); assertEquals(true,PopIdentity.PRO.proOnly) }
+    @Test fun `exactly the six approved runtime palettes are available`() {
+        assertEquals(setOf("PULSE","MINT","VIOLET","CORAL","SOLAR","GRAPHITE"), PopIdentity.entries.map { it.name }.toSet())
+    }
 }

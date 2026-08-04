@@ -3,6 +3,7 @@ package com.popwam.pop.ui.auth
 import android.app.Activity
 import android.content.Intent
 import android.provider.Settings
+import android.net.Uri
 import androidx.activity.compose.LocalActivity
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.auth.api.identity.GetPhoneNumberHintIntentRequest
 import com.google.android.gms.auth.api.identity.Identity
@@ -23,6 +26,7 @@ import com.popwam.mobile.authentication.AuthenticationStage
 import com.popwam.mobile.foundation.navigation.PopDestination
 import com.popwam.pop.data.auth.PhoneCountryStore
 import com.popwam.pop.data.auth.PhoneIdentity
+import com.popwam.pop.BuildConfig
 import com.popwam.pop.ui.currentLocale
 import java.util.Locale
 
@@ -36,6 +40,7 @@ fun AuthenticationHost(
     val activity=requireNotNull(LocalActivity.current as? FragmentActivity) {
         "AuthenticationHost requires a FragmentActivity"
     }
+    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val overlay by viewModel.overlays.collectAsStateWithLifecycle()
     val query by viewModel.countrySearch.collectAsStateWithLifecycle()
@@ -81,6 +86,8 @@ fun AuthenticationHost(
                 Identity.getSignInClient(activity).getPhoneNumberHintIntent(GetPhoneNumberHintIntentRequest.builder().build())
                     .addOnSuccessListener { pending -> phoneHint.launch(IntentSenderRequest.Builder(pending).build()) }
             },
+            openTerms = { CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse("${BuildConfig.API_BASE_URL.trimEnd('/')}/terms")) },
+            openPrivacy = { CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse("${BuildConfig.API_BASE_URL.trimEnd('/')}/privacy")) },
             otpChanged=viewModel::updateOtp,
             verifyOtp=viewModel::verifyOtp,
             resendOtp={viewModel.resend(activity)},

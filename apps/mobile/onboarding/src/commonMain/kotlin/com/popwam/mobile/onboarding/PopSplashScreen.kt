@@ -9,19 +9,22 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.popwam.mobile.designsystem.PopIdentityStyle
-import com.popwam.mobile.designsystem.popSemanticColors
+import com.popwam.mobile.designsystem.LocalPopSemanticColors
 import com.popwam.mobile.onboarding.generated.resources.Res
 import com.popwam.mobile.onboarding.generated.resources.pop_logo_description
 import com.popwam.mobile.onboarding.generated.resources.splash_go_ahead
@@ -29,29 +32,26 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun PopSplashScreen(
-    stage: SplashStage,
+    progress: Float,
+    showGoAhead: Boolean,
     onGoAhead: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = popSemanticColors(PopIdentityStyle.MINT, dark = false)
+    val colors = LocalPopSemanticColors.current
+    val frame = splashFrame(progress)
     ReferenceFrame(modifier.background(colors.backgroundPrimary)) {
         Canvas(Modifier.fillMaxSize()) {
-            drawSplashCircle(stage, colors.brandPrimary, PopIdentityStyle.MINT.soft)
-        }
-        val logoBounds = when (stage) {
-            SplashStage.ONE, SplashStage.TWO -> SplashLogoBounds(93, 307, 207, 238)
-            SplashStage.THREE -> SplashLogoBounds(93, 301, 207, 238)
-            SplashStage.FOUR -> SplashLogoBounds(92, 327, 207, 238)
-            SplashStage.FIVE -> SplashLogoBounds(93, 188, 207, 238)
+            drawSplashShape(frame, colors.brandPrimary, colors.logoPrimary.copy(alpha = .14f))
         }
         PopMarkVector(
-            color = if (stage >= SplashStage.THREE) colors.textInverse else colors.brandPrimary,
+            color = lerp(colors.logoPrimary, colors.logoOnPrimary, frame.logoOnPrimaryAlpha),
             contentDescription = stringResource(Res.string.pop_logo_description),
             modifier = Modifier
-                .offset(logoBounds.x.dp, logoBounds.y.dp)
-                .size(logoBounds.width.dp, logoBounds.height.dp),
+                .offset(frame.logoX.dp, frame.logoY.dp)
+                .size(207.dp, 238.dp)
+                .graphicsLayer(alpha = frame.logoAlpha),
         )
-        if (stage == SplashStage.FIVE) {
+        if (showGoAhead) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -72,18 +72,41 @@ fun PopSplashScreen(
     }
 }
 
-private fun DrawScope.drawSplashCircle(stage: SplashStage, brand: androidx.compose.ui.graphics.Color, soft: androidx.compose.ui.graphics.Color) {
-    when (stage) {
-        SplashStage.ONE -> drawCircle(soft, radius = 50.dp.toPx(), center = androidx.compose.ui.geometry.Offset(196.dp.toPx(), (-26).dp.toPx()))
-        SplashStage.TWO -> drawCircle(brand, radius = 50.dp.toPx(), center = androidx.compose.ui.geometry.Offset(196.dp.toPx(), 426.dp.toPx()))
-        SplashStage.THREE -> drawCircle(brand, radius = 127.dp.toPx(), center = androidx.compose.ui.geometry.Offset(196.dp.toPx(), 420.dp.toPx()))
-        SplashStage.FOUR -> drawCircle(brand, radius = 487.dp.toPx(), center = androidx.compose.ui.geometry.Offset(196.dp.toPx(), 420.dp.toPx()))
-        SplashStage.FIVE -> drawOval(
+internal data class SplashFrame(
+    val circleCenterY: Float,
+    val circleRadius: Float,
+    val logoX: Float,
+    val logoY: Float,
+    val logoAlpha: Float,
+    val logoOnPrimaryAlpha: Float,
+    val shapeBrandAlpha: Float,
+)
+
+/** Pure keyframe interpolation makes the movement testable without Compose. */
+internal fun splashFrame(progress: Float): SplashFrame {
+    val p = FastOutSlowInEasing.transform(progress.coerceIn(0f, 1f))
+    fun between(start: Float, end: Float, from: Float, to: Float): Float =
+        ((p - start) / (end - start)).coerceIn(0f, 1f).let { from + (to - from) * it }
+    return when {
+        p < .22f -> SplashFrame(between(0f, .22f, -26f, 426f), 50f, 93f, 307f, 1f, 0f, between(0f, .22f, 0f, 1f))
+        p < .48f -> SplashFrame(between(.22f, .48f, 426f, 420f), between(.22f, .48f, 50f, 127f), 93f, 307f, 1f, 0f, 1f)
+        p < .75f -> SplashFrame(between(.48f, .75f, 420f, 420f), between(.48f, .75f, 127f, 487f), 93f, between(.48f, .75f, 307f, 327f), 1f, between(.48f, .62f, 0f, 1f), 1f)
+        else -> SplashFrame(420f, between(.75f, 1f, 487f, 487f), between(.75f, 1f, 92f, 93f), between(.75f, 1f, 327f, 188f), 1f, 1f, 1f)
+    }
+}
+
+private fun DrawScope.drawSplashShape(frame: SplashFrame, brand: Color, soft: Color) {
+    if (frame.circleRadius < 487f) {
+        drawCircle(
+            lerp(soft, brand, frame.shapeBrandAlpha),
+            radius = frame.circleRadius.dp.toPx(),
+            center = androidx.compose.ui.geometry.Offset(196.dp.toPx(), frame.circleCenterY.dp.toPx()),
+        )
+    } else {
+        drawOval(
             brand,
             topLeft = androidx.compose.ui.geometry.Offset((-291).dp.toPx(), (-67).dp.toPx()),
             size = androidx.compose.ui.geometry.Size(974.dp.toPx(), 722.dp.toPx()),
         )
     }
 }
-
-private data class SplashLogoBounds(val x: Int, val y: Int, val width: Int, val height: Int)

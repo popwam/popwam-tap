@@ -22,6 +22,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 import com.popwam.mobile.authentication.KtorAuthenticationRemoteDataSource
+import com.popwam.mobile.authentication.PhoneExchangeDiagnostic
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -58,7 +59,20 @@ class AppContainer(application:Application){
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys=true;encodeDefaults=true }) }
         engine { config { connectTimeout(15,TimeUnit.SECONDS);readTimeout(30,TimeUnit.SECONDS) } }
     }
-    val authenticationRemote=KtorAuthenticationRemoteDataSource(authenticationHttpClient,BuildConfig.API_BASE_URL)
+    val authenticationRemote=KtorAuthenticationRemoteDataSource(
+        authenticationHttpClient,
+        BuildConfig.API_BASE_URL,
+        onFailure = { code, status ->
+            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.POP_EXCHANGE_RESPONSE, http = status, safeError = code)
+        },
+        onPhoneExchangeDiagnostic = { boundary, status ->
+            when (boundary) {
+                PhoneExchangeDiagnostic.STARTED -> AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PHONE_EXCHANGE_STARTED)
+                PhoneExchangeDiagnostic.HTTP_STATUS -> AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PHONE_EXCHANGE_HTTP_STATUS, "http_${status ?: 0}")
+                PhoneExchangeDiagnostic.PARSED -> AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PHONE_EXCHANGE_PARSED)
+            }
+        },
+    )
     init { sessions.setLifecycleHooks({
         // POP OTP persistence has already completed. Supplementary work must not delay setup routing.
         lifecycleScope.launch {

@@ -44,4 +44,12 @@
     <string name="auth_biometric_cancelled">تم إلغاء المصادقة البيومترية. أعد المحاولة للمتابعة.</string>
     <string name="auth_biometric_locked">المصادقة البيومترية مقفلة مؤقتًا. اتبع إرشادات جهازك ثم أعد المحاولة.</string>
     <string name="auth_biometric_recovery">يتطلب جهازك خطوة استرداد أمني. افتح إعدادات النظام ثم ارجع وأعد المحاولة.</string>
+    <string name="auth_legal_prefix">بمتابعتك، فإنك توافق على</string>
+    <string name="auth_legal_joiner">و</string>
+    <string name="auth_terms">شروط الخدمة</string>
+    <string name="auth_privacy">سياسة الخصوصية</string>
+    <string name="auth_server_unreachable">تعذر الاتصال بالخادم. تحقق من اتصالك وحاول مرة أخرى.</string>
+    <string name="auth_phone_verification_failed">تعذر التحقق من رقم الهاتف. حاول مرة أخرى.</string>
+    <string name="auth_server_configuration_incomplete">إعداد الخادم غير مكتمل. حاول لاحقًا.</string>
+    <string name="auth_account_preparation_failed">حدث خطأ أثناء تجهيز الحساب.</string>
 </resources>

@@ -68,6 +68,8 @@ import com.popwam.pop.data.auth.biometricUnlockEligibility
 import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.nfc.NfcCoordinator
 import com.popwam.pop.ui.theme.AppearanceStore
+import com.popwam.mobile.foundation.launch.IdentityPalette
+import com.popwam.mobile.foundation.launch.ThemeMode
 import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -80,6 +82,8 @@ import com.google.gson.JsonParser
     initialRoute:String="home",
     appearanceStore:AppearanceStore,
     phoneCountries:PhoneCountryStore,
+    onThemeModeSelected:(ThemeMode)->Unit,
+    onPaletteSelected:(IdentityPalette)->Unit,
 ){
     val authState by auth.state.collectAsStateWithLifecycle()
     LaunchedEffect(phoneCountries) { phoneCountries.refresh() }
@@ -106,9 +110,13 @@ import com.google.gson.JsonParser
         }
         return
     }
-    if(authState.setupStage!=AuthSetupStage.READY){PhaseCSetupScreen(authState,auth,currentLocale());return}
+    // Phase 4 owns the complete new-user security journey.  The retired Phase C
+    // continuation UI must never reopen after a passkey operation.
     LaunchedEffect(authState.authenticated){main.reload();if(pendingActivation.isNotBlank()){main.inspectActivation(pendingActivation);pendingActivation=""}}
-    FigmaMainNavigation(main,initialRoute=pendingRoute,onLogout={destination=UnauthenticatedDestination.PHONE_AUTH.name;auth.logout()},appearanceStore=appearanceStore)
+    FigmaMainNavigation(
+        main, initialRoute=pendingRoute, onLogout={destination=UnauthenticatedDestination.PHONE_AUTH.name;auth.logout()}, appearanceStore=appearanceStore,
+        onThemeModeSelected=onThemeModeSelected, onPaletteSelected=onPaletteSelected,
+    )
 }
 
 fun currentLocale():String{

@@ -1,6 +1,6 @@
 <resources>
     <string name="pop_logo_description">POP logo</string>
-    <string name="splash_go_ahead">go ahead</string>
+    <string name="splash_go_ahead">Go Ahead</string>
     <string name="language_title_en">Choose your language</string>
     <string name="language_title_ar">أختر اللغة</string>
     <string name="language_english">English</string>
@@ -21,7 +21,7 @@
     <string name="palette_solar">SOLAR</string>
     <string name="palette_graphite">GRAPHITE</string>
     <string name="palette_selected">%1$s selected</string>
-    <string name="onboarding_skip">skip</string>
+    <string name="onboarding_skip">Skip</string>
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_get_started">get started</string>
     <string name="all_in_one_title">Everything you need\nOne POP</string>

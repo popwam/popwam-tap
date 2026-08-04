@@ -37,10 +37,19 @@ import androidx.navigation.navArgument
 import coil3.compose.AsyncImage
 import com.popwam.pop.R
 import com.popwam.pop.ui.theme.AppearanceStore
+import com.popwam.mobile.foundation.launch.IdentityPalette
+import com.popwam.mobile.foundation.launch.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogout: () -> Unit, appearanceStore:AppearanceStore) {
+fun FigmaMainNavigation(
+    vm: MainViewModel,
+    initialRoute: String = "home",
+    onLogout: () -> Unit,
+    appearanceStore:AppearanceStore,
+    onThemeModeSelected:(ThemeMode)->Unit,
+    onPaletteSelected:(IdentityPalette)->Unit,
+) {
     val context = LocalContext.current
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -153,10 +162,10 @@ fun FigmaMainNavigation(vm: MainViewModel, initialRoute: String = "home", onLogo
                 composable("programming") { LaunchedEffect(Unit) { vm.loadProgramming() }; LegacyProgrammingList(state.programmingCards) { nav.navigate("program/$it") } }
                 composable("program/{id}") { entry -> state.programmingCards.firstOrNull { it.id == entry.arguments?.getString("id") }?.let { LegacyProgramming(it, state, vm) } }
                 composable("hce") { LegacyHce(state.cards) }
-                composable("settings") { SecuritySettingsScreen("root",state,vm,appearanceStore,{if(it.startsWith("friends")||it=="nearby"||it.startsWith("legal/"))nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout) }
-                composable("settings/{section}",arguments=listOf(navArgument("section"){type=NavType.StringType})){entry->SecuritySettingsScreen(entry.arguments?.getString("section") ?: "root",state,vm,appearanceStore,{if(it.startsWith("friends")||it=="nearby"||it.startsWith("legal/"))nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout)}
+                composable("settings") { SecuritySettingsScreen("root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it=="nearby"||it.startsWith("legal/"))nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout) }
+                composable("settings/{section}",arguments=listOf(navArgument("section"){type=NavType.StringType})){entry->SecuritySettingsScreen(entry.arguments?.getString("section") ?: "root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it=="nearby"||it.startsWith("legal/"))nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout)}
                 composable("integrations") { SecurePortal(R.string.connected_accounts,"dashboard/integrations",R.string.connected_accounts_help) }
-                composable("passkeys") { SecuritySettingsScreen("passkeys",state,vm,appearanceStore,{nav.navigate("settings/$it")},nav::popBackStack,onLogout) }
+                composable("passkeys") { SecuritySettingsScreen("passkeys",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{nav.navigate("settings/$it")},nav::popBackStack,onLogout) }
                 composable("legal/terms"){NativeLegalScreen(PreAuthLegalKind.TERMS,onBack=nav::popBackStack)}
                 composable("legal/privacy"){NativeLegalScreen(PreAuthLegalKind.PRIVACY,onBack=nav::popBackStack)}
             }

@@ -10,13 +10,18 @@ import androidx.compose.ui.text.font.*
 import androidx.compose.ui.unit.dp
 import com.popwam.pop.R
 import com.popwam.mobile.designsystem.PopFontFamilies
+import com.popwam.mobile.designsystem.PopIdentityStyle
+import com.popwam.mobile.designsystem.popSemanticColors
 
-/** Appearance controls surfaces; identity controls the POP personality. */
-data class PopIdentityPalette(val backgroundDay:Color=Color(0xFFF8FAFC),val backgroundNight:Color=Color(0xFF0B1220),val surfaceDay:Color=Color.White,val surfaceNight:Color=Color(0xFF121B2A),val primaryDay:Color,val primaryNight:Color,val accentDay:Color,val accentNight:Color,val titleDay:Color=Color(0xFF0F172A),val titleNight:Color=Color(0xFFF8FAFC),val bodyDay:Color=Color(0xFF334155),val bodyNight:Color=Color(0xFFCBD5E1),val mutedDay:Color=Color(0xFF64748B),val mutedNight:Color=Color(0xFFCBD5E1),val outlineDay:Color=Color(0xFF94A3B8),val outlineNight:Color=Color(0xFF64748B),val selectedSurfaceDay:Color,val selectedSurfaceNight:Color,val selectedContentDay:Color,val selectedContentNight:Color,val onPrimaryDay:Color=Color.White,val onPrimaryNight:Color=Color.White)
-private fun palette(primary:Color,accent:Color)=PopIdentityPalette(primaryDay=primary,primaryNight=accent,accentDay=accent,accentNight=accent,selectedSurfaceDay=primary.copy(alpha=.12f),selectedSurfaceNight=accent.copy(alpha=.24f),selectedContentDay=primary,selectedContentNight=accent)
-enum class PopIdentity(val label:String, val palette:PopIdentityPalette, val description:String, val proOnly:Boolean=false) {
-    PULSE("Pulse",palette(Color(0xFF1E5BFF),Color(0xFF60A5FA)),"Connected. Clear. Modern."), MINT("Mint",palette(Color(0xFF0EA5A4),Color(0xFF2DD4BF)),"Fresh. Calm. Capable."), VIOLET("Violet",palette(Color(0xFF7C3AED),Color(0xFFA78BFA)),"Expressive. Focused. Bold."), CORAL("Coral",palette(Color(0xFFF43F5E),Color(0xFFFB7185)),"Warm. Human. Energetic."), SOLAR("Solar",palette(Color(0xFFF59E0B),Color(0xFFFBBF24)),"Bright. Optimistic. Clear."), GRAPHITE("Graphite",palette(Color(0xFF334155),Color(0xFF94A3B8)),"Quiet. Solid. Precise."), PRO("POP Pro",palette(Color(0xFF0EA5A4),Color(0xFF5EEAD4)).copy(backgroundDay=Color(0xFFF0FDFA),backgroundNight=Color(0xFF071A1A),surfaceNight=Color(0xFF102727)),"Premium POP identity.",true);
-    val primary get()=palette.primaryDay; val accent get()=palette.accentDay
+/** The six palette identities are projected from the shared semantic token set. */
+enum class PopIdentity(val label:String, val description:String) {
+    PULSE("Pulse","Connected. Clear. Modern."),
+    MINT("Mint","Fresh. Calm. Capable."),
+    VIOLET("Violet","Expressive. Focused. Bold."),
+    CORAL("Coral","Warm. Human. Energetic."),
+    SOLAR("Solar","Bright. Optimistic. Clear."),
+    GRAPHITE("Graphite","Quiet. Solid. Precise.");
+    val primary get()=popSemanticColors(PopIdentityStyle.valueOf(name),false).brandPrimary
     companion object { fun from(value:String?)=entries.firstOrNull { it.name==value }?:PULSE }
 }
 
@@ -27,13 +32,19 @@ data class PopSemanticColors(
 )
 val LocalPopColors=staticCompositionLocalOf { PopSemanticColors(Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified,Color.Unspecified) }
 
-fun logoColor(identity:PopIdentity,dark:Boolean)=when { identity==PopIdentity.GRAPHITE&&dark->Color(0xFFCBD5E1); dark->identity.palette.primaryNight; else->identity.palette.primaryDay }
+fun logoColor(identity:PopIdentity,dark:Boolean)=popSemanticColors(PopIdentityStyle.valueOf(identity.name),dark).logoPrimary
 private fun resolveColors(identity:PopIdentity,dark:Boolean):Pair<ColorScheme,PopSemanticColors> {
-    val p=identity.palette; val background=if(dark)p.backgroundNight else p.backgroundDay; val surface=if(dark)p.surfaceNight else p.surfaceDay
-    val variant=surface.copy(alpha=if(dark).86f else .94f); val on=if(dark)p.titleNight else p.titleDay; val muted=if(dark)p.mutedNight else p.mutedDay
-    val primary=if(dark)p.primaryNight else p.primaryDay; val onPrimary=if(dark)p.onPrimaryNight else p.onPrimaryDay
-    val scheme=(if(dark) darkColorScheme() else lightColorScheme()).copy(primary=primary,onPrimary=onPrimary,secondary=identity.accent,onSecondary=if(dark)Color(0xFF06201F) else Color.White,background=background,onBackground=on,surface=surface,onSurface=on,surfaceVariant=variant,onSurfaceVariant=muted,outline=if(dark) Color(0xFF64748B) else Color(0xFF94A3B8),error=if(dark)Color(0xFFFFB4AB) else Color(0xFFBA1A1A))
-    return scheme to PopSemanticColors(primary,if(dark)p.accentNight else p.accentDay,background,surface,variant,on,if(dark)p.bodyNight else p.bodyDay,onPrimary,if(dark)p.outlineNight else p.outlineDay,muted,if(dark)p.selectedSurfaceNight else p.selectedSurfaceDay,if(dark)p.selectedContentNight else p.selectedContentDay,scheme.error,Color(0xFF22C55E),Color(0xFFF59E0B))
+    val shared=popSemanticColors(PopIdentityStyle.valueOf(identity.name),dark)
+    val scheme=(if(dark) darkColorScheme() else lightColorScheme()).copy(
+        primary=shared.brandPrimary,onPrimary=shared.onBrand,secondary=shared.logoAccent,onSecondary=shared.onBrand,
+        background=shared.backgroundPrimary,onBackground=shared.textPrimary,surface=shared.surfacePrimary,onSurface=shared.textPrimary,
+        surfaceVariant=shared.surfaceSecondary,onSurfaceVariant=shared.textSecondary,outline=shared.borderDefault,error=shared.error,
+    )
+    return scheme to PopSemanticColors(
+        shared.brandPrimary,shared.logoAccent,shared.backgroundPrimary,shared.surfacePrimary,shared.surfaceSecondary,
+        shared.textPrimary,shared.textSecondary,shared.onBrand,shared.borderDefault,shared.textTertiary,
+        shared.brandPrimary.copy(alpha=if(dark).24f else .12f),shared.brandPrimary,shared.error,shared.success,shared.warning,
+    )
 }
 
 private val Cairo=FontFamily(Font(R.font.cairo,FontWeight.Normal),Font(R.font.cairo,FontWeight.Medium),Font(R.font.cairo,FontWeight.Bold),Font(R.font.cairo,FontWeight.Black))

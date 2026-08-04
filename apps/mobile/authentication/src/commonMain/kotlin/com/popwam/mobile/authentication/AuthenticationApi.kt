@@ -106,6 +106,8 @@ sealed interface AuthenticationApiResult<out T> {
     data class Failure(val code: String, val status: Int? = null) : AuthenticationApiResult<Nothing>
 }
 
+enum class PhoneExchangeDiagnostic { STARTED, HTTP_STATUS, PARSED }
+
 interface AuthenticationRemoteDataSource {
     suspend fun createChallenge(phoneE164: String, deviceCredentialId: String?): AuthenticationApiResult<AuthenticationEnvelope>
     suspend fun exchangeFirebaseProof(challengeId: String, idToken: String, deviceName: String): AuthenticationApiResult<AuthenticationEnvelope>
@@ -126,6 +128,10 @@ class KtorAuthenticationRemoteDataSource(
     private val client: HttpClient,
     private val baseUrl: String,
     private val json: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true },
+    /** Receives only a safe category and HTTP status; never request bodies or credentials. */
+    private val onFailure: (code: String, status: Int?) -> Unit = { _, _ -> },
+    /** Android wires these to debug-only, credential-free boundary diagnostics. */
+    private val onPhoneExchangeDiagnostic: (PhoneExchangeDiagnostic, Int?) -> Unit = { _, _ -> },
 ) : AuthenticationRemoteDataSource {
     private fun endpoint(path: String) = "${baseUrl.trimEnd('/')}/$path"
 
@@ -133,20 +139,43 @@ class KtorAuthenticationRemoteDataSource(
         val response = block()
         val text = response.body<String>()
         if (response.status.value in 200..299) AuthenticationApiResult.Success(json.decodeFromString<T>(text))
-        else AuthenticationApiResult.Failure(runCatching { json.parseToJsonElement(text).jsonObject["error"]?.toString()?.trim('"') }.getOrNull() ?: "SERVER_FAILURE", response.status.value)
-    } catch (_: Throwable) {
-        AuthenticationApiResult.Failure("NETWORK_FAILURE")
+        else AuthenticationApiResult.Failure(
+            runCatching { json.parseToJsonElement(text).jsonObject["error"]?.toString()?.trim('"') }.getOrNull() ?: "SERVER_FAILURE",
+            response.status.value,
+        ).also { onFailure(it.code, it.status) }
+    } catch (error: Throwable) {
+        val code = if (error::class.simpleName?.contains("Serialization", ignoreCase = true) == true) "AUTH_CONTRACT_PARSE_FAILED" else "NETWORK_FAILURE"
+        AuthenticationApiResult.Failure(code).also { onFailure(it.code, it.status) }
     }
 
     override suspend fun createChallenge(phoneE164: String, deviceCredentialId: String?) = call<AuthenticationEnvelope> {
         client.post(endpoint("api/mobile/auth/challenge")) { contentType(ContentType.Application.Json); setBody(ChallengeRequest(phoneE164 = phoneE164, deviceCredentialId = deviceCredentialId)) }
     }
 
-    override suspend fun exchangeFirebaseProof(challengeId: String, idToken: String, deviceName: String) = call<AuthenticationEnvelope> {
-        client.post(endpoint("api/mobile/auth/firebase/phone/exchange")) {
-            contentType(ContentType.Application.Json)
-            header("X-Firebase-Id-Token", idToken)
-            setBody(FirebaseExchangeRequest(challengeId = challengeId, deviceName = deviceName))
+    override suspend fun exchangeFirebaseProof(challengeId: String, idToken: String, deviceName: String): AuthenticationApiResult<AuthenticationEnvelope> {
+        onPhoneExchangeDiagnostic(PhoneExchangeDiagnostic.STARTED, null)
+        return try {
+            val response = client.post(endpoint("api/mobile/auth/firebase/phone/exchange")) {
+                contentType(ContentType.Application.Json)
+                header("X-Firebase-Id-Token", idToken)
+                setBody(FirebaseExchangeRequest(challengeId = challengeId, deviceName = deviceName))
+            }
+            val status = response.status.value
+            onPhoneExchangeDiagnostic(PhoneExchangeDiagnostic.HTTP_STATUS, status)
+            val text = response.body<String>()
+            if (status !in 200..299) {
+                AuthenticationApiResult.Failure(
+                    runCatching { json.parseToJsonElement(text).jsonObject["error"]?.toString()?.trim('"') }.getOrNull() ?: "SERVER_FAILURE",
+                    status,
+                ).also { onFailure(it.code, it.status) }
+            } else {
+                AuthenticationApiResult.Success(json.decodeFromString<AuthenticationEnvelope>(text)).also {
+                    onPhoneExchangeDiagnostic(PhoneExchangeDiagnostic.PARSED, status)
+                }
+            }
+        } catch (error: Throwable) {
+            val code = if (error::class.simpleName?.contains("Serialization", ignoreCase = true) == true) "AUTH_CONTRACT_PARSE_FAILED" else "NETWORK_FAILURE"
+            AuthenticationApiResult.Failure(code).also { onFailure(it.code, it.status) }
         }
     }
 

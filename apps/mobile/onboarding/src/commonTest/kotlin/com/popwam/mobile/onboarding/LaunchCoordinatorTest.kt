@@ -29,14 +29,13 @@ class LaunchCoordinatorTest {
         assertEquals(PopDestination.PhoneAuth, coordinator.state.value.destination)
     }
 
-    @Test fun processRestoreKeepsConfirmedThemeAndPalette() = runTest {
+    @Test fun processRestoreKeepsThemeAndPaletteSelectedOnTap() = runTest {
         val persistence = MemoryPersistence()
         val first = LaunchCoordinator(PersistedLaunchStateStore(persistence))
         first.restore()
         first.selectBaseTheme(ThemeMode.LIGHT)
         first.openThemeGallery()
-        first.previewPopStyle(IdentityPalette.CORAL)
-        first.confirmPopStyle()
+        first.selectPopStyle(IdentityPalette.CORAL)
 
         val restored = LaunchCoordinator(PersistedLaunchStateStore(persistence))
         restored.restore()

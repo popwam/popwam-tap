@@ -18,7 +18,6 @@ import com.popwam.mobile.foundation.navigation.WelcomePage
 import com.popwam.mobile.onboarding.LanguageScreen
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import com.popwam.mobile.onboarding.PopSplashScreen
-import com.popwam.mobile.onboarding.SplashStage
 import com.popwam.mobile.onboarding.ThemeScreen
 import com.popwam.mobile.onboarding.WelcomeScreen
 import com.popwam.pop.ui.theme.popFontFamilies
@@ -42,11 +41,11 @@ class Phase3ScreenshotTest {
     }
 
     @Test fun firstSplashStage() = capture("splash-stage-1", "en", ThemeMode.LIGHT) {
-        PopSplashScreen(SplashStage.ONE, {}, Modifier.fillMaxSize())
+        PopSplashScreen(progress = 0f, showGoAhead = false, onGoAhead = {}, modifier = Modifier.fillMaxSize())
     }
 
     @Test fun finalFirstLaunchSplashStage() = capture("splash-stage-5", "en", ThemeMode.LIGHT) {
-        PopSplashScreen(SplashStage.FIVE, {}, Modifier.fillMaxSize())
+        PopSplashScreen(progress = 1f, showGoAhead = true, onGoAhead = {}, modifier = Modifier.fillMaxSize())
     }
 
     @Test fun languageEnglish() = capture("language-en", "en", ThemeMode.LIGHT) {
@@ -83,7 +82,7 @@ class Phase3ScreenshotTest {
 
     @androidx.compose.runtime.Composable
     private fun ThemeScreenCapture(mode: ThemeMode, gallery: Boolean) {
-        ThemeScreen(mode, IdentityPalette.MINT, gallery, {}, {}, {}, {}, {}, {})
+        ThemeScreen(mode, IdentityPalette.MINT, gallery, {}, {}, {}, {}, {})
     }
 
     private fun capture(

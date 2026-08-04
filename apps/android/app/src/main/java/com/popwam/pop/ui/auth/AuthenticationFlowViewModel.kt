@@ -17,6 +17,8 @@ import com.popwam.pop.data.auth.AndroidDeviceBindingProvider
 import com.popwam.pop.data.auth.FirebasePhoneAuthGateway
 import com.popwam.pop.data.auth.FirebasePhoneEvent
 import com.popwam.pop.data.auth.FirebasePhoneFailure
+import com.popwam.pop.data.auth.AuthRuntimeDiagnostics
+import com.popwam.pop.data.auth.AuthRuntimeStage
 import com.popwam.pop.data.auth.PasskeyCoordinator
 import com.popwam.pop.data.auth.PhoneIdentity
 import com.popwam.pop.data.auth.PhoneParseResult
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
@@ -81,7 +84,13 @@ class AuthenticationFlowViewModel(
         val value=state.value.otp.value
         val length=state.value.challenge?.otpConfiguration?.codeLength ?: return
         if(!state.value.otp.isComplete(length)){coordinator.reportError(AuthenticationError.OTP_INVALID);return}
-        if(coordinator.beginOtpVerification())firebase.verifyCode(value,::handleFirebase)
+        if(coordinator.beginOtpVerification()) {
+            firebase.verifyCode(value,::handleFirebase)
+            viewModelScope.launch {
+                delay(45_000)
+                coordinator.recoverOtpVerification()
+            }
+        }
     }
     fun changePhone(){firebase.reset();firebaseOperation=false;viewModelScope.launch { coordinator.resetPhone() }}
 
@@ -148,7 +157,18 @@ class AuthenticationFlowViewModel(
         viewModelScope.launch {
             when(event) {
                 is FirebasePhoneEvent.CodeSent -> {firebaseOperation=false;coordinator.phoneCodeSent(event.verificationId)}
-                is FirebasePhoneEvent.Verified -> {firebaseOperation=false;coordinator.exchangeFirebaseProof(event.idToken,android.os.Build.MODEL.take(120))}
+                is FirebasePhoneEvent.Verified -> {
+                    firebaseOperation=false
+                    AuthRuntimeDiagnostics.mark(AuthRuntimeStage.OTP_PROVIDER_SUCCESS)
+                    AuthRuntimeDiagnostics.mark(AuthRuntimeStage.FIREBASE_TOKEN_READY)
+                    coordinator.exchangeFirebaseProof(event.idToken,android.os.Build.MODEL.take(120))?.let { envelope ->
+                        if (envelope.enrollmentSession != null) {
+                            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.RESTRICTED_SESSION_STORED)
+                        }
+                        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.NEXT_ACTION_RECEIVED, envelope.nextAction.name.lowercase())
+                        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.OTP_FLOW_NAVIGATED, state.value.stage.name.lowercase())
+                    }
+                }
                 is FirebasePhoneEvent.Failed -> {firebaseOperation=false;coordinator.reportError(event.reason.toAuthenticationError())}
                 FirebasePhoneEvent.AutoRetrievalTimedOut -> firebaseOperation=false
             }
@@ -170,8 +190,13 @@ private fun FirebasePhoneFailure.toAuthenticationError()=when(this) {
     FirebasePhoneFailure.TOO_MANY_REQUESTS,
     FirebasePhoneFailure.QUOTA -> AuthenticationError.RATE_LIMITED
     FirebasePhoneFailure.NETWORK -> AuthenticationError.OFFLINE
-    FirebasePhoneFailure.CONFIGURATION -> AuthenticationError.CONFIGURATION
-    else -> AuthenticationError.SERVER_FAILURE
+    FirebasePhoneFailure.CONFIGURATION,
+    FirebasePhoneFailure.APP_VERIFICATION,
+    FirebasePhoneFailure.RECAPTCHA,
+    FirebasePhoneFailure.MISSING_ACTIVITY -> AuthenticationError.SERVER_CONFIGURATION_INCOMPLETE
+    FirebasePhoneFailure.UNAVAILABLE,
+    FirebasePhoneFailure.EXCHANGE,
+    FirebasePhoneFailure.IDENTITY_CONFLICT -> AuthenticationError.PHONE_VERIFICATION_FAILED
 }
 
 class AuthenticationFlowFactory(

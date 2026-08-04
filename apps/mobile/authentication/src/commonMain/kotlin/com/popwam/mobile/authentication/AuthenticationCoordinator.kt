@@ -57,7 +57,11 @@ class AuthenticationCoordinator(
             reportError(AuthenticationError.OTP_ATTEMPTS_EXHAUSTED)
             return false
         }
-        mutableState.value = current.copy(operation = AuthenticationOperation.VERIFYING, otp = current.otp.copy(attemptsUsed = current.otp.attemptsUsed + 1), error = null)
+        mutableState.value = current.copy(
+            operation = AuthenticationOperation.VERIFYING,
+            otp = current.otp.copy(attemptsUsed = current.otp.attemptsUsed + 1),
+            error = null,
+        )
         return true
     }
 
@@ -107,20 +111,40 @@ class AuthenticationCoordinator(
         val current = mutableState.value
         val challenge = current.challenge ?: return
         val otp = current.otp.copy(providerChallengeHandle = providerHandle, remainingSeconds = challenge.otpConfiguration?.resendAfterSeconds ?: 60)
-        mutableState.value = current.copy(stage = AuthenticationStage.OTP, operation = AuthenticationOperation.IDLE, otp = otp)
+        mutableState.value = current.copy(
+            stage = AuthenticationStage.OTP,
+            operation = AuthenticationOperation.IDLE,
+            otp = otp,
+            otpResultConsumed = false,
+        )
         overlays.present(OverlayEntry("auth-otp-${challenge.challengeId}", OverlayKey.OTP, OverlayPresentation.BOTTOM_SHEET, OverlayDismissPolicy.ACTION_REQUIRED))
         vault.saveRestoration(RestorableAuthenticationState(challenge.challengeId, AuthenticationStage.OTP, current.maskedPhone, current.phoneE164, providerHandle, challenge = challenge))
     }
 
     suspend fun exchangeFirebaseProof(idToken: String, deviceName: String): AuthenticationEnvelope? {
-        val challenge = mutableState.value.challenge ?: return null
-        if (mutableState.value.operation == AuthenticationOperation.VERIFYING) return null
-        mutableState.value = mutableState.value.copy(operation = AuthenticationOperation.VERIFYING, error = null)
+        val current = mutableState.value
+        val challenge = current.challenge ?: return null
+        // beginOtpVerification intentionally sets VERIFYING before Firebase
+        // returns.  The previous VERIFYING guard therefore dropped every
+        // manually entered correct code before the POP exchange could begin.
+        // Gate the Firebase result itself instead, so a late duplicate callback
+        // cannot start a second exchange or navigation.
+        if (current.otpResultConsumed) return null
+        mutableState.value = current.copy(
+            operation = AuthenticationOperation.VERIFYING,
+            error = null,
+            otpResultConsumed = true,
+        )
         return when (val result = remote.exchangeFirebaseProof(challenge.challengeId, idToken, deviceName)) {
             is AuthenticationApiResult.Failure -> { fail(result.code); null }
             is AuthenticationApiResult.Success -> {
-                acceptVerifiedEnvelope(result.value)
-                result.value
+                if (!result.value.ok) {
+                    fail(result.value.error ?: "AUTH_CONTRACT_PARSE_FAILED")
+                    null
+                } else {
+                    acceptVerifiedEnvelope(result.value)
+                    result.value
+                }
             }
         }
     }
@@ -214,6 +238,17 @@ class AuthenticationCoordinator(
         mutableState.value = AuthenticationStateMachine.continueVerified(mutableState.value)
     }
 
+    /** Bounded recovery for a provider/exchange callback that never returns. */
+    fun recoverOtpVerification() {
+        val current = mutableState.value
+        if (current.stage != AuthenticationStage.OTP || current.operation != AuthenticationOperation.VERIFYING) return
+        mutableState.value = current.copy(
+            operation = AuthenticationOperation.IDLE,
+            error = AuthenticationError.PHONE_VERIFICATION_FAILED,
+            otpResultConsumed = true,
+        )
+    }
+
     fun usePasskeyFallback(): Boolean {
         val current = mutableState.value
         val challenge = current.challenge ?: return false
@@ -296,7 +331,10 @@ class AuthenticationCoordinator(
 
     private fun errorFor(code: String) = when {
         code.contains("RATE_LIMIT") -> AuthenticationError.RATE_LIMITED
-        code.contains("NETWORK") -> AuthenticationError.OFFLINE
+        code.contains("ADMIN_UNAVAILABLE") || code.contains("CONFIG") || code.contains("CONTRACT") || code.contains("CHALLENGE_UNAVAILABLE") -> AuthenticationError.SERVER_CONFIGURATION_INCOMPLETE
+        code.contains("NETWORK") -> AuthenticationError.SERVER_UNREACHABLE
+        code.contains("FIREBASE") || code.contains("PHONE_IDENTITY") || code.contains("OTP") -> AuthenticationError.PHONE_VERIFICATION_FAILED
+        code.contains("ENROLLMENT") || code.contains("SESSION_UPGRADE") -> AuthenticationError.ACCOUNT_PREPARATION_FAILED
         code.contains("CHALLENGE_EXPIRED") -> AuthenticationError.CHALLENGE_EXPIRED
         code.contains("SESSION_EXPIRED") -> AuthenticationError.SESSION_EXPIRED
         code.contains("PASSKEY") -> AuthenticationError.PASSKEY_REJECTED

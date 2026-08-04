@@ -1,16 +1,17 @@
 package com.popwam.mobile.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,6 +22,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.popwam.mobile.designsystem.LocalPopSemanticColors
@@ -43,16 +45,18 @@ fun LanguageScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalPopSemanticColors.current
-    val supported = listOf("en", "ar", "fr").filter { it in availableLanguageTags }
+    // The approved first-launch choice is deliberately two languages only.
+    val supported = listOf("en", "ar").filter { it in availableLanguageTags }
         .ifEmpty { listOf("en", "ar") }
     ReferenceFrame(modifier.background(colors.backgroundPrimary)) {
         PopMarkVector(
             color = colors.brandPrimary,
             contentDescription = stringResource(Res.string.pop_logo_description),
-            modifier = Modifier.offset(102.dp, 95.dp).size(190.dp, 218.dp),
+            modifier = Modifier.offset(102.dp, 248.dp).size(190.dp, 218.dp),
         )
         Column(
-            modifier = Modifier.offset(27.dp, 363.dp).size(342.dp, 93.dp),
+            modifier = Modifier.offset(27.dp, 474.dp).size(342.dp, 93.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Text(
@@ -61,6 +65,8 @@ fun LanguageScreen(
                 fontSize = 28.sp,
                 lineHeight = 33.sp,
                 fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
             Text(
                 stringResource(Res.string.language_title_ar),
@@ -68,11 +74,13 @@ fun LanguageScreen(
                 fontSize = 28.sp,
                 lineHeight = 33.sp,
                 fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
         Column(
             modifier = Modifier
-                .offset(74.dp, if (supported.size > 2) 516.dp else 580.dp)
+                .offset(74.dp, 664.dp)
                 .size(246.3158.dp, (64 * supported.size + 22 * (supported.size - 1)).dp),
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
@@ -85,7 +93,12 @@ fun LanguageScreen(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(246.3158.dp, 63.9474.dp)
-                        .background(colors.surfacePrimary, RoundedCornerShape(12.dp))
+                        .background(if (isSelected) colors.brandPrimary.copy(alpha = .12f) else colors.surfacePrimary, RoundedCornerShape(12.dp))
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) colors.brandPrimary else colors.borderStrong,
+                            shape = RoundedCornerShape(12.dp),
+                        )
                         .semantics {
                             role = Role.RadioButton
                             selected = isSelected
@@ -100,6 +113,8 @@ fun LanguageScreen(
                         fontSize = 24.sp,
                         lineHeight = 34.sp,
                         fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }

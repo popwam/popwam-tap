@@ -2,4 +2,5 @@
 <resources>
     <color name="pop_black">#050505</color>
     <color name="pop_gold">#D4AF37</color>
+    <color name="pop_splash_background">#FFFFFF</color>
 </resources>
