@@ -1,7 +1,9 @@
 import { prisma, type ProfileAccess, type ProfileModuleVisibility } from "@popwam/db";
 import { csrfRejected, getCurrentPopUser, isTrustedPopMutation, unauthorized } from "@/lib/api-auth";
 import { validateProfileSlug } from "@/lib/profile-slugs";
-import { managedProfileWhere } from "@/lib/profile-publishing";
+import { evaluateProfileReadiness, getOwnedDraft, managedProfileWhere } from "@/lib/profile-publishing";
+import { getUserEntitlements } from "@/lib/plans";
+import { profileRuntimeFailure } from "@/lib/profile-runtime-errors";
 
 const accesses = new Set<ProfileAccess>(["PUBLIC", "UNLISTED", "PRIVATE"]);
 const moduleVisibilities = new Set<ProfileModuleVisibility>(["PUBLIC", "UNLISTED", "FRIENDS", "ONLY_ME"]);
@@ -29,13 +31,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
   if (body.module?.visibility && !moduleVisibilities.has(body.module.visibility)) return Response.json({ ok: false, error: "MODULE_VISIBILITY_INVALID" }, { status: 400 });
   if (body.media?.visibility && !moduleVisibilities.has(body.media.visibility)) return Response.json({ ok: false, error: "MEDIA_VISIBILITY_INVALID" }, { status: 400 });
   try {
+    const { effective } = await getUserEntitlements(user.id);
     const result = await prisma.$transaction(async (tx) => {
       const profile = await tx.profile.findFirst({ where: managedProfileWhere(user.id, profileId), select: { slug: true, draftSlug: true, draftRevision: true } });
       if (!profile) throw new Error("PROFILE_NOT_FOUND");
       if (profile.draftRevision !== body.expectedDraftRevision) throw new Error("STALE_DRAFT");
       if (normalizedSlug) {
+        if (normalizedSlug !== (profile.draftSlug ?? profile.slug) && !effective.allowCustomSlug && !effective.customSlugAllowed) throw new Error("FEATURE_CUSTOM_SLUG_REQUIRED");
         const [current, old] = await Promise.all([
-          tx.profile.findFirst({ where: { slug: normalizedSlug, id: { not: profileId } }, select: { id: true } }),
+          tx.profile.findFirst({ where: { OR: [{ slug: normalizedSlug }, { draftSlug: normalizedSlug }], id: { not: profileId } }, select: { id: true } }),
           tx.profileSlugHistory.findUnique({ where: { slug: normalizedSlug }, select: { profileId: true } }),
         ]);
         if (current || (old && old.profileId !== profileId)) throw new Error("SLUG_TAKEN");
@@ -68,9 +72,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
       });
     }, { isolationLevel: "Serializable" });
     if (!result.count) throw new Error("STALE_DRAFT");
-    return Response.json({ ok: true, draftRevision: body.expectedDraftRevision! + 1 });
+    const updated = await getOwnedDraft(user.id, profileId);
+    return Response.json({
+      ok: true,
+      draftRevision: body.expectedDraftRevision! + 1,
+      readiness: updated ? evaluateProfileReadiness(updated) : undefined,
+    });
   } catch (error) {
-    const code = error instanceof Error ? error.message : "VISIBILITY_UPDATE_FAILED";
+    const { code } = profileRuntimeFailure("VISIBILITY", error, "VISIBILITY_UPDATE_FAILED");
     return Response.json({ ok: false, error: code }, { status: code === "STALE_DRAFT" ? 409 : code === "PROFILE_NOT_FOUND" ? 404 : 400 });
   }
 }

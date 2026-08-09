@@ -51,7 +51,7 @@ export function profileDraftFingerprint(profile: DraftProfileData) {
   const scalar = {
     slug: profile.draftSlug ?? profile.slug, displayName: profile.displayName, displayLabel: profile.displayLabel, type: profile.type,
     profileKind: profile.profileKind, categoryId: profile.categoryId, templateId: profile.templateId,
-    access: profile.access, primaryLanguage: profile.primaryLanguage,
+    access: profile.access, primaryLanguage: profile.primaryLanguage, theme: profile.theme,
     displayNameAr: profile.displayNameAr, displayNameEn: profile.displayNameEn, title: profile.title,
     jobTitleAr: profile.jobTitleAr, jobTitleEn: profile.jobTitleEn, company: profile.company,
     bio: profile.bio, bioAr: profile.bioAr, bioEn: profile.bioEn,
@@ -259,7 +259,7 @@ export async function publishProfile(userId: string, profileId: string, expected
     if (!readiness.ready) return { ok: false as const, readiness };
     const fingerprint = profileDraftFingerprint(profile);
     if (profile.publication?.publishedRevision.draftFingerprint === fingerprint) {
-      return { ok: true as const, idempotent: true as const, readiness };
+      return { ok: true as const, idempotent: true as const, lifecycle: "PUBLISHED" as const, draftRevision: profile.draftRevision, readiness };
     }
     const slug = validateProfileSlug(profile.draftSlug ?? profile.slug ?? "");
     if (!slug.ok) throw new Error(slug.error);
@@ -337,8 +337,8 @@ export async function publishProfile(userId: string, profileId: string, expected
     for (const media of publicAssets) {
       await tx.auditLog.create({ data: { actorId: userId, operation: "profile.media.promoted", targetId: media.id, metadata: { purpose: media.purpose } } });
     }
-    return { ok: true as const, idempotent: false as const, readiness, revisionNumber: revision.revisionNumber };
-  }, { isolationLevel: "Serializable" });
+    return { ok: true as const, idempotent: false as const, lifecycle: "PUBLISHED" as const, draftRevision: profile.draftRevision, readiness, revisionNumber: revision.revisionNumber };
+  }, { isolationLevel: "Serializable", maxWait: 10_000, timeout: 30_000 });
 }
 
 export async function transitionProfile(userId: string, profileId: string, action: "pause" | "resume" | "archive") {

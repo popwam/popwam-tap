@@ -5,10 +5,12 @@ import {
   ProfileModuleVisibility,
   prisma,
 } from "@popwam/db";
+import { randomUUID } from "node:crypto";
 import { mergeEntitlements } from "@/lib/plans";
 import { requireValidProfileModuleConfiguration } from "@/lib/profile-module-config";
 import { templateAllowed } from "@/lib/virtual-cards";
 import { categoryTemplateCompatibility, idempotentProfileCreationDecision, primaryProfileDecision, profileModuleDecision, profileQuotaDecision } from "@/lib/profile-domain-policy";
+import { defaultProfileSlug } from "@/lib/profile-slugs";
 
 const CORE_MODULE_KEYS = ["IDENTITY", "ABOUT", "CONTACT", "LINKS"];
 
@@ -47,7 +49,7 @@ async function profileQuotaContext(tx: Tx, userId: string) {
     tx.userLimitOverride.findUnique({ where: { userId } }),
     tx.plan.findUnique({ where: { slug: "free" } }),
     tx.profileEntitlement.findMany({ where: { userId, status: "ACTIVE", startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }] }, select: { profileLimitIncrement: true } }),
-    tx.profile.count({ where: { userId } }),
+    tx.profile.count({ where: { userId, archivedAt: null, lifecycle: { not: "ARCHIVED" } } }),
   ]);
   const activePlan = subscription?.plan || plan;
   if (!activePlan) throw new Error("PLAN_NOT_CONFIGURED");
@@ -75,6 +77,7 @@ export async function validateProfileTemplate(tx: Tx, input: Pick<CreateProfileI
   if (category && !category.isActive) throw new Error("PROFILE_CATEGORY_INCOMPATIBLE");
 
   const selectedTemplateId = input.templateId || category?.defaultTemplateId || null;
+  if (!selectedTemplateId) throw new Error("PROFILE_TEMPLATE_REQUIRED");
   const template = selectedTemplateId
     ? await tx.profileTemplate.findUnique({ where: { id: selectedTemplateId }, include: { categoryRef: true } })
     : null;
@@ -87,12 +90,18 @@ export async function validateProfileTemplate(tx: Tx, input: Pick<CreateProfileI
 }
 
 export async function initializeDefaultModules(tx: Tx, profileId: string, templateId?: string | null) {
-  const candidates = templateId
+  const templateCandidates = templateId
     ? await tx.profileTemplateModule.findMany({
       where: { templateId, allowed: true, OR: [{ enabledByDefault: true }, { required: true }] },
       include: { moduleDefinition: true },
       orderBy: { defaultSortOrder: "asc" },
     })
+    : [];
+  // Older catalogue rows legitimately have no explicit template/module rules.
+  // Falling back to the core modules keeps those templates usable and prevents
+  // newly created profiles from being permanently blocked by IDENTITY missing.
+  const candidates = templateCandidates.length > 0
+    ? templateCandidates
     : (await tx.profileModuleDefinition.findMany({ where: { key: { in: CORE_MODULE_KEYS }, isActive: true }, orderBy: { key: "asc" } }))
       .map((moduleDefinition, index) => ({ moduleDefinition, defaultSortOrder: index * 10, required: false, defaultConfiguration: null }));
 
@@ -150,17 +159,39 @@ async function createProfileInTransaction(tx: Tx, input: CreateProfileInput, isP
       primaryLanguage: input.primaryLanguage || "ar",
     },
   });
+  // The public slug remains unpublished until readiness/publishing succeeds,
+  // but every draft receives a stable server-generated candidate immediately.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = defaultProfileSlug(displayName, randomUUID());
+    const [current, historical] = await Promise.all([
+      tx.profile.findFirst({ where: { OR: [{ slug: candidate }, { draftSlug: candidate }], id: { not: profile.id } }, select: { id: true } }),
+      tx.profileSlugHistory.findUnique({ where: { slug: candidate }, select: { profileId: true } }),
+    ]);
+    if (!current && !historical) {
+      await tx.profile.update({ where: { id: profile.id }, data: { draftSlug: candidate } });
+      break;
+    }
+    if (attempt === 4) throw new Error("PROFILE_SLUG_GENERATION_FAILED");
+  }
   await initializeDefaultModules(tx, profile.id, template?.id);
   await tx.auditLog.create({ data: { actorId: input.userId, operation: isPrimary ? "profile.primary.create" : "profile.additional.create", targetId: profile.id, metadata: { profileKind: input.profileKind, categoryId: category?.id || null, templateId: template?.id || null } } });
   return profile;
 }
 
 export async function createPrimaryProfile(input: CreateProfileInput) {
-  return prisma.$transaction((tx) => createProfileInTransaction(tx, input, true), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  return prisma.$transaction((tx) => createProfileInTransaction(tx, input, true), {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    maxWait: 10_000,
+    timeout: 30_000,
+  });
 }
 
 export async function createAdditionalProfile(input: CreateProfileInput) {
-  return prisma.$transaction((tx) => createProfileInTransaction(tx, input, false), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  return prisma.$transaction((tx) => createProfileInTransaction(tx, input, false), {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    maxWait: 10_000,
+    timeout: 30_000,
+  });
 }
 
 export async function setPrimaryProfile(userId: string, profileId: string) {

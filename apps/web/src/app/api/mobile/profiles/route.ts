@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   const [{ effective }, profiles] = await Promise.all([
     getUserEntitlements(user.id),
     prisma.profile.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, archivedAt: null, lifecycle: { not: "ARCHIVED" } },
       include: {
         destinations: { orderBy: { sortOrder: "asc" } },
         uploads: { orderBy: { sortOrder: "asc" } },
