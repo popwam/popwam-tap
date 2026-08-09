@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { detectImageContentType } from "@popwam/storage";
 import { evaluateProfileReadiness, type DraftProfileData } from "./profile-publishing";
-import { normalizeProfileSlug, validateProfileSlug } from "./profile-slugs";
+import { defaultProfileSlug, normalizeProfileSlug, validateProfileSlug } from "./profile-slugs";
 
 function draft(overrides: Partial<DraftProfileData> = {}) {
   return {
@@ -43,6 +43,77 @@ describe("profile publishing policy", () => {
     expect(validateProfileSlug("my-profile")).toEqual({ ok: true, slug: "my-profile" });
   });
 
+  it("builds a stable default link candidate from the profile name and server randomness", () => {
+    expect(defaultProfileSlug("Sarah Studio", "A1B2-C3D4")).toBe("sarah-studio-a1b2c3d4");
+    expect(defaultProfileSlug("?????", "ABC12345")).toBe("pop-abc12345");
+    expect(defaultProfileSlug("a".repeat(100), "12345678")).toHaveLength(63);
+  });
+
+  it("tracks public profile appearance in draft readiness fingerprints", () => {
+    const source = readFileSync(new URL("./profile-publishing.ts", import.meta.url), "utf8");
+    expect(source).toContain("primaryLanguage: profile.primaryLanguage, theme: profile.theme");
+  });
+
+  it("keeps create and archive ownership server-derived and mutations trusted", () => {
+    const createRoute = readFileSync(new URL("../app/api/profiles/route.ts", import.meta.url), "utf8");
+    const archiveRoute = readFileSync(new URL("../app/api/profiles/[profileId]/route.ts", import.meta.url), "utf8");
+    expect(createRoute).toContain("userId: user.id");
+    expect(createRoute).not.toContain("body.userId");
+    expect(createRoute).toContain("isTrustedPopMutation(request)");
+    expect(archiveRoute).toContain("archiveProfile(user.id, profileId");
+    expect(archiveRoute).not.toContain("body.userId");
+    expect(archiveRoute).toContain("isTrustedPopMutation(request)");
+  });
+
+  it("exposes the mobile create POST contract with canonical profile kinds", () => {
+    const createRoute = readFileSync(new URL("../app/api/profiles/route.ts", import.meta.url), "utf8");
+    expect(createRoute).toContain("export async function POST");
+    expect(createRoute).toContain('body.profileKind !== "PERSONAL" && body.profileKind !== "BUSINESS"');
+    expect(createRoute).toContain("categorySlug: body.categorySlug");
+    expect(createRoute).toContain("templateId: body.templateId");
+    expect(createRoute).toContain("profileId: profile.id");
+  });
+
+  it("requires a live template and initializes core modules for legacy catalogues without rules", () => {
+    const domain = readFileSync(new URL("./profile-domain.ts", import.meta.url), "utf8");
+    expect(domain).toContain('throw new Error("PROFILE_TEMPLATE_REQUIRED")');
+    expect(domain).toContain("templateCandidates.length > 0");
+    expect(domain).toContain("CORE_MODULE_KEYS");
+    expect(domain).toContain('archivedAt: null, lifecycle: { not: "ARCHIVED" }');
+    expect(domain).toContain("timeout: 30_000");
+  });
+
+  it("keeps archived profiles out of legacy mobile selection and active quota", () => {
+    const mobile = readFileSync(new URL("../app/api/mobile/profiles/route.ts", import.meta.url), "utf8");
+    const selector = readFileSync(new URL("./profile-editor.ts", import.meta.url), "utf8");
+    expect(mobile).toContain('archivedAt: null, lifecycle: { not: "ARCHIVED" }');
+    expect(selector).toContain('archivedAt: null, lifecycle: { not: "ARCHIVED" }');
+  });
+
+  it("keeps PRIVATE visibility independent from publication readiness and returns the new revision", () => {
+    const route = readFileSync(new URL("../app/api/profiles/[profileId]/visibility/route.ts", import.meta.url), "utf8");
+    const transactionEnd = route.indexOf('}, { isolationLevel: "Serializable" });');
+    const readinessEvaluation = route.indexOf("evaluateProfileReadiness(updated)");
+    expect(transactionEnd).toBeGreaterThan(0);
+    expect(readinessEvaluation).toBeGreaterThan(transactionEnd);
+    expect(route).toContain("draftRevision: body.expectedDraftRevision! + 1");
+  });
+
+  it("repairs category defaults with an idempotent additive migration", () => {
+    const migration = readFileSync(new URL("../../../../packages/db/prisma/migrations/20260809133000_profile_category_default_templates/migration.sql", import.meta.url), "utf8");
+    expect(migration).toContain('UPDATE "ProfileCategory" AS category');
+    expect(migration).toContain('category."defaultTemplateId" IS DISTINCT FROM template."id"');
+    expect(migration).not.toContain("DELETE FROM");
+    expect(migration).not.toContain("DROP TABLE");
+  });
+
+  it("checks slug conflicts against published drafts and history on the server", () => {
+    const route = readFileSync(new URL("../app/api/profiles/[profileId]/visibility/route.ts", import.meta.url), "utf8");
+    expect(route).toContain("{ slug: normalizedSlug }, { draftSlug: normalizedSlug }");
+    expect(route).toContain("profileSlugHistory.findUnique");
+    expect(route).toContain("FEATURE_CUSTOM_SLUG_REQUIRED");
+  });
+
   it("detects actual image bytes rather than trusting client MIME", () => {
     expect(detectImageContentType(new Uint8Array([0xff, 0xd8, 0xff, 0x00]))).toBe("image/jpeg");
     expect(detectImageContentType(new TextEncoder().encode("<script>alert(1)</script>"))).toBeNull();
@@ -77,6 +148,7 @@ describe("profile publishing policy", () => {
     expect(source).toContain("publishedRevision.draftFingerprint === fingerprint");
     expect(source).toContain('action === "archive"');
     expect(source).toContain('action === "pause" ? "PAUSED" : "PUBLISHED"');
+    expect(source).toContain('maxWait: 10_000, timeout: 30_000');
   });
 
   it("keeps draft media private and exposes it only through the current published revision", () => {

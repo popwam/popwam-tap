@@ -1,9 +1,10 @@
 import { getCurrentPopUser, isTrustedPopMutation, csrfRejected, unauthorized } from "@/lib/api-auth";
 import { buildOwnerPreviewProjection } from "@/lib/profile-preview";
 import { evaluateProfileReadiness, getOwnedDraft, publishProfile, transitionProfile } from "@/lib/profile-publishing";
+import { profileRuntimeFailure } from "@/lib/profile-runtime-errors";
 
 function failure(error: unknown) {
-  const code = error instanceof Error ? error.message : "PUBLISHING_FAILED";
+  const { code } = profileRuntimeFailure("PUBLISH", error, "PUBLISHING_FAILED");
   const status = code === "PROFILE_NOT_FOUND" ? 404 : code === "STALE_DRAFT" ? 409 : 400;
   return Response.json({ ok: false, error: code }, { status, headers: { "cache-control": "no-store" } });
 }

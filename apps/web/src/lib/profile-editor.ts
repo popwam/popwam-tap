@@ -2,6 +2,7 @@ import {
   DestinationType,
   OrgRole,
   Prisma,
+  ProfileTheme,
   ProfileModuleVisibility,
   prisma,
 } from "@popwam/db";
@@ -9,6 +10,7 @@ import { assertWithinLimitLocked, getUserEntitlements } from "./plans";
 import { buildOwnerPreviewProjection } from "./profile-preview";
 import {
   evaluateProfileReadiness,
+  draftProfileInclude,
   getOwnedDraft,
   loadPublishedRevision,
   managedProfileWhere,
@@ -43,6 +45,7 @@ type EditorLocale = "ar" | "en";
 
 export type ProfileEditorAction =
   | { type: "TEMPLATE_SELECT"; templateId?: unknown }
+  | { type: "APPEARANCE_SAVE"; theme?: unknown }
   | { type: "IDENTITY_SAVE"; displayLabel?: unknown; displayName?: unknown; displayNameAr?: unknown; displayNameEn?: unknown; jobTitleAr?: unknown; jobTitleEn?: unknown; organizationNameAr?: unknown; organizationNameEn?: unknown; primaryLanguage?: unknown }
   | { type: "ABOUT_SAVE"; title?: unknown; bio?: unknown; bioAr?: unknown; bioEn?: unknown; descriptionAr?: unknown; descriptionEn?: unknown }
   | { type: "CONTACT_SAVE"; phone?: unknown; alternatePhone?: unknown; email?: unknown; website?: unknown; whatsappBusiness?: unknown; whatsappPrivate?: unknown; locationText?: unknown; addressAr?: unknown; addressEn?: unknown; visibility?: unknown }
@@ -62,6 +65,9 @@ export type ProfileEditorAction =
   | { type: "MEDIA_REORDER"; ids?: unknown };
 
 const CORE_TEMPLATE_FALLBACK_MODULES = new Set(["IDENTITY", "ABOUT", "CONTACT", "LINKS"]);
+const profileThemes = new Set<ProfileTheme>([
+  "CLASSIC_DARK", "CLASSIC_LIGHT", "ELEGANT_DARK", "ELEGANT_LIGHT", "BUSINESS_DARK", "BUSINESS_LIGHT",
+]);
 function templateAllowsModule(profile: { templateId: string | null; template?: { moduleRules: Array<{ moduleDefinition: { key: string }; allowed: boolean }> } | null }, key: string) {
   if (!profile.templateId) return true;
   const rules = profile.template?.moduleRules || [];
@@ -204,7 +210,7 @@ export async function getProfileSelector(userId: string, selectedProfileId?: str
       },
       orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
     }),
-    prisma.profile.count({ where: { userId } }),
+    prisma.profile.count({ where: { userId, archivedAt: null, lifecycle: { not: "ARCHIVED" } } }),
     prisma.profileEntitlement.aggregate({
       where: { userId, status: "ACTIVE", startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
       _sum: { profileLimitIncrement: true },
@@ -214,6 +220,12 @@ export async function getProfileSelector(userId: string, selectedProfileId?: str
   const selected = profiles.some((profile) => profile.id === selectedProfileId)
     ? selectedProfileId!
     : profiles.find((profile) => profile.isPrimary)?.id || profiles[0]?.id || null;
+  const configuredKinds = Array.isArray(effective.availableProfileTypes)
+    ? effective.availableProfileTypes.filter((item): item is string => item === "PERSONAL" || item === "BUSINESS")
+    : [];
+  const allowedProfileKinds = configuredKinds.length > 0
+    ? configuredKinds.filter((kind) => kind !== "BUSINESS" || Boolean(effective.allowBusinessCards))
+    : ["PERSONAL", ...(effective.allowBusinessCards ? ["BUSINESS"] : [])];
   return {
     profiles: profiles.map((profile) => ({
       id: profile.id,
@@ -231,6 +243,9 @@ export async function getProfileSelector(userId: string, selectedProfileId?: str
       remaining: Math.max(0, limit - ownedUsage),
       planSlug: plan.slug,
       quotaAllowsAdditional: ownedUsage < limit,
+      allowedProfileKinds,
+      customSlugAllowed: Boolean(effective.allowCustomSlug || effective.customSlugAllowed),
+      allowedThemes: Array.isArray(effective.availableThemes) ? effective.availableThemes.filter((item): item is string => typeof item === "string") : [],
       onboardingSupported: false,
       blocker: "ONBOARDING_PROGRESS_USER_SCOPED",
     },
@@ -283,6 +298,13 @@ export async function getProfileEditor(userId: string, profileId: string, locale
     },
     permissions: { canEdit: true, canSetPrimary: false },
     readiness,
+    appearance: {
+      theme: profile.theme,
+      templateId: profile.templateId,
+      templateSlug: profile.template?.slug || null,
+      templateName: localized(locale, profile.template?.nameAr || null, profile.template?.nameEn || null, profile.template?.slug || ""),
+      previewImageUrl: profile.template?.previewImageUrl || null,
+    },
     preview: buildOwnerPreviewProjection(profile, locale),
     identity: {
       displayLabel: profile.displayLabel || "",
@@ -385,6 +407,7 @@ async function reorderExact(tx: Tx, model: "destination" | "profileService" | "p
 export async function mutateProfileEditor(userId: string, profileId: string, expectedRevision: number, action: ProfileEditorAction) {
   if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new Error("DRAFT_REVISION_REQUIRED");
   if (!action || typeof action !== "object" || !("type" in action)) throw new Error("ACTION_INVALID");
+  const { effective } = await getUserEntitlements(userId);
   return prisma.$transaction(async (tx) => {
     const profile = await loadLockedProfile(tx, userId, profileId, expectedRevision);
     const requiredKeys = new Set([
@@ -396,6 +419,16 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
     let auditMetadata: Prisma.InputJsonObject | undefined;
 
     switch (action.type) {
+      case "APPEARANCE_SAVE": {
+        const theme = String(action.theme || "") as ProfileTheme;
+        if (!profileThemes.has(theme)) throw new Error("PROFILE_THEME_INVALID");
+        const allowedThemes = Array.isArray(effective.availableThemes) ? effective.availableThemes.filter((item): item is string => typeof item === "string") : [];
+        if (theme !== profile.theme && (!effective.allowThemes || (allowedThemes.length > 0 && !allowedThemes.includes(theme)))) throw new Error("PROFILE_THEME_PLAN_REQUIRED");
+        await tx.profile.update({ where: { id: profileId }, data: { theme } });
+        auditOperation = "profile.appearance.changed";
+        auditMetadata = { theme };
+        break;
+      }
       case "TEMPLATE_SELECT": {
         const templateId = requiredId(action.templateId);
         const template = await tx.profileTemplate.findFirst({
@@ -629,6 +662,7 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
     const changed = await tx.profile.updateMany({ where: { id: profileId, draftRevision: expectedRevision }, data: { draftRevision: { increment: 1 } } });
     if (changed.count !== 1) throw new Error("STALE_DRAFT");
     if (auditOperation) await tx.auditLog.create({ data: { actorId: userId, operation: auditOperation, targetId: auditTarget, metadata: auditMetadata } });
-    return { ok: true, draftRevision: expectedRevision + 1 };
+    const updated = await tx.profile.findFirst({ where: managedProfileWhere(userId, profileId), include: draftProfileInclude });
+    return { ok: true, draftRevision: expectedRevision + 1, readiness: updated ? evaluateProfileReadiness(updated) : undefined };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10_000, timeout: 30_000 });
 }

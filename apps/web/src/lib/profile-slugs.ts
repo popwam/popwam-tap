@@ -21,3 +21,12 @@ export function validateProfileSlug(value: string) {
   if (RESERVED_PROFILE_SLUGS.has(slug)) return { ok: false as const, error: "SLUG_RESERVED" };
   return { ok: true as const, slug };
 }
+
+/** Produces the initial owner-facing draft link. The random component is
+ * supplied by the server so clients can never claim or predict uniqueness. */
+export function defaultProfileSlug(displayName: string, randomValue: string) {
+  const suffix = normalizeProfileSlug(randomValue).replace(/-/g, "").slice(0, 8) || "profile";
+  const maximumBaseLength = Math.max(3, 63 - suffix.length - 1);
+  const base = normalizeProfileSlug(displayName).slice(0, maximumBaseLength).replace(/-$/g, "") || "pop";
+  return `${base}-${suffix}`;
+}
