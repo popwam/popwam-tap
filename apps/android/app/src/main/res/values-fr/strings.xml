@@ -88,4 +88,22 @@
     <string name="settings_request_storage">Demander plus de stockage</string>
     <string name="settings_request_links">Demander plus de liens</string>
     <string name="quota_request_submitted">Demande d’augmentation envoyée</string>
+    <string name="home_suggested">Suggestions pour vous</string>
+    <string name="home_suggestions_unavailable">Les suggestions personnalisées ne sont pas encore disponibles. Ouvrez la recherche pour trouver des personnes et des profils publics.</string>
+    <string name="home_distinguished_services">Services à découvrir</string>
+    <string name="home_services_unavailable">L’annuaire des services n’est pas encore disponible.</string>
+    <string name="home_profile_ready">Votre profil est prêt</string>
+    <string name="home_profile_ready_body">%1$s est prêt à être consulté et partagé.</string>
+    <string name="home_complete_profile">Complétez votre profil</string>
+    <string name="home_complete_profile_body">Complétez votre profil pour permettre aux autres de vous contacter plus facilement.</string>
+    <string name="home_search_hint">Rechercher des personnes, entreprises et services</string>
+    <string name="home_partial">Certaines données de l’accueil sont indisponibles. Le contenu chargé reste visible.</string>
+    <string name="home_error">Impossible de charger l’accueil</string>
+    <string name="home_error_body">Vérifiez votre connexion et réessayez.</string>
+    <string name="home_empty_body">Créez un profil POP pour commencer.</string>
+    <string name="home_add_profile_future">L’ajout d’un profil est relié au parcours de configuration approuvé et sera disponible pendant la phase Profil.</string>
+    <string name="open">Ouvrir</string>
+    <string name="home_status_published">Publié</string>
+    <string name="home_status_draft">Brouillon</string>
+    <string name="home_status_archived">Archivé</string>
 </resources>

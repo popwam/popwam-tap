@@ -600,4 +600,22 @@
     <string name="settings_request_storage">طلب مساحة تخزين إضافية</string>
     <string name="settings_request_links">طلب روابط إضافية</string>
     <string name="quota_request_submitted">تم إرسال طلب الزيادة</string>
+    <string name="home_suggested">مقترح لك</string>
+    <string name="home_suggestions_unavailable">الاقتراحات المخصصة غير متاحة حاليًا. افتح البحث للعثور على أشخاص وملفات عامة.</string>
+    <string name="home_distinguished_services">خدمات مميزة</string>
+    <string name="home_services_unavailable">دليل الخدمات غير متاح حاليًا.</string>
+    <string name="home_profile_ready">ملفك جاهز</string>
+    <string name="home_profile_ready_body">%1$s جاهز للعرض والمشاركة.</string>
+    <string name="home_complete_profile">أكمل ملفك</string>
+    <string name="home_complete_profile_body">أكمل بيانات ملفك لزيادة فرص التواصل معك.</string>
+    <string name="home_search_hint">ابحث عن أشخاص وأعمال وخدمات</string>
+    <string name="home_partial">بعض بيانات الصفحة الرئيسية غير متاحة. ما زال المحتوى المحمّل ظاهرًا.</string>
+    <string name="home_error">تعذر تحميل الصفحة الرئيسية</string>
+    <string name="home_error_body">تحقق من اتصالك وحاول مرة أخرى.</string>
+    <string name="home_empty_body">أنشئ ملف POP للبدء.</string>
+    <string name="home_add_profile_future">إضافة ملف جديد مرتبطة بمسار إعداد الملف المعتمد وستتوفر في مرحلة الملف.</string>
+    <string name="open">فتح</string>
+    <string name="home_status_published">منشور</string>
+    <string name="home_status_draft">مسودة</string>
+    <string name="home_status_archived">مؤرشف</string>
 </resources>

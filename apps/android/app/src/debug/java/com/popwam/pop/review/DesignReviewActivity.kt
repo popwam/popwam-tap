@@ -1,8 +1,8 @@
 package com.popwam.pop.review
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -62,9 +62,13 @@ import com.popwam.mobile.onboarding.WelcomeScreen
 import com.popwam.pop.ui.theme.popFontFamilies
 import com.popwam.pop.TapApplication
 import com.popwam.pop.ui.currentLocale
+import com.popwam.pop.ui.home.HomeLoadState
+import com.popwam.pop.ui.home.HomeProfile
+import com.popwam.pop.ui.home.HomeScreen
+import com.popwam.pop.ui.home.HomeUiState
 
 /** Debug source set only. It renders fixtures and never instantiates a phone, OTP, or auth client. */
-class DesignReviewActivity : ComponentActivity() {
+class DesignReviewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { DesignReviewGallery() }
@@ -76,6 +80,7 @@ private enum class ReviewScreen(val label: String) {
     ALL_IN_ONE("All in One"), SHARE("Share Your Way"), PERSONAL("Personal & Business"), GET_STARTED("Get Started"),
     PHONE("Phone Number"), COUNTRY("Country"), OTP("OTP"), VERIFIED("Verified"), PASSKEY("Passkey"),
     BIOMETRIC("Biometric"), ACCOUNT_CREATED("Account Created"),
+    HOME_LOADED("Home Loaded"), HOME_LOADING("Home Loading"), HOME_EMPTY("Home Empty"), HOME_ERROR("Home Error"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -130,11 +135,44 @@ private fun DesignReviewGallery() {
                     ReviewScreen.PASSKEY -> AuthenticationExperience(reviewState(AuthenticationStage.PASSKEY, AuthenticationNextAction.ENROLL_PASSKEY), OverlayState(), countries, "", reviewCallbacks)
                     ReviewScreen.BIOMETRIC -> AuthenticationExperience(reviewState(AuthenticationStage.BIOMETRIC, AuthenticationNextAction.ENROLL_BIOMETRIC).copy(biometricCapability = BiometricCapability.FINGERPRINT), OverlayState(), countries, "", reviewCallbacks)
                     ReviewScreen.ACCOUNT_CREATED -> AuthenticationExperience(reviewState(AuthenticationStage.ACCOUNT_CREATED, AuthenticationNextAction.PROFILE_SETUP, SessionScope.FULL), OverlayState(), countries, "", reviewCallbacks)
+                    ReviewScreen.HOME_LOADED -> HomeScreen(homeReviewState(language), {})
+                    ReviewScreen.HOME_LOADING -> HomeScreen(HomeUiState(), {})
+                    ReviewScreen.HOME_EMPTY -> HomeScreen(HomeUiState(loadState = HomeLoadState.EMPTY), {})
+                    ReviewScreen.HOME_ERROR -> HomeScreen(HomeUiState(loadState = HomeLoadState.ERROR, errorCode = "REVIEW"), {})
                 }
             }
         }
     }
 }
+
+private fun homeReviewState(language: String) = HomeUiState(
+    loadState = HomeLoadState.CONTENT,
+    profiles = listOf(
+        HomeProfile(
+            id = "review-primary",
+            name = if (language == "ar") "سارة أحمد" else "Sarah Ahmed",
+            subtitle = if (language == "ar") "مصممة منتجات" else "Product designer",
+            avatarUrl = null,
+            lifecycle = "PUBLISHED",
+            visibility = "PUBLIC",
+            isPrimary = true,
+        ),
+        HomeProfile(
+            id = "review-business",
+            name = if (language == "ar") "استوديو سارة" else "Sarah Studio",
+            subtitle = if (language == "ar") "ملف أعمال" else "Business profile",
+            avatarUrl = null,
+            lifecycle = "DRAFT",
+            visibility = "PRIVATE",
+            isPrimary = false,
+        ),
+    ),
+    activeProfileId = "review-primary",
+    completionPercent = 84,
+    activeProductCount = 2,
+    totalOpenCount = 148,
+    isPartial = true,
+)
 
 private val reviewCallbacks = AuthenticationCallbacks({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
 private val otpOverlay = OverlayState(OverlayEntry("review-otp", OverlayKey.OTP, OverlayPresentation.BOTTOM_SHEET, OverlayDismissPolicy.ACTION_REQUIRED))

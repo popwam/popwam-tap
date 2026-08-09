@@ -600,4 +600,22 @@
     <string name="settings_request_storage">Request more storage</string>
     <string name="settings_request_links">Request more links</string>
     <string name="quota_request_submitted">Increase request submitted</string>
+    <string name="home_suggested">Suggested for you</string>
+    <string name="home_suggestions_unavailable">Personal suggestions are not available yet. Open search to find people and public profiles.</string>
+    <string name="home_distinguished_services">Distinguished services</string>
+    <string name="home_services_unavailable">The services directory is not available yet.</string>
+    <string name="home_profile_ready">Your profile is ready</string>
+    <string name="home_profile_ready_body">%1$s is ready to view and share.</string>
+    <string name="home_complete_profile">Complete your profile</string>
+    <string name="home_complete_profile_body">Complete your profile details to make it easier for people to connect with you.</string>
+    <string name="home_search_hint">Search people, businesses, and services</string>
+    <string name="home_partial">Some Home data is unavailable. Your loaded content remains visible.</string>
+    <string name="home_error">Home could not be loaded</string>
+    <string name="home_error_body">Check your connection and try again.</string>
+    <string name="home_empty_body">Create a POP profile to get started.</string>
+    <string name="home_add_profile_future">Adding a profile is connected to the approved profile setup flow and will be available in the Profile phase.</string>
+    <string name="open">Open</string>
+    <string name="home_status_published">Published</string>
+    <string name="home_status_draft">Draft</string>
+    <string name="home_status_archived">Archived</string>
 </resources>

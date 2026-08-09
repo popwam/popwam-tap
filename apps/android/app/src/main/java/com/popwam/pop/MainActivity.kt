@@ -32,6 +32,9 @@ import com.popwam.pop.ui.launch.reducedMotionEnabled
 import com.popwam.pop.ui.theme.PopwamTheme
 import com.popwam.pop.ui.theme.AppearanceStore
 import com.popwam.pop.ui.theme.popFontFamilies
+import com.popwam.pop.ui.home.AndroidHomeRepository
+import com.popwam.pop.ui.home.HomeViewModel
+import com.popwam.pop.ui.home.HomeViewModelFactory
 import com.popwam.pop.ui.currentLocale
 import com.popwam.pop.ui.auth.AuthenticationFlowFactory
 import com.popwam.pop.ui.auth.AuthenticationFlowViewModel
@@ -93,9 +96,6 @@ class MainActivity : AppCompatActivity() {
             LaunchExperience(launchViewModel,localization,popFontFamilies()) {
                 val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
                 val authState by auth.state.collectAsStateWithLifecycle()
-                val main: MainViewModel = viewModel(
-                    factory = MainFactory(app.container.repository, app.container.sessions.role,app.container.analytics),
-                )
                 if(!authState.authenticated) {
                     Phase3OnboardingTheme(
                         launchState.persisted.selectedBaseTheme,
@@ -111,12 +111,16 @@ class MainActivity : AppCompatActivity() {
                             onProfileSetup={ destination -> launchViewModel.acceptProfileSetupHandoff(destination) },
                         )
                     }
-                } else PopwamTheme(launchState.persisted.selectedBaseTheme.name,"DEFAULT",launchState.persisted.selectedPopStyle.name) {
+                } else {
+                    val main: MainViewModel = viewModel(factory = MainFactory(app.container.repository, app.container.sessions.role,app.container.analytics))
+                    val home: HomeViewModel = viewModel(factory = HomeViewModelFactory(AndroidHomeRepository(app.container.repository, ::currentLocale),app.container.analytics))
+                    PopwamTheme(launchState.persisted.selectedBaseTheme.name,"DEFAULT",launchState.persisted.selectedPopStyle.name) {
                     PopwamApp(
-                        auth, main, NfcDeepLinkPolicy.route(intent?.dataString), appearanceStore, app.container.phoneCountries,
+                        auth, main, home, NfcDeepLinkPolicy.route(intent?.dataString), appearanceStore, app.container.phoneCountries,
                         onThemeModeSelected = launchViewModel::selectBaseTheme,
                         onPaletteSelected = launchViewModel::selectPopStyle,
                     )
+                }
                 }
             }
         }

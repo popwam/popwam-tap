@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
@@ -39,11 +40,18 @@ import com.popwam.pop.R
 import com.popwam.pop.ui.theme.AppearanceStore
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.ThemeMode
+import com.popwam.pop.ui.home.HomeDestination
+import com.popwam.pop.ui.home.HomeEvent
+import com.popwam.pop.ui.home.HomePrimaryTab
+import com.popwam.pop.ui.home.HomeRoute
+import com.popwam.pop.ui.home.HomeViewModel
+import com.popwam.pop.ui.home.selectedHomeTab
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FigmaMainNavigation(
     vm: MainViewModel,
+    home: HomeViewModel,
     initialRoute: String = "home",
     onLogout: () -> Unit,
     appearanceStore:AppearanceStore,
@@ -62,7 +70,7 @@ fun FigmaMainNavigation(
     }
     val snackbar = remember { SnackbarHostState() }
     var howItWorks by rememberSaveable { mutableStateOf(false) }
-    val darkBackground = currentRoute == "home" || currentRoute?.startsWith("virtual-card/") == true
+    val darkBackground = MaterialTheme.colorScheme.background.luminance() < .5f || currentRoute?.startsWith("virtual-card/") == true
     PopSystemBars(darkBackground)
     val phaseGFeedback = when(state.error ?: state.message){
         "ACTIVATION_COOLDOWN"->stringResource(R.string.share_activation_cooldown)
@@ -87,12 +95,12 @@ fun FigmaMainNavigation(
             vm.clearFeedback()
         }
     }
-    PopDynamicBackground(when { currentRoute?.startsWith("virtual-card/")==true -> PopBackdrop.DETAILS; currentRoute=="home" -> PopBackdrop.HOME; else -> PopBackdrop.NEUTRAL }) {
+    PopDynamicBackground(when { currentRoute?.startsWith("virtual-card/")==true -> PopBackdrop.DETAILS; else -> PopBackdrop.NEUTRAL }) {
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            if (currentRoute in topRoutes) TopAppBar(
+            if (currentRoute in topRoutes && currentRoute != "home") TopAppBar(
                 title = { val firstName=state.profiles.firstOrNull()?.firstName?.takeIf(String::isNotBlank);Text(firstName ?: stringResource(R.string.app_name), fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = if(darkBackground) Color.White else Color.Black),
                 actions = {
@@ -102,26 +110,24 @@ fun FigmaMainNavigation(
             )
         },
         bottomBar = {
-            if (currentRoute in topRoutes) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
-                listOf(
-                    Triple("home", R.string.home, Icons.Default.Home),
-                    Triple("share", R.string.editor_share, Icons.Default.Share),
-                    Triple("menu", R.string.nav_menu, Icons.Default.Menu),
-                ).forEach { (route, label, icon) ->
-                    NavigationBarItem(
-                        selected = currentRoute == route,
-                        onClick = { nav.navigate(route) { popUpTo("home"); launchSingleTop = true } },
-                        icon = { Icon(icon, stringResource(label)) },
-                        label = { Text(stringResource(label), maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFFFF1B8), selectedIconColor = Color(0xFF9A7412)),
-                    )
-                }
-            }
+            if (currentRoute in topRoutes) PopPrimaryNavigationBar(selectedHomeTab(currentRoute)) { route -> nav.navigate(route) { popUpTo("home"); launchSingleTop = true } }
         },
     ) { padding ->
         Box(Modifier.padding(padding)) {
             NavHost(nav, if (initialRoute == "home" || initialRoute.startsWith("card/")) initialRoute else "home") {
-                composable("home") { ProfileEditorHomeScreen(state,vm) { nav.navigate(it) } }
+                composable("home") {
+                    HomeRoute(home, navigate = { destination ->
+                        when (destination) {
+                            HomeDestination.Search -> nav.navigate("friends/search")
+                            HomeDestination.Notifications -> nav.navigate("settings/notifications")
+                            HomeDestination.AddProfile -> nav.navigate("home-add-profile")
+                            HomeDestination.Share -> nav.navigate("share")
+                            HomeDestination.Menu -> nav.navigate("menu")
+                            is HomeDestination.Profile -> nav.navigate("profile/${destination.id}")
+                        }
+                    }, onSessionExpired = onLogout)
+                }
+                composable("home-add-profile") { FutureHomeDestination(stringResource(R.string.home_add_profile_future), nav::popBackStack) }
                 composable("share") { ShareCenterScreen(state,vm,{nav.navigate("share-activate")}){nav.navigate(it)} }
                 composable("share-activate") { ShareActivationScreen(state,vm){nav.popBackStack()} }
                 composable("virtual-cards") { VirtualProfiles(state, vm::reload, { nav.navigate("virtual-card/$it") }, { nav.navigate("create-card/start") }) }
@@ -175,35 +181,53 @@ fun FigmaMainNavigation(
     HowItWorksSheet(howItWorks,{howItWorks=false}){howItWorks=false;nav.navigate("create-card/start")}
 }
 
+@Composable
+private fun PopPrimaryNavigationBar(selected: HomePrimaryTab, navigate: (String) -> Unit) {
+    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 28.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 320.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                listOf(
+                    Triple(HomePrimaryTab.HOME, "home", Pair(R.string.home, Icons.Default.Home)),
+                    Triple(HomePrimaryTab.SHARE, "share", Pair(R.string.editor_share, Icons.Default.Share)),
+                    Triple(HomePrimaryTab.MENU, "menu", Pair(R.string.nav_menu, Icons.Default.GridView)),
+                ).forEach { (tab, route, item) ->
+                    val selectedColor = if (selected == tab) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    Column(
+                        Modifier.widthIn(min = 80.dp).heightIn(min = 56.dp).clickable { navigate(route) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(item.second, stringResource(item.first), Modifier.size(if (tab == HomePrimaryTab.SHARE) 26.dp else 24.dp), tint = selectedColor)
+                        Text(stringResource(item.first), style = MaterialTheme.typography.labelSmall, color = selectedColor, maxLines = 1)
+                        Spacer(Modifier.size(3.dp).background(if (selected == tab) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FutureHomeDestination(message: String, back: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(28.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Icon(Icons.Default.PersonAdd, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(back) { Text(stringResource(R.string.back)) }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RefreshScreen(loading: Boolean, refresh: () -> Unit, content: @Composable () -> Unit) {
     PullToRefreshBox(isRefreshing = loading, onRefresh = refresh, modifier = Modifier.fillMaxSize()) { content() }
-}
-
-@Composable
-private fun FigmaHome(state: MainUiState, refresh: () -> Unit, howItWorks:()->Unit, go: (String) -> Unit) {
-    RefreshScreen(state.loading, refresh) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item { Text(stringResource(R.string.welcome_back), color = Color(0xFFD8D0B7)); Text(state.profiles.firstOrNull()?.firstName?.takeIf(String::isNotBlank) ?: stringResource(R.string.app_name), color=Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Medium) }
-            item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){ActionTile(R.string.vc_create,Icons.Default.ContactPage,Modifier.weight(1f)){go("create-card/start")};ActionTile(R.string.activate_product,Icons.Default.AddCircle,Modifier.weight(1f)){go("activate")};ActionTile(R.string.scan_qr,Icons.Default.QrCodeScanner,Modifier.weight(1f)){go("activate")}} }
-            item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FigmaStat(state.profiles.count { it.virtualCard != null }.toString(), stringResource(R.string.profiles), Modifier.weight(1f))
-                    FigmaStat(state.cards.count { it.cardStatus == "ACTIVE" }.toString(), stringResource(R.string.active_cards), Modifier.weight(1f))
-                    FigmaStat(state.cards.sumOf { it.openCount }.toString(), stringResource(R.string.total_opens), Modifier.weight(1f))
-                }
-            }
-            item { Text(stringResource(R.string.recent_cards), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-            if (state.profiles.none { it.virtualCard != null }) item { EmptyCard(R.string.profiles_empty, Icons.Default.ContactPage) }
-            items(state.profiles.filter { it.virtualCard != null }.take(4), key = { it.id }) { profile -> VirtualProfileRow(profile) { go("virtual-card/${profile.id}") } }
-            item { Text(stringResource(R.string.my_products),color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold) }
-            if(state.cards.isEmpty()) item { EmptyCard(R.string.cards_empty,Icons.Default.Inventory2) }
-            items(state.cards.take(3),key={"home-${it.id}"}){card->Surface(Modifier.fillMaxWidth().clickable{go("card/${card.id}")},shape=RoundedCornerShape(18.dp)){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Contactless,null,tint=Color(0xFFD4AF37));Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(card.displayLabel?:stringResource(R.string.my_products),fontWeight=FontWeight.Bold);FigmaLtrText(card.serialNumber,MaterialTheme.typography.bodySmall)};Icon(Icons.Default.ChevronRight,null)}}}
-            item { Text(stringResource(R.string.latest_activity),color=Color.White,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold);TextButton({go("activity")}){Text(stringResource(R.string.view_activity))} }
-            item { OutlinedButton(howItWorks,Modifier.fillMaxWidth()){Icon(Icons.Default.HelpOutline,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.how_it_works))} }
-        }
-    }
 }
 
 @Composable
