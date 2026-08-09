@@ -45,7 +45,7 @@ describe("profile publishing policy", () => {
 
   it("builds a stable default link candidate from the profile name and server randomness", () => {
     expect(defaultProfileSlug("Sarah Studio", "A1B2-C3D4")).toBe("sarah-studio-a1b2c3d4");
-    expect(defaultProfileSlug("?????", "ABC12345")).toBe("pop-abc12345");
+    expect(defaultProfileSlug("عيادة", "ABC12345")).toBe("pop-abc12345");
     expect(defaultProfileSlug("a".repeat(100), "12345678")).toHaveLength(63);
   });
 
