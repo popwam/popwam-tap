@@ -239,14 +239,14 @@ internal fun PrimaryAction(text: String, onClick: () -> Unit, modifier: Modifier
         contentAlignment = Alignment.Center,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(colors.brandPrimary)
+            .background(colors.primaryAction)
             .semantics { role = Role.Button }
             .clickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(text, color = colors.onBrand, fontSize = 24.sp, lineHeight = 29.sp, fontWeight = FontWeight.Medium)
+            Text(text, color = colors.onPrimaryAction, fontSize = 24.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold)
             ChevronVector(
-                color = colors.onBrand,
+                color = colors.onPrimaryAction,
                 modifier = Modifier.offset(x = if (rtl) (-82).dp else 82.dp).size(24.dp).graphicsLayer(scaleX = if (rtl) -1f else 1f),
             )
         }

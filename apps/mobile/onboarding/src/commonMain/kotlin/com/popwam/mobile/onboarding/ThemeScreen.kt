@@ -97,7 +97,7 @@ fun ThemeScreen(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(82.5796.dp, 63.9474.dp)
-                        .background(if (active) colors.brandPrimary else colors.surfacePrimary, RoundedCornerShape(12.dp))
+                        .background(if (active) colors.primaryAction else colors.surfacePrimary, RoundedCornerShape(12.dp))
                         .semantics {
                             role = Role.RadioButton
                             selected = active
@@ -107,7 +107,7 @@ fun ThemeScreen(
                 ) {
                     ThemeModeVector(
                         mode = mode,
-                        color = if (active) colors.onBrand else colors.textPrimary,
+                        color = if (active) colors.onPrimaryAction else colors.textPrimary,
                         modifier = Modifier.size(48.dp),
                     )
                 }
@@ -115,7 +115,7 @@ fun ThemeScreen(
         }
         Text(
             text = stringResource(Res.string.theme_style),
-            color = colors.brandPrimary,
+            color = colors.primaryAction,
             fontSize = 15.sp,
             lineHeight = 40.sp,
             fontWeight = FontWeight.SemiBold,
@@ -168,8 +168,8 @@ private fun ThemeGallery(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 56.dp)
-                        .background(if (active) colors.brandPrimary.copy(alpha = .12f) else colors.surfaceElevated, RoundedCornerShape(14.dp))
-                        .border(BorderStroke(1.dp, if (active) colors.brandPrimary else colors.borderDefault), RoundedCornerShape(14.dp))
+                        .background(if (active) colors.selectedBackground else colors.surfaceElevated, RoundedCornerShape(14.dp))
+                        .border(BorderStroke(1.dp, if (active) colors.selectedForeground else colors.borderDefault), RoundedCornerShape(14.dp))
                         .semantics {
                             role = Role.RadioButton
                             selected = active

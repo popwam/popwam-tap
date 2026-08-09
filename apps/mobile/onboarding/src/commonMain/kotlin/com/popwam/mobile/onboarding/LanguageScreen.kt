@@ -93,10 +93,10 @@ fun LanguageScreen(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(246.3158.dp, 63.9474.dp)
-                        .background(if (isSelected) colors.brandPrimary.copy(alpha = .12f) else colors.surfacePrimary, RoundedCornerShape(12.dp))
+                        .background(if (isSelected) colors.selectedBackground else colors.surfacePrimary, RoundedCornerShape(12.dp))
                         .border(
                             width = 1.dp,
-                            color = if (isSelected) colors.brandPrimary else colors.borderStrong,
+                            color = if (isSelected) colors.selectedForeground else colors.borderStrong,
                             shape = RoundedCornerShape(12.dp),
                         )
                         .semantics {
@@ -109,7 +109,7 @@ fun LanguageScreen(
                 ) {
                     Text(
                         labelText,
-                        color = colors.brandPrimary,
+                        color = colors.selectedForeground,
                         fontSize = 24.sp,
                         lineHeight = 34.sp,
                         fontWeight = FontWeight.Bold,

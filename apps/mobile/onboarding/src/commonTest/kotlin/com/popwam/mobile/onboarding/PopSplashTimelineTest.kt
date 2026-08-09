@@ -8,13 +8,14 @@ import kotlin.test.assertTrue
 class PopSplashTimelineTest {
     @Test fun `splash logo and shape interpolate continuously between visual keyframes`() {
         val start = splashFrame(0f)
-        val middle = splashFrame(.5f)
+        // FastOutSlowIn has already crossed the final radius keyframe at raw .5.
+        val middle = splashFrame(.4f)
         val end = splashFrame(1f)
 
         assertNotEquals(start.circleCenterY, middle.circleCenterY)
         assertNotEquals(middle.circleRadius, end.circleRadius)
         assertTrue(middle.logoOnPrimaryAlpha in 0f..1f)
-        assertEquals(207f, end.logoX + 114f, "the logo retains a stable visual width and optical center basis")
+        assertEquals(196.5f, end.logoX + 59.5f, "the logo remains optically centered on the reference frame")
     }
 
     @Test fun `reusing an externally owned progress value never restarts the timeline`() {

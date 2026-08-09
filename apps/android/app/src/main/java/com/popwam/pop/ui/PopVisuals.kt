@@ -77,7 +77,7 @@ fun PopDynamicBackground(kind: PopBackdrop, accent: Color = Color(0xFFD4AF37), c
         PopBackdrop.HOME -> listOf(Color(0xFF050505), Color(0xFF101010), Color(0xFF1A1406))
         PopBackdrop.DETAILS -> listOf(Color(0xFF050505), accent.copy(alpha = .38f), Color(0xFF111111))
         PopBackdrop.EMPTY -> listOf(Color(0xFFF8F8F8), accent.copy(alpha = .12f), Color.White)
-        PopBackdrop.NEUTRAL -> listOf(Color.White, Color(0xFFF7F7F7))
+        PopBackdrop.NEUTRAL -> listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.surface)
     }
     Box(Modifier.fillMaxSize().background(Brush.linearGradient(colors))) {
         if (kind != PopBackdrop.NEUTRAL) Canvas(Modifier.fillMaxSize()) {

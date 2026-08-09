@@ -181,9 +181,9 @@ private fun PhoneScreen(state: AuthenticationUiState, country: AuthenticationCou
         Column(Modifier.fillMaxWidth().padding(top = PopSpacing.xs), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(stringResource(Res.string.auth_legal_prefix), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary, textAlign = TextAlign.Center)
             Row(horizontalArrangement = Arrangement.spacedBy(PopSpacing.xxs), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = callbacks.openTerms) { Text(stringResource(Res.string.auth_terms), color = colors.brandPrimary, fontWeight = FontWeight.SemiBold) }
+                TextButton(onClick = callbacks.openTerms) { Text(stringResource(Res.string.auth_terms), color = colors.primaryAction, fontWeight = FontWeight.SemiBold) }
                 Text(stringResource(Res.string.auth_legal_joiner), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
-                TextButton(onClick = callbacks.openPrivacy) { Text(stringResource(Res.string.auth_privacy), color = colors.brandPrimary, fontWeight = FontWeight.SemiBold) }
+                TextButton(onClick = callbacks.openPrivacy) { Text(stringResource(Res.string.auth_privacy), color = colors.primaryAction, fontWeight = FontWeight.SemiBold) }
             }
         }
         Spacer(Modifier.height(PopSpacing.lg))

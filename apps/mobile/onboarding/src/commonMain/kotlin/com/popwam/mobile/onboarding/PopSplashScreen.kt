@@ -48,7 +48,7 @@ fun PopSplashScreen(
             contentDescription = stringResource(Res.string.pop_logo_description),
             modifier = Modifier
                 .offset(frame.logoX.dp, frame.logoY.dp)
-                .size(207.dp, 238.dp)
+                .size(119.dp, 135.dp)
                 .graphicsLayer(alpha = frame.logoAlpha),
         )
         if (showGoAhead) {
@@ -57,13 +57,13 @@ fun PopSplashScreen(
                 modifier = Modifier
                     .offset(41.dp, 712.dp)
                     .size(312.dp, 81.dp)
-                    .background(colors.brandPrimary, RoundedCornerShape(12.dp))
+                    .background(colors.primaryAction, RoundedCornerShape(12.dp))
                     .semantics { role = Role.Button }
                     .clickable(onClick = onGoAhead),
             ) {
                 Text(
                     text = stringResource(Res.string.splash_go_ahead),
-                    color = colors.textInverse,
+                    color = colors.onPrimaryAction,
                     fontSize = 35.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -88,10 +88,10 @@ internal fun splashFrame(progress: Float): SplashFrame {
     fun between(start: Float, end: Float, from: Float, to: Float): Float =
         ((p - start) / (end - start)).coerceIn(0f, 1f).let { from + (to - from) * it }
     return when {
-        p < .22f -> SplashFrame(between(0f, .22f, -26f, 426f), 50f, 93f, 307f, 1f, 0f, between(0f, .22f, 0f, 1f))
-        p < .48f -> SplashFrame(between(.22f, .48f, 426f, 420f), between(.22f, .48f, 50f, 127f), 93f, 307f, 1f, 0f, 1f)
-        p < .75f -> SplashFrame(between(.48f, .75f, 420f, 420f), between(.48f, .75f, 127f, 487f), 93f, between(.48f, .75f, 307f, 327f), 1f, between(.48f, .62f, 0f, 1f), 1f)
-        else -> SplashFrame(420f, between(.75f, 1f, 487f, 487f), between(.75f, 1f, 92f, 93f), between(.75f, 1f, 327f, 188f), 1f, 1f, 1f)
+        p < .22f -> SplashFrame(between(0f, .22f, -26f, 426f), 50f, 137f, 358.5f, 1f, 0f, between(0f, .22f, 0f, 1f))
+        p < .48f -> SplashFrame(between(.22f, .48f, 426f, 420f), between(.22f, .48f, 50f, 127f), 137f, 358.5f, 1f, 0f, 1f)
+        p < .75f -> SplashFrame(between(.48f, .75f, 420f, 420f), between(.48f, .75f, 127f, 487f), 137f, between(.48f, .75f, 358.5f, 378.5f), 1f, between(.48f, .62f, 0f, 1f), 1f)
+        else -> SplashFrame(420f, between(.75f, 1f, 487f, 487f), 137f, between(.75f, 1f, 378.5f, 239.5f), 1f, 1f, 1f)
     }
 }
 

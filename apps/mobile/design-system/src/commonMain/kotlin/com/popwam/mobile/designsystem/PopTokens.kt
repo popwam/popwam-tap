@@ -1,6 +1,7 @@
 package com.popwam.mobile.designsystem
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -59,6 +60,14 @@ enum class PopIdentityStyle(
 data class PopSemanticColors(
     val brandPrimary: Color,
     val onBrand: Color,
+    val primaryAction: Color,
+    val onPrimaryAction: Color,
+    val secondaryAction: Color,
+    val onSecondaryAction: Color,
+    val iconPrimary: Color,
+    val iconSecondary: Color,
+    val selectedBackground: Color,
+    val selectedForeground: Color,
     /** Explicit artwork roles. Consumers must not recolor logo paths blindly. */
     val logoPrimary: Color,
     val logoSecondary: Color,
@@ -96,28 +105,45 @@ data class PopSemanticColors(
 )
 
 fun popSemanticColors(identity: PopIdentityStyle, dark: Boolean): PopSemanticColors {
+    val background = if (dark) Color(0xFF0B0F0F) else Color(0xFFF7F9F9)
+    val action = if (dark) {
+        identity.primary.ensureContrastAgainst(background, minimum = 3f, toward = Color.White)
+    } else {
+        listOf(identity.primary, identity.hover, identity.pressed)
+            .first { contrastRatio(it, Color.White) >= 4.5f }
+    }
+    val onAction = listOf(Color.White, Color(0xFF111817)).maxBy { contrastRatio(action, it) }
+
     if (!dark) return PopSemanticColors(
         brandPrimary = identity.primary,
         onBrand = identity.onPrimary,
+        primaryAction = action,
+        onPrimaryAction = onAction,
+        secondaryAction = Color(0xFF52605E),
+        onSecondaryAction = Color.White,
+        iconPrimary = Color(0xFF111817),
+        iconSecondary = Color(0xFF52605E),
+        selectedBackground = identity.soft,
+        selectedForeground = action,
         logoPrimary = Color(0xFF111817),
         logoSecondary = Color(0xFF111817),
         logoAccent = identity.primary,
-        logoOnPrimary = identity.onPrimary,
+        logoOnPrimary = onAction,
         logoOnDark = Color.White,
-        backgroundPrimary = Color(0xFFFFFFFF),
-        backgroundSecondary = Color(0xFFF7F9F9),
+        backgroundPrimary = background,
+        backgroundSecondary = Color(0xFFEEF3F2),
         backgroundTertiary = Color(0xFFEEF3F2),
         surfacePrimary = Color(0xFFFFFFFF),
         surfaceSecondary = Color(0xFFF4F7F6),
         surfaceElevated = Color(0xFFFFFFFF),
         textPrimary = Color(0xFF111817),
         textSecondary = Color(0xFF52605E),
-        textTertiary = Color(0xFF7A8785),
+        textTertiary = Color(0xFF657370),
         textInverse = Color(0xFFFFFFFF),
-        textDisabled = Color(0xFF9DA8A6),
-        borderDefault = Color(0xFFE1E7E6),
-        borderStrong = Color(0xFFC2CCCA),
-        borderFocus = identity.primary,
+        textDisabled = Color(0xFF73817F),
+        borderDefault = Color(0xFF81918E),
+        borderStrong = Color(0xFF60706D),
+        borderFocus = action,
         success = Color(0xFF16A34A),
         successText = Color(0xFF166534),
         successBackground = Color(0xFFF0FDF4),
@@ -134,15 +160,21 @@ fun popSemanticColors(identity: PopIdentityStyle, dark: Boolean): PopSemanticCol
         disabledBorder = Color(0xFFDDE2E1),
     )
 
-    val darkBrand = if (identity == PopIdentityStyle.MINT) Color(0xFF2DD4D1) else identity.primary
-    val darkOnBrand = if (identity == PopIdentityStyle.MINT) Color(0xFF062524) else identity.onPrimary
     return PopSemanticColors(
-        brandPrimary = darkBrand,
-        onBrand = darkOnBrand,
+        brandPrimary = identity.primary,
+        onBrand = identity.onPrimary,
+        primaryAction = action,
+        onPrimaryAction = onAction,
+        secondaryAction = Color(0xFFB7C1BF),
+        onSecondaryAction = Color(0xFF0B0F0F),
+        iconPrimary = Color(0xFFF4F7F6),
+        iconSecondary = Color(0xFFB7C1BF),
+        selectedBackground = action.copy(alpha = .24f),
+        selectedForeground = action,
         logoPrimary = Color(0xFFF4F7F6),
         logoSecondary = Color(0xFFF4F7F6),
-        logoAccent = darkBrand,
-        logoOnPrimary = darkOnBrand,
+        logoAccent = identity.primary,
+        logoOnPrimary = onAction,
         logoOnDark = Color.White,
         backgroundPrimary = Color(0xFF0B0F0F),
         backgroundSecondary = Color(0xFF111716),
@@ -154,10 +186,10 @@ fun popSemanticColors(identity: PopIdentityStyle, dark: Boolean): PopSemanticCol
         textSecondary = Color(0xFFB7C1BF),
         textTertiary = Color(0xFF87928F),
         textInverse = Color(0xFF111817),
-        textDisabled = Color(0xFF66716F),
-        borderDefault = Color(0xFF283330),
-        borderStrong = Color(0xFF3B4845),
-        borderFocus = darkBrand,
+        textDisabled = Color(0xFF7A8784),
+        borderDefault = Color(0xFF596965),
+        borderStrong = Color(0xFF71807D),
+        borderFocus = action,
         success = Color(0xFF22C55E),
         successText = Color(0xFF86EFAC),
         successBackground = Color(0xFF0D2818),
@@ -173,4 +205,21 @@ fun popSemanticColors(identity: PopIdentityStyle, dark: Boolean): PopSemanticCol
         disabledBackground = Color(0xFF1C2322),
         disabledBorder = Color(0xFF303937),
     )
+}
+
+private fun Color.ensureContrastAgainst(background: Color, minimum: Float, toward: Color): Color {
+    if (contrastRatio(this, background) >= minimum) return this
+    return (1..10).asSequence()
+        .map { lerp(this, toward, it / 10f) }
+        .first { contrastRatio(it, background) >= minimum }
+}
+
+private fun contrastRatio(first: Color, second: Color): Float {
+    fun Color.luminance(): Float {
+        fun channel(value: Float) = if (value <= .04045f) value / 12.92f else Math.pow(((value + .055f) / 1.055f).toDouble(), 2.4).toFloat()
+        return .2126f * channel(red) + .7152f * channel(green) + .0722f * channel(blue)
+    }
+    val lighter = maxOf(first.luminance(), second.luminance())
+    val darker = minOf(first.luminance(), second.luminance())
+    return (lighter + .05f) / (darker + .05f)
 }

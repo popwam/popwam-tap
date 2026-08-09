@@ -28,8 +28,14 @@ fun PopTheme(
     val colors = popSemanticColors(identity, dark)
     val scheme = if (dark) {
         darkColorScheme(
-            primary = colors.brandPrimary,
-            onPrimary = colors.onBrand,
+            primary = colors.primaryAction,
+            onPrimary = colors.onPrimaryAction,
+            primaryContainer = colors.selectedBackground,
+            onPrimaryContainer = colors.selectedForeground,
+            secondary = colors.secondaryAction,
+            onSecondary = colors.onSecondaryAction,
+            secondaryContainer = colors.surfaceSecondary,
+            onSecondaryContainer = colors.textPrimary,
             background = colors.backgroundPrimary,
             onBackground = colors.textPrimary,
             surface = colors.surfacePrimary,
@@ -37,13 +43,22 @@ fun PopTheme(
             surfaceVariant = colors.surfaceSecondary,
             onSurfaceVariant = colors.textSecondary,
             outline = colors.borderDefault,
+            outlineVariant = colors.borderStrong,
             error = colors.error,
             onError = colors.textInverse,
+            errorContainer = colors.errorBackground,
+            onErrorContainer = colors.errorText,
         )
     } else {
         lightColorScheme(
-            primary = colors.brandPrimary,
-            onPrimary = colors.onBrand,
+            primary = colors.primaryAction,
+            onPrimary = colors.onPrimaryAction,
+            primaryContainer = colors.selectedBackground,
+            onPrimaryContainer = colors.selectedForeground,
+            secondary = colors.secondaryAction,
+            onSecondary = colors.onSecondaryAction,
+            secondaryContainer = colors.surfaceSecondary,
+            onSecondaryContainer = colors.textPrimary,
             background = colors.backgroundPrimary,
             onBackground = colors.textPrimary,
             surface = colors.surfacePrimary,
@@ -51,8 +66,11 @@ fun PopTheme(
             surfaceVariant = colors.surfaceSecondary,
             onSurfaceVariant = colors.textSecondary,
             outline = colors.borderDefault,
+            outlineVariant = colors.borderStrong,
             error = colors.error,
             onError = colors.textInverse,
+            errorContainer = colors.errorBackground,
+            onErrorContainer = colors.errorText,
         )
     }
     val layoutDirection = if (direction == PopScriptDirection.RTL) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -76,4 +94,3 @@ fun PopTheme(
 
 fun languageDirection(languageTag: String): PopScriptDirection =
     if (languageTag.substringBefore('-').lowercase() == "ar") PopScriptDirection.RTL else PopScriptDirection.LTR
-

@@ -16,13 +16,15 @@ data class PopFontFamilies(
 object PopTypeScale {
     val display = TextStyle(fontSize = 48.sp, lineHeight = 56.sp, fontWeight = FontWeight.Bold)
     val heading1 = TextStyle(fontSize = 40.sp, lineHeight = 48.sp, fontWeight = FontWeight.Bold)
-    val heading2 = TextStyle(fontSize = 36.sp, lineHeight = 44.sp, fontWeight = FontWeight.SemiBold)
-    val heading3 = TextStyle(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.SemiBold)
-    val title = TextStyle(fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Medium)
-    val body = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Normal)
-    val label = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Medium)
-    val caption = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
-    val button = TextStyle(fontSize = 20.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+    val heading2 = TextStyle(fontSize = 36.sp, lineHeight = 44.sp, fontWeight = FontWeight.Bold)
+    val heading3 = TextStyle(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold)
+    val title = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
+    val section = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+    val body = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium)
+    val supporting = TextStyle(fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium)
+    val label = TextStyle(fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
+    val caption = TextStyle(fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
+    val button = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
 }
 
 fun popTypography(fonts: PopFontFamilies, direction: PopScriptDirection): Typography {
@@ -36,17 +38,16 @@ fun popTypography(fonts: PopFontFamilies, direction: PopScriptDirection): Typogr
         displayMedium = PopTypeScale.heading1.withFamily(),
         displaySmall = PopTypeScale.heading2.withFamily(),
         headlineLarge = PopTypeScale.heading1.withFamily(),
-        headlineMedium = PopTypeScale.heading2.withFamily(),
-        headlineSmall = PopTypeScale.heading3.withFamily(),
+        headlineMedium = PopTypeScale.heading3.withFamily(),
+        headlineSmall = PopTypeScale.title.withFamily(),
         titleLarge = PopTypeScale.title.withFamily(),
-        titleMedium = PopTypeScale.label.withFamily(),
-        titleSmall = PopTypeScale.caption.copy(fontWeight = FontWeight.Medium).withFamily(),
+        titleMedium = PopTypeScale.section.withFamily(),
+        titleSmall = PopTypeScale.body.copy(fontWeight = FontWeight.SemiBold).withFamily(),
         bodyLarge = PopTypeScale.body.withFamily(),
-        bodyMedium = PopTypeScale.label.copy(fontWeight = FontWeight.Normal).withFamily(),
-        bodySmall = PopTypeScale.caption.withFamily(),
+        bodyMedium = PopTypeScale.supporting.withFamily(),
+        bodySmall = PopTypeScale.label.copy(fontWeight = FontWeight.Medium).withFamily(),
         labelLarge = PopTypeScale.button.withFamily(),
         labelMedium = PopTypeScale.label.withFamily(),
-        labelSmall = PopTypeScale.caption.copy(fontWeight = FontWeight.Medium).withFamily(),
+        labelSmall = PopTypeScale.caption.withFamily(),
     )
 }
-
