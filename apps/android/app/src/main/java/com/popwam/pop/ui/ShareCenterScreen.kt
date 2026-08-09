@@ -60,7 +60,7 @@ private fun qrBitmap(value:String,size:Int=760):Bitmap{
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShareCenterScreen(state:MainUiState,vm:MainViewModel,onActivate:()->Unit,go:(String)->Unit){
+fun ShareCenterScreen(state:MainUiState,vm:MainViewModel,onActivate:()->Unit,go:(String)->Unit,initialProfileId:String?=null){
     val context=LocalContext.current
     val locale=if(LocalConfiguration.current.locales[0].language=="ar")"ar" else "en"
     var targetId by rememberSaveable{mutableStateOf<String?>(null)}
@@ -71,7 +71,7 @@ fun ShareCenterScreen(state:MainUiState,vm:MainViewModel,onActivate:()->Unit,go:
     val selector=state.profileSelector
     val targets=state.shareTargets
     val selected=ShareCenterPolicy.selectedTarget(targets?.targets.orEmpty(),targetId)
-    LaunchedEffect(Unit){vm.loadShareCenter(locale)}
+    LaunchedEffect(initialProfileId){vm.loadShareCenter(locale,initialProfileId)}
     LaunchedEffect(targets?.targets){targetId=ShareCenterPolicy.selectedTarget(targets?.targets.orEmpty(),targetId)?.id}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(18.dp)){
         item{

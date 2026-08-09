@@ -504,12 +504,7 @@ data class MainUiState(
     val activation: ActivationInspectResponse? = null,
     val nfcUri: String? = null,
     val nfcVerification: VerifyNfcResponse? = null,
-    val publishing: PublishingStatusResponse? = null,
     val profileSelector: ProfileSelectorResponse? = null,
-    val profileEditor: ProfileEditorResponse? = null,
-    val profileTemplates: List<ProfileBootstrapTemplateDto> = emptyList(),
-    val selectedProfileId: String? = null,
-    val editorSaveState: String = "IDLE",
     val shareTargets: ShareTargetsResponse? = null,
     val shareProducts: List<ShareProductDto> = emptyList(),
     val shareActivation: ScratchActivationInspectResponse? = null,
@@ -969,31 +964,6 @@ class MainViewModel(
         }
     }
 
-    fun loadPublishing(profileId:String,locale:String) = viewModelScope.launch {
-        working {
-            val result=repo.publishingStatus(profileId,locale)
-            if(result.ok){_state.value=_state.value.copy(publishing=result);analytics.track("profile_preview_viewed",mapOf("platform" to "android"));analytics.track("publish_readiness_viewed",mapOf("platform" to "android","outcome" to if(result.readiness.ready)"ready" else "blocked"))} else fail(result.error)
-        }
-    }
-
-    fun loadProfileHome(locale:String,selected:String?=null) = viewModelScope.launch {
-        working {
-            val selector=repo.profileSelector(selected ?: _state.value.selectedProfileId)
-            if(!selector.ok){fail(selector.error);return@working}
-            val profileId=selector.selectedProfileId
-            if(profileId==null){_state.value=_state.value.copy(profileSelector=selector,profileEditor=null,selectedProfileId=null);return@working}
-            val editor=repo.profileEditor(profileId,locale)
-            if(!editor.ok){fail(editor.error);return@working}
-            _state.value=_state.value.copy(profileSelector=selector,profileEditor=editor,selectedProfileId=profileId,editorSaveState="IDLE")
-            analytics.track("home_viewed",mapOf("platform" to "android","profile_kind" to editor.profile.profileKind))
-        }
-    }
-
-    fun switchEditorProfile(profileId:String,locale:String) {
-        analytics.track("profile_switched",mapOf("platform" to "android"))
-        loadProfileHome(locale,profileId)
-    }
-
     fun loadShareCenter(locale:String,selectedProfileId:String?=null)=viewModelScope.launch {
         working {
             val selector=repo.profileSelector(selectedProfileId ?: _state.value.selectedShareProfileId)
@@ -1005,6 +975,12 @@ class MainViewModel(
             if(targets!=null&&!targets.ok){fail(targets.error);return@working}
             _state.value=_state.value.copy(profileSelector=selector,selectedShareProfileId=profileId,shareTargets=targets,shareProducts=products.products)
             analytics.track("share_center_viewed",mapOf("platform" to "android"))
+        }
+    }
+
+    fun adoptActiveProfile(profileId:String) {
+        if (profileId.isNotBlank() && profileId != _state.value.selectedShareProfileId) {
+            _state.value = _state.value.copy(selectedShareProfileId = profileId)
         }
     }
 
@@ -1072,106 +1048,6 @@ class MainViewModel(
         }
     }
 
-    fun mutateProfileEditor(action:JsonObject,locale:String,onSaved:()->Unit={}) = viewModelScope.launch {
-        val editor=_state.value.profileEditor ?: return@launch
-        _state.value=_state.value.copy(editorSaveState="SAVING",error=null)
-        try {
-            val result=repo.mutateProfileEditor(editor.profile.id,editor.profile.draftRevision,action)
-            if(!result.ok){_state.value=_state.value.copy(editorSaveState="FAILED");fail(result.error);return@launch}
-            _state.value=_state.value.copy(editorSaveState="SAVED")
-            analytics.track("profile_section_saved",mapOf("platform" to "android","module_type" to (action.get("type")?.asString?.substringBefore('_') ?: "UNKNOWN"),"outcome" to "success"))
-            val refreshed=repo.profileEditor(editor.profile.id,locale)
-            if(refreshed.ok)_state.value=_state.value.copy(profileEditor=refreshed,editorSaveState="SAVED")
-            onSaved()
-        } catch(error:HttpException) {
-            if(error.code()==409)_state.value=_state.value.copy(editorSaveState="CONFLICT",error="STALE_DRAFT")
-            else {_state.value=_state.value.copy(editorSaveState="FAILED");fail("REQUEST_FAILED")}
-        }
-    }
-
-    fun loadCompatibleProfileTemplates(category:String,kind:String,locale:String)=viewModelScope.launch { working {
-        val result=repo.profileTemplates(category,kind,locale)
-        if(result.ok)_state.value=_state.value.copy(profileTemplates=result.templates) else fail(result.error)
-    } }
-
-    fun uploadEditorMedia(context:Context,uri:Uri,locale:String)=viewModelScope.launch {
-        val editor=_state.value.profileEditor ?: return@launch
-        working {
-            val resolver=context.contentResolver
-            val mime=resolver.getType(uri) ?: "application/octet-stream"
-            var name=uri.lastPathSegment?.substringAfterLast('/') ?: "gallery.jpg"
-            var size=0L
-            resolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE),null,null,null)?.use{cursor->if(cursor.moveToFirst()){cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf{it>=0}?.let{name=cursor.getString(it)};cursor.getColumnIndex(OpenableColumns.SIZE).takeIf{it>=0}?.let{size=cursor.getLong(it)}}}
-            AndroidUploadPolicy.validate(mime,size,false)?.let{fail(it);return@working}
-            val bytes=resolver.openInputStream(uri)?.use{it.readBytes()} ?: throw IllegalArgumentException("FILE_READ_FAILED")
-            val result=repo.uploadMedia(editor.profile.id,"gallery",name,mime,bytes,editor.profile.draftRevision)
-            if(!result.ok){fail(result.error);return@working}
-            analytics.track("draft_media_uploaded",mapOf("platform" to "android","module_type" to "GALLERY","outcome" to "success"))
-            val refreshed=repo.profileEditor(editor.profile.id,locale)
-            if(refreshed.ok)_state.value=_state.value.copy(profileEditor=refreshed,editorSaveState="SAVED")
-        }
-    }
-
-    fun removeEditorMedia(mediaId:String,locale:String)=viewModelScope.launch {
-        val editor=_state.value.profileEditor ?: return@launch
-        try {
-            val result=repo.removeEditorMedia(editor.profile.id,mediaId,editor.profile.draftRevision)
-            if(!result.ok){fail(result.error);return@launch}
-            val refreshed=repo.profileEditor(editor.profile.id,locale)
-            if(refreshed.ok)_state.value=_state.value.copy(profileEditor=refreshed,editorSaveState="SAVED")
-        } catch(error:HttpException) {
-            if(error.code()==409)_state.value=_state.value.copy(editorSaveState="CONFLICT",error="STALE_DRAFT") else fail("REQUEST_FAILED")
-        }
-    }
-
-    fun setPublishingVisibility(profileId:String,access:String,locale:String) = viewModelScope.launch {
-        val revision=_state.value.publishing?.readiness?.draftRevision ?: return@launch
-        working {
-            val result=repo.updatePublishingVisibility(profileId,revision,access)
-            if(result.ok){analytics.track("visibility_changed",mapOf("platform" to "android","visibility" to access));loadPublishing(profileId,locale)} else fail(result.error)
-        }
-    }
-
-    fun setPublishingSlug(profileId:String,slug:String,locale:String)=viewModelScope.launch {
-        val revision=_state.value.publishing?.readiness?.draftRevision ?: return@launch
-        working {
-            val result=repo.updatePublishingSlug(profileId,revision,slug)
-            if(result.ok)loadPublishing(profileId,locale) else fail(result.error)
-        }
-    }
-
-    fun setMediaVisibility(profileId:String,mediaId:String,visibility:String,locale:String)=viewModelScope.launch {
-        val revision=_state.value.publishing?.readiness?.draftRevision ?: return@launch
-        working {
-            val result=repo.updateMediaVisibility(profileId,revision,mediaId,visibility)
-            if(result.ok){analytics.track("visibility_changed",mapOf("platform" to "android","visibility" to visibility,"module_type" to "MEDIA"));loadPublishing(profileId,locale)}else fail(result.error)
-        }
-    }
-
-    fun setModuleVisibility(profileId:String,key:String,visibility:String,locale:String)=viewModelScope.launch {
-        val revision=_state.value.publishing?.readiness?.draftRevision ?: return@launch
-        working {
-            val result=repo.updateModuleVisibility(profileId,revision,key,visibility)
-            if(result.ok){analytics.track("visibility_changed",mapOf("platform" to "android","visibility" to visibility,"module_type" to key));loadPublishing(profileId,locale)}else fail(result.error)
-        }
-    }
-
-    fun publishingAction(profileId:String,action:String,locale:String) = viewModelScope.launch {
-        val revision=_state.value.publishing?.readiness?.draftRevision
-        working {
-            if(action=="publish")analytics.track("profile_publish_started",mapOf("platform" to "android"))
-            val result=repo.publishingAction(profileId,action,if(action=="publish")revision else null)
-            if(result.ok) {
-                analytics.track(if(action=="publish")"profile_published" else "profile_paused",mapOf("platform" to "android","outcome" to "success"))
-                loadPublishing(profileId,locale)
-                reload()
-            } else {
-                if(result.readiness!=null)_state.value=_state.value.copy(publishing=_state.value.publishing?.copy(readiness=result.readiness))
-                fail(result.error ?: "PUBLISH_FAILED")
-            }
-        }
-    }
-
     fun card(id: String) = viewModelScope.launch {
         working {
             val result = repo.card(id)
@@ -1212,28 +1088,6 @@ class MainViewModel(
                 reload()
             } else {
                 fail(result.error)
-            }
-        }
-    }
-
-    fun saveProfile(id: String?, body: ProfileWriteRequest) = viewModelScope.launch {
-        working {
-            val result = if (id == null) {
-                val created = repo.createProfile(body)
-                val createdId = created.profile?.id
-                if (!created.ok || createdId == null) {
-                    fail(created.error ?: "PROFILE_SAVE_FAILED")
-                    return@working
-                }
-                repo.updateProfile(createdId, body)
-            } else {
-                repo.updateProfile(id, body)
-            }
-            if (result.ok) {
-                _state.value = _state.value.copy(message = "PROFILE_SAVED")
-                reload()
-            } else {
-                fail(result.error ?: "PROFILE_SAVE_FAILED")
             }
         }
     }
@@ -1339,61 +1193,6 @@ class MainViewModel(
                 }
                 is NfcResult.Failure -> fail("NFC_${result.reason}")
             }
-        }
-    }
-
-    fun upload(
-        context: Context,
-        profileId: String,
-        uri: Uri,
-        kind: String,
-        file: Boolean = false,
-    ) = viewModelScope.launch {
-        working {
-            val resolver = context.contentResolver
-            val mime = resolver.getType(uri) ?: "application/octet-stream"
-            var name = uri.lastPathSegment?.substringAfterLast('/') ?: "upload"
-            var size = -1L
-            resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE), null, null, null)?.use { cursor -> if(cursor.moveToFirst()){cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf{it>=0}?.let{name=cursor.getString(it)};cursor.getColumnIndex(OpenableColumns.SIZE).takeIf{it>=0}?.let{size=cursor.getLong(it)}} }
-            AndroidUploadPolicy.validate(mime,size.coerceAtLeast(0),file)?.let { fail(it);return@working }
-            val max = if(file) AndroidUploadPolicy.MAX_FILE_BYTES else AndroidUploadPolicy.MAX_IMAGE_BYTES
-            _state.value=_state.value.copy(uploadProgress=0,uploadedUrl=null)
-            val bytes = resolver.openInputStream(uri)?.use { input ->
-                val output=ByteArrayOutputStream();val buffer=ByteArray(64*1024);var total=0L
-                while(true){val read=input.read(buffer);if(read<0)break;total+=read;if(total>max)throw IllegalArgumentException("UPLOAD_TOO_LARGE");output.write(buffer,0,read);if(size>0)_state.value=_state.value.copy(uploadProgress=((total*100/size).coerceIn(0,99)).toInt())};output.toByteArray()
-            } ?: throw IllegalArgumentException("FILE_READ_FAILED")
-            try {
-                if(file){
-                    val result=repo.uploadFile(profileId,"","",name,mime,bytes)
-                    if(result.ok){_state.value=_state.value.copy(message="UPLOAD_COMPLETE",uploadProgress=100,uploadedUrl=result.url);reload()}else fail(result.error)
-                }else{
-                    val result=repo.uploadMedia(profileId,kind,name,mime,bytes)
-                    if(result.ok){analytics.track("draft_media_uploaded",mapOf("platform" to "android","outcome" to "success"));_state.value=_state.value.copy(message="UPLOAD_COMPLETE",uploadProgress=100,uploadedUrl=result.asset?.previewUrl);reload()}else fail(result.error)
-                }
-            } catch (error: HttpException) {
-                fail(when(error.code()){401->"AUTH_EXPIRED";403->"UPLOAD_FORBIDDEN";413->"UPLOAD_TOO_LARGE";415->"UPLOAD_TYPE_NOT_ALLOWED";else->"UPLOAD_FAILED_${error.code()}"})
-            } finally {
-                _state.value=_state.value.copy(uploadProgress=null)
-            }
-        }
-    }
-
-    fun addDestination(profileId: String, body: DestinationWriteRequest) = viewModelScope.launch {
-        working {
-            val result = repo.createDestination(profileId, body)
-            if (result.ok) {
-                _state.value = _state.value.copy(message = "DESTINATION_SAVED")
-                reload()
-            } else {
-                fail(result.error)
-            }
-        }
-    }
-
-    fun deleteDestination(id: String) = viewModelScope.launch {
-        working {
-            val result = repo.deleteDestination(id)
-            if (result.ok) reload() else fail(result.error)
         }
     }
 

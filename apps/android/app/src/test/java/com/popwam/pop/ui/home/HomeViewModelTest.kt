@@ -80,6 +80,16 @@ class HomeViewModelTest {
         assertEquals(HomePrimaryTab.MENU, selectedHomeTab("menu"))
     }
 
+    @Test fun `profile feature switch refreshes Home without recreation`() = runTest(dispatcher) {
+        var selected:String?=null
+        val viewModel=HomeViewModel(HomeRepository { id->snapshot().copy(selectedProfileId=id?:"profile-1",profiles=listOf(HomeProfile(id?:"profile-1",id?:"profile-1",null,null,"PUBLISHED","PUBLIC",true))) },analytics,null){selected=it}
+        runCurrent()
+        viewModel.selectActiveProfile("profile-2")
+        runCurrent()
+        assertEquals("profile-2",viewModel.state.value.activeProfileId)
+        assertEquals("profile-2",selected)
+    }
+
     @Test fun `expired session emits the authenticated root handoff`() = runTest(dispatcher) {
         val viewModel = HomeViewModel(HomeRepository {
             throw HttpException(Response.error<Unit>(401, "expired".toResponseBody()))

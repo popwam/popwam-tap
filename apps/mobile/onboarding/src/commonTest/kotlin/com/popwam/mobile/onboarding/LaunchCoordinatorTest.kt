@@ -61,6 +61,19 @@ class LaunchCoordinatorTest {
         restored.restore()
         assertEquals(pending, restored.state.value.persisted.pendingDestination)
     }
+
+    @Test fun activeProfileSelectionPersistsWithoutRestart() = runTest {
+        val persistence=MemoryPersistence()
+        val coordinator=LaunchCoordinator(PersistedLaunchStateStore(persistence))
+        coordinator.restore()
+        coordinator.selectActiveProfile("profile-2")
+        assertEquals("profile-2",coordinator.state.value.persisted.activeProfileId)
+
+        val restored=LaunchCoordinator(PersistedLaunchStateStore(persistence))
+        restored.restore()
+        assertEquals("profile-2",restored.state.value.persisted.activeProfileId)
+        assertTrue(restored.state.value.persisted.hasCompletedProfileSetup)
+    }
 }
 
 internal class MemoryPersistence(var serialized: String? = null) : LaunchStatePersistence {

@@ -66,6 +66,7 @@ import com.popwam.pop.ui.home.HomeLoadState
 import com.popwam.pop.ui.home.HomeProfile
 import com.popwam.pop.ui.home.HomeScreen
 import com.popwam.pop.ui.home.HomeUiState
+import com.popwam.pop.ui.profile.*
 
 /** Debug source set only. It renders fixtures and never instantiates a phone, OTP, or auth client. */
 class DesignReviewActivity : AppCompatActivity() {
@@ -81,6 +82,11 @@ private enum class ReviewScreen(val label: String) {
     PHONE("Phone Number"), COUNTRY("Country"), OTP("OTP"), VERIFIED("Verified"), PASSKEY("Passkey"),
     BIOMETRIC("Biometric"), ACCOUNT_CREATED("Account Created"),
     HOME_LOADED("Home Loaded"), HOME_LOADING("Home Loading"), HOME_EMPTY("Home Empty"), HOME_ERROR("Home Error"),
+    PROFILE_LIST("Profile List"), PROFILE_PERSONAL("Personal Profile"), PROFILE_BUSINESS("Business Profile"),
+    PROFILE_PROFESSIONAL("Professional"), PROFILE_RESTAURANT("Restaurant"), PROFILE_CLINIC("Clinic"),
+    PROFILE_CREATE("Create Profile"),
+    PROFILE_BASIC("Basic Info"), PROFILE_CONTACT("Contact & Links"), PROFILE_MEDIA("Media"),
+    PROFILE_APPEARANCE("Appearance"), PROFILE_VERIFICATION("Verification"), PROFILE_LOADING("Profiles Loading"), PROFILE_ERROR("Profiles Error"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,7 +108,7 @@ private fun DesignReviewGallery() {
 
     Phase3OnboardingTheme(mode, palette, isSystemInDarkTheme(), language, popFontFamilies()) {
         Scaffold(
-            topBar = { TopAppBar(title = { Text("Phase 3–4 Design Review") }) },
+            topBar = { TopAppBar(title = { Text("POP Design Review") }) },
         ) { inset ->
             Column(Modifier.fillMaxSize().padding(inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
@@ -139,10 +145,40 @@ private fun DesignReviewGallery() {
                     ReviewScreen.HOME_LOADING -> HomeScreen(HomeUiState(), {})
                     ReviewScreen.HOME_EMPTY -> HomeScreen(HomeUiState(loadState = HomeLoadState.EMPTY), {})
                     ReviewScreen.HOME_ERROR -> HomeScreen(HomeUiState(loadState = HomeLoadState.ERROR, errorCode = "REVIEW"), {})
+                    ReviewScreen.PROFILE_LIST -> ProfileListScreen(profileReviewState(language), {})
+                    ReviewScreen.PROFILE_PERSONAL -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PERSONAL),"review-primary",{}, {})
+                    ReviewScreen.PROFILE_BUSINESS -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.BUSINESS),"review-primary",{}, {})
+                    ReviewScreen.PROFILE_PROFESSIONAL -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PROFESSIONAL),"review-primary",{}, {})
+                    ReviewScreen.PROFILE_RESTAURANT -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.RESTAURANT),"review-primary",{}, {})
+                    ReviewScreen.PROFILE_CLINIC -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.CLINIC),"review-primary",{}, {})
+                    ReviewScreen.PROFILE_CREATE -> ProfileCreationScreen(profileReviewState(language).copy(categories=listOf(ProfileCategoryOption("personal","Personal",ProfileBackendKind.PERSONAL,null),ProfileCategoryOption("business","Business",ProfileBackendKind.BUSINESS,null))),{}, {})
+                    ReviewScreen.PROFILE_BASIC -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.BASIC_INFORMATION,{}, {})
+                    ReviewScreen.PROFILE_CONTACT -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.CONTACT_LINKS,{}, {})
+                    ReviewScreen.PROFILE_MEDIA -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.MEDIA,{}, {})
+                    ReviewScreen.PROFILE_APPEARANCE -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.APPEARANCE,{}, {})
+                    ReviewScreen.PROFILE_VERIFICATION -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.VERIFICATION,{}, {})
+                    ReviewScreen.PROFILE_LOADING -> ProfileListScreen(ProfilesUiState(), {})
+                    ReviewScreen.PROFILE_ERROR -> ProfileListScreen(ProfilesUiState(loadState=ProfileLoadState.ERROR,errorCode="REVIEW"), {})
                 }
             }
         }
     }
+}
+
+private fun profileReviewState(language:String,category:ProfileCategoryKind=ProfileCategoryKind.PERSONAL):ProfilesUiState {
+    val name=if(language=="ar") "سارة أحمد" else when(category){ProfileCategoryKind.BUSINESS->"Sarah Studio";ProfileCategoryKind.RESTAURANT->"POP Kitchen";ProfileCategoryKind.CLINIC->"POP Clinic";ProfileCategoryKind.PROFESSIONAL->"Sarah Ahmed, Designer";else->"Sarah Ahmed"}
+    val kind=if(category in setOf(ProfileCategoryKind.BUSINESS,ProfileCategoryKind.RESTAURANT,ProfileCategoryKind.CLINIC))ProfileBackendKind.BUSINESS else ProfileBackendKind.PERSONAL
+    val summary=OwnedProfile("review-primary",name,if(language=="ar")"مصممة منتجات" else "Product designer",null,kind,category,category.name.lowercase(),"PUBLISHED","PUBLIC",true,ProfileVerificationState.UNAVAILABLE,ProfileCompletion(true))
+    val content=ProfileContent(
+        summary,4,if(language=="ar")"ar" else "en",name,name,if(language=="ar")name else "سارة أحمد",if(language=="ar")"Sarah Ahmed" else name,"مصممة منتجات","Product designer","استوديو سارة","Sarah Studio","Designing useful things","", "نبذة تعريفية واضحة وقابلة للقراءة.","A clear and readable profile introduction.","","", "+201001234567","","sarah@example.com","https://popwam.com","+201001234567","","Cairo","القاهرة","Cairo",mapOf("phone" to "PUBLIC","email" to "PUBLIC"),"sarah-a1b2c3d4","ELEGANT_LIGHT","Elegant",
+        links=listOf(ProfileLink("link-1","Portfolio","","Portfolio","WEBSITE","https://example.com","PUBLIC",0)),
+        services=listOf(ProfileService("service-1","Product strategy","","Product strategy","","Research and product strategy","","PUBLIC")),
+        locations=listOf(ProfileLocation("branch-1","Downtown","","Downtown","","Cairo","+201001234567","https://maps.google.com","PUBLIC")),
+        media=listOf(ProfileMedia("media-1","GALLERY","","PUBLIC",0)),
+        modules=listOf(ProfileModule("IDENTITY","Identity",true,"PUBLIC",true,true),ProfileModule("ABOUT","About",true,"PUBLIC",false,true),ProfileModule("CONTACT","Contact",true,"PUBLIC",false,true),ProfileModule("SERVICES","Services",true,"PUBLIC",false,true),ProfileModule("BRANCHES","Locations",true,"PUBLIC",false,true),ProfileModule("GALLERY","Gallery",true,"PUBLIC",false,true)),
+    )
+    val second=summary.copy(id="review-business",name=if(language=="ar")"استوديو سارة" else "Sarah Studio",backendKind=ProfileBackendKind.BUSINESS,categoryKind=ProfileCategoryKind.BUSINESS,isPrimary=false,lifecycle="DRAFT",visibility="PRIVATE",completion=ProfileCompletion(false,listOf("VISIBILITY_REQUIRED")))
+    return ProfilesUiState(ProfileLoadState.CONTENT,listOf(summary,second),summary.id,content,ProfileQuota(2,5,3,true),offline=false)
 }
 
 private fun homeReviewState(language: String) = HomeUiState(

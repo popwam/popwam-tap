@@ -41,6 +41,8 @@ interface PopwamApi {
     @PATCH("api/mobile/cards/{id}") suspend fun updateCard(@Path("id") id:String,@Body body:CardUpdateRequest):ApiResult
     @GET("api/mobile/profiles") suspend fun profiles():ProfilesResponse
     @GET("api/profiles") suspend fun profileSelector(@Query("selected") selected:String?=null):ProfileSelectorResponse
+    @POST("api/profiles") suspend fun createAdditionalProfile(@Body body:AdditionalProfileCreateRequest):AdditionalProfileCreateResponse
+    @HTTP(method="DELETE",path="api/profiles/{id}",hasBody=true) suspend fun archiveProfile(@Path("id") id:String,@Body body:ArchiveProfileRequest):ArchiveProfileResponse
     @GET("api/profiles/{id}/editor") suspend fun profileEditor(@Path("id") id:String,@Query("locale") locale:String):ProfileEditorResponse
     @PATCH("api/profiles/{id}/editor") suspend fun mutateProfileEditor(@Path("id") id:String,@Body body:ProfileEditorMutationRequest):ApiResult
     @GET("api/profiles/{id}/publishing") suspend fun publishingStatus(@Path("id") id:String,@Query("locale") locale:String):PublishingStatusResponse

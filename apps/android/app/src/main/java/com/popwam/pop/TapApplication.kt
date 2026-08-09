@@ -4,6 +4,7 @@ import android.app.Application
 import com.google.gson.GsonBuilder
 import com.popwam.pop.data.api.AuthApi
 import com.popwam.pop.data.api.PopwamApi
+import com.popwam.pop.data.api.ProfileRuntimeDiagnostics
 import com.popwam.pop.data.auth.*
 import com.popwam.pop.data.repository.PopwamRepository
 import com.popwam.pop.data.repository.AuthSetupRepository
@@ -30,8 +31,15 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.header
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 
-class TapApplication:Application(){lateinit var container:AppContainer;override fun onCreate(){super.onCreate();LocalizationAuthorityStore.configureCachedPolicy(this);val selected=AndroidLaunchStatePersistence.peekSelectedLanguage(this);if(selected!=null&&selected in com.popwam.pop.ui.LocalePolicy.availableLocales())applyPopLanguage(selected) else applyPopLanguage(com.popwam.pop.ui.LocalePolicy.resolve(null,""));container=AppContainer(this)}}
+class TapApplication:Application(),SingletonImageLoader.Factory{
+    lateinit var container:AppContainer
+    override fun onCreate(){super.onCreate();LocalizationAuthorityStore.configureCachedPolicy(this);val selected=AndroidLaunchStatePersistence.peekSelectedLanguage(this);if(selected!=null&&selected in com.popwam.pop.ui.LocalePolicy.availableLocales())applyPopLanguage(selected) else applyPopLanguage(com.popwam.pop.ui.LocalePolicy.resolve(null,""));container=AppContainer(this)}
+    override fun newImageLoader(context:android.content.Context)=ImageLoader.Builder(context).components{add(OkHttpNetworkFetcherFactory(callFactory={container.apiClient}))}.build()
+}
 class AppContainer(application:Application){
     private val gson=GsonBuilder().create();val sessionStore=SecureSessionStore(application)
     private val lifecycleScope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
@@ -48,7 +56,11 @@ class AppContainer(application:Application){
     val localization=LocalizationAuthorityStore(application,authApi,launchState)
     val phoneCountries=PhoneCountryStore(application,authApi)
     val sessions=SessionRepository(authApi,sessionStore)
-    private val apiClient=baseClient().newBuilder().addInterceptor(AccessTokenInterceptor(sessionStore)).authenticator(RefreshAuthenticator(sessions)).build()
+    val apiClient=baseClient().newBuilder()
+        .addInterceptor(AccessTokenInterceptor(sessionStore))
+        .apply { if (BuildConfig.DEBUG) addInterceptor(ProfileRuntimeDiagnostics.httpInterceptor()) }
+        .authenticator(RefreshAuthenticator(sessions))
+        .build()
     val api=Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL).client(apiClient).addConverterFactory(GsonConverterFactory.create(gson)).build().create(PopwamApi::class.java)
     val pushTokens=FcmTokenBridge(application,api,sessions)
     val analytics=FirebasePopAnalytics(application)

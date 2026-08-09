@@ -46,12 +46,14 @@ import com.popwam.pop.ui.home.HomePrimaryTab
 import com.popwam.pop.ui.home.HomeRoute
 import com.popwam.pop.ui.home.HomeViewModel
 import com.popwam.pop.ui.home.selectedHomeTab
+import com.popwam.pop.ui.profile.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FigmaMainNavigation(
     vm: MainViewModel,
     home: HomeViewModel,
+    profiles: ProfilesViewModel,
     initialRoute: String = "home",
     onLogout: () -> Unit,
     appearanceStore:AppearanceStore,
@@ -61,9 +63,35 @@ fun FigmaMainNavigation(
     val context = LocalContext.current
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
+    val homeState by home.state.collectAsStateWithLifecycle()
+    val profileState by profiles.state.collectAsStateWithLifecycle()
     val current by nav.currentBackStackEntryAsState()
     val topRoutes = PopNavigationPolicy.bottomRoutes
     val currentRoute = current?.destination?.route
+    LaunchedEffect(homeState.activeProfileId) {
+        homeState.activeProfileId?.let { id ->
+            vm.adoptActiveProfile(id)
+            if (profileState.activeProfileId != id) profiles.onEvent(ProfileEvent.SelectProfile(id))
+        }
+    }
+    LaunchedEffect(profiles) {
+        profiles.effects.collect { effect ->
+            when(effect){
+                is ProfileEffect.Navigate -> when(val destination=effect.destination){
+                    ProfileDestination.List->nav.navigate("profiles")
+                    ProfileDestination.Create->nav.navigate("profiles/create")
+                    is ProfileDestination.View->nav.navigate("profile/${destination.id}")
+                    is ProfileDestination.Editor->nav.navigate("profile/${destination.id}/edit")
+                    is ProfileDestination.Section->nav.navigate("profile/${destination.id}/edit/${destination.section.name}")
+                    is ProfileDestination.Share->nav.navigate("profile/share/${destination.id}")
+                    is ProfileDestination.Qr->nav.navigate("profile/qr/${destination.id}")
+                    is ProfileDestination.Nfc->nav.navigate("profile/nfc/${destination.id}")
+                }
+                ProfileEffect.SessionExpired->onLogout()
+                ProfileEffect.ConfirmDiscard->Unit
+            }
+        }
+    }
     BackHandler(enabled=currentRoute in topRoutes) {
         // Root destinations are switched through the bottom bar; one system
         // Back press must not terminate the authenticated app unexpectedly.
@@ -120,15 +148,19 @@ fun FigmaMainNavigation(
                         when (destination) {
                             HomeDestination.Search -> nav.navigate("friends/search")
                             HomeDestination.Notifications -> nav.navigate("settings/notifications")
-                            HomeDestination.AddProfile -> nav.navigate("home-add-profile")
+                            HomeDestination.AddProfile -> nav.navigate("profiles/create")
                             HomeDestination.Share -> nav.navigate("share")
                             HomeDestination.Menu -> nav.navigate("menu")
                             is HomeDestination.Profile -> nav.navigate("profile/${destination.id}")
                         }
                     }, onSessionExpired = onLogout)
                 }
-                composable("home-add-profile") { FutureHomeDestination(stringResource(R.string.home_add_profile_future), nav::popBackStack) }
-                composable("share") { ShareCenterScreen(state,vm,{nav.navigate("share-activate")}){nav.navigate(it)} }
+                composable("profiles") { ProfileListScreen(profileState,profiles::onEvent) }
+                composable("profiles/create") { ProfileCreationScreen(profileState,nav::popBackStack,profiles::onEvent) }
+                composable("share") { ShareCenterScreen(state,vm,{nav.navigate("share-activate")},{nav.navigate(it)}) }
+                composable("profile/share/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ShareCenterScreen(state,vm,{nav.navigate("share-activate")},{nav.navigate(it)},entry.arguments?.getString("id"))}
+                composable("profile/qr/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ShareCenterScreen(state,vm,{nav.navigate("share-activate")},{nav.navigate(it)},entry.arguments?.getString("id"))}
+                composable("profile/nfc/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){FutureHomeDestination(stringResource(R.string.profile_nfc),nav::popBackStack)}
                 composable("share-activate") { ShareActivationScreen(state,vm){nav.popBackStack()} }
                 composable("virtual-cards") { VirtualProfiles(state, vm::reload, { nav.navigate("virtual-card/$it") }, { nav.navigate("create-card/start") }) }
                 composable("products") { PhysicalCards(state, vm::reload) { nav.navigate("card/$it") } }
@@ -148,10 +180,12 @@ fun FigmaMainNavigation(
                     val id = entry.arguments?.getString("id").orEmpty()
                     VirtualCardDetailsScreen(id, state, vm, { nav.popBackStack() }, { nav.navigate("profile/$id") }) { nav.navigate("profile-publish/$id") }
                 }
-                composable("profile-publish/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ProfilePublishingScreen(entry.arguments?.getString("id").orEmpty(),state,vm,nav::popBackStack)}
+                composable("profile-publish/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ProfileEditorSectionScreen(profileState,entry.arguments?.getString("id").orEmpty(),ProfileEditorSection.VISIBILITY,nav::popBackStack,profiles::onEvent)}
                 composable("profile/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
-                    LegacyProfileEditor(state.profiles.firstOrNull { it.id == entry.arguments?.getString("id") }, vm, nav::popBackStack)
+                    ProfileViewScreen(profileState,entry.arguments?.getString("id").orEmpty(),nav::popBackStack,profiles::onEvent)
                 }
+                composable("profile/{id}/edit",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ProfileEditorHubScreen(profileState,entry.arguments?.getString("id").orEmpty(),nav::popBackStack,profiles::onEvent)}
+                composable("profile/{id}/edit/{section}",arguments=listOf(navArgument("id"){type=NavType.StringType},navArgument("section"){type=NavType.StringType})){entry->val section=runCatching{ProfileEditorSection.valueOf(entry.arguments?.getString("section").orEmpty())}.getOrDefault(ProfileEditorSection.BASIC_INFORMATION);ProfileEditorSectionScreen(profileState,entry.arguments?.getString("id").orEmpty(),section,nav::popBackStack,profiles::onEvent)}
                 composable("card/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     val id = entry.arguments?.getString("id").orEmpty(); LaunchedEffect(id) { vm.card(id) }
                     var confirmLost by remember{mutableStateOf(false)}

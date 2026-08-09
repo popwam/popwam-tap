@@ -74,6 +74,7 @@ class LaunchViewModel(
 
     fun openThemeGallery() = coordinator.openThemeGallery()
     fun selectPopStyle(style: IdentityPalette) = viewModelScope.launch { coordinator.selectPopStyle(style) }
+    fun selectActiveProfile(profileId: String) = viewModelScope.launch { coordinator.selectActiveProfile(profileId) }
     fun dismissThemeGallery() = coordinator.dismissThemeGallery()
 
     fun nextWelcome(page: WelcomePage) {

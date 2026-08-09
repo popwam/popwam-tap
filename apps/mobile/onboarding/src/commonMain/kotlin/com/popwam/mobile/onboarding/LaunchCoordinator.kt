@@ -152,6 +152,12 @@ class LaunchCoordinator(
         mutableState.value = mutableState.value.copy(persisted = updated)
     }
 
+    suspend fun selectActiveProfile(profileId: String) {
+        val normalized = profileId.trim().takeIf(String::isNotEmpty) ?: return
+        val updated = store.update { it.copy(activeProfileId = normalized, hasCompletedProfileSetup = true) }
+        mutableState.value = mutableState.value.copy(persisted = updated)
+    }
+
     companion object {
         const val THEME_GALLERY_OVERLAY_ID = "phase3-theme-gallery"
     }

@@ -96,13 +96,19 @@ private suspend fun <T> optionalHomeData(block: suspend () -> T): T? = try {
 class HomeViewModel(
     private val repository: HomeRepository,
     private val analytics: PopAnalytics,
+    private val initialProfileId: String? = null,
+    private val onActiveProfileChanged: (String) -> Unit = {},
 ) : ViewModel() {
-    private val _state = MutableStateFlow(HomeUiState())
+    private val _state = MutableStateFlow(HomeUiState(activeProfileId = initialProfileId))
     val state = _state.asStateFlow()
     private val _effects = MutableSharedFlow<HomeEffect>(extraBufferCapacity = 8)
     val effects = _effects.asSharedFlow()
 
-    init { load(initial = true) }
+    init { load(initial = true, selectedProfileId = initialProfileId) }
+
+    fun selectActiveProfile(id: String) {
+        if (id.isNotBlank() && id != _state.value.activeProfileId) load(initial = false, selectedProfileId = id, persistSelection = true)
+    }
 
     fun onEvent(event: HomeEvent) {
         when (event) {
@@ -116,7 +122,7 @@ class HomeViewModel(
             is HomeEvent.SelectProfile -> {
                 if (event.id != _state.value.activeProfileId) {
                     analytics.track("profile_switched", mapOf("platform" to "android"))
-                    load(initial = false, selectedProfileId = event.id)
+                    load(initial = false, selectedProfileId = event.id, persistSelection = true)
                 }
             }
         }
@@ -126,7 +132,7 @@ class HomeViewModel(
         _effects.tryEmit(HomeEffect.Navigate(destination))
     }
 
-    private fun load(initial: Boolean, selectedProfileId: String? = _state.value.activeProfileId) {
+    private fun load(initial: Boolean, selectedProfileId: String? = _state.value.activeProfileId, persistSelection: Boolean = false) {
         if (_state.value.isRefreshing) return
         viewModelScope.launch {
             _state.value = _state.value.copy(
@@ -146,6 +152,7 @@ class HomeViewModel(
                     totalOpenCount = snapshot.totalOpenCount,
                     isPartial = snapshot.partial,
                 )
+                if (persistSelection) snapshot.selectedProfileId?.let(onActiveProfileChanged)
                 analytics.track("home_viewed", mapOf("platform" to "android", "outcome" to if (snapshot.partial) "partial" else "loaded"))
             } catch (error: HttpException) {
                 if (error.code() == 401) _effects.emit(HomeEffect.SessionExpired)
@@ -168,7 +175,9 @@ class HomeViewModel(
 class HomeViewModelFactory(
     private val repository: HomeRepository,
     private val analytics: PopAnalytics,
+    private val initialProfileId: String? = null,
+    private val onActiveProfileChanged: (String) -> Unit = {},
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = HomeViewModel(repository, analytics) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = HomeViewModel(repository, analytics, initialProfileId, onActiveProfileChanged) as T
 }
