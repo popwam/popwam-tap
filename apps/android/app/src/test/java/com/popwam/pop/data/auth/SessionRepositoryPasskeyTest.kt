@@ -65,4 +65,9 @@ class SessionRepositoryPasskeyTest {
         assertEquals("access-2",repository.refresh());assertEquals("refresh-2",store.tokens?.refreshToken)
         repository.logout();assertNull(store.tokens);assertEquals(1,api.logoutCalls)
     }
+    @Test fun `failed refresh invalidates local session before logout lifecycle hook`()=runTest {
+        val store=Store(SessionTokens("access","refresh","user-1","USER"));val api=Api(success()).apply{refreshResponse=AuthResponse(ok=false,error="SESSION_EXPIRED")};val repository=SessionRepository(api,store);var hooks=0
+        repository.setLifecycleHooks({}, {assertFalse(repository.authenticated);hooks++})
+        assertNull(repository.refresh());assertNull(store.tokens);assertEquals(1,hooks)
+    }
 }

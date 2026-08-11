@@ -11,6 +11,14 @@ export async function GET(request: Request) {
     devices: { active: inventory.devices.filter(device => device.status === "ACTIVE" || device.status === "CURRENT").length },
     sessions: { active: inventory.sessions.length },
     recovery: { phoneVerified: Boolean(context.user.phoneVerifiedAt) },
+    account: {
+      name: context.user.name || null,
+      email: context.user.email || null,
+      phone: context.user.phoneE164 || context.user.phone || null,
+      phoneVerified: Boolean(context.user.phoneVerifiedAt),
+      locale: context.user.locale || null,
+      status: "ACTIVE",
+    },
     currentSessionContext: context.bindingHash ? "AVAILABLE" : "UPGRADE_REQUIRED",
   }, { headers: { "cache-control": "no-store" } });
 }

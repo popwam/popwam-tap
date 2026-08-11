@@ -149,6 +149,32 @@ enum ProfileEntitlementStatus {
   EXPIRED
 }
 
+enum ProfileVerificationKind {
+  IDENTITY
+  BUSINESS
+  PROFESSIONAL
+  MEDICAL
+  CONTACT
+  DOMAIN
+}
+
+enum ProfileVerificationStatus {
+  NOT_STARTED
+  REQUIRED
+  IN_PROGRESS
+  PENDING
+  VERIFIED
+  REJECTED
+  NEEDS_UPDATE
+  EXPIRED
+}
+
+enum ProfileVerificationAuthority {
+  SYSTEM
+  ADMIN
+  PROVIDER
+}
+
 enum OnboardingDefinitionStatus {
   DRAFT
   PUBLISHED
@@ -1096,6 +1122,8 @@ model Profile {
   revisions            ProfileRevision[]
   slugHistory          ProfileSlugHistory[]
   mediaAssets          ProfileMediaAsset[]
+  sectionEntries       ProfileSectionEntry[]
+  verificationCases    ProfileVerificationCase[]
   selectedForFriends   FriendsPreference[]  @relation("FriendsSocialProfile")
   friendReports        UserReport[]         @relation("UserReportProfile")
 
@@ -1132,7 +1160,12 @@ model ProfileRevision {
   displayLabel          String?
   type                  ProfileType
   profileKind           ProfileKind?
+  categorySlug          String?
   primaryLanguage       String
+  profession            ProfessionType                @default(PERSONAL)
+  customProfession      String?
+  firstName             String?
+  lastName              String?
   displayNameAr         String?
   displayNameEn         String?
   title                 String?
@@ -1197,6 +1230,7 @@ model ProfileRevision {
   services              ProfileRevisionService[]
   branches              ProfileRevisionBranch[]
   media                 ProfileRevisionMedia[]
+  sectionEntries        ProfileRevisionSectionEntry[]
 
   @@unique([profileId, revisionNumber])
   @@index([profileId, status, revisionNumber])
@@ -1315,6 +1349,22 @@ model ProfileRevisionMedia {
   @@index([revisionId, sortOrder])
 }
 
+model ProfileRevisionSectionEntry {
+  id          String                  @id @default(cuid())
+  revisionId  String
+  sourceId    String
+  moduleKey   String
+  fieldKey    String
+  instanceKey String
+  value       Json
+  visibility  ProfileModuleVisibility
+  sortOrder   Int                     @default(0)
+  revision    ProfileRevision         @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@unique([revisionId, sourceId])
+  @@index([revisionId, moduleKey, visibility, sortOrder])
+}
+
 model ProfileSlugHistory {
   id        String   @id @default(cuid())
   profileId String
@@ -1391,8 +1441,50 @@ model ProfileModuleDefinition {
   modules            ProfileModule[]
   templateRules      ProfileTemplateModule[]
   onboardingSteps    OnboardingStep[]
+  sectionEntries     ProfileSectionEntry[]
 
   @@index([isActive, key])
+}
+
+model ProfileSectionEntry {
+  id                 String                  @id @default(cuid())
+  profileId          String
+  moduleDefinitionId String
+  fieldKey           String
+  instanceKey        String                  @default("default")
+  value              Json
+  visibility         ProfileModuleVisibility @default(ONLY_ME)
+  sortOrder           Int                     @default(0)
+  schemaVersion      Int                     @default(1)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  profile            Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  moduleDefinition   ProfileModuleDefinition @relation(fields: [moduleDefinitionId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, fieldKey, instanceKey])
+  @@index([profileId, moduleDefinitionId, visibility, sortOrder])
+}
+
+model ProfileVerificationCase {
+  id            String                       @id @default(cuid())
+  profileId     String
+  kind          ProfileVerificationKind
+  status        ProfileVerificationStatus    @default(NOT_STARTED)
+  authority     ProfileVerificationAuthority @default(SYSTEM)
+  provider      String?
+  reasonCode    String?
+  revision      Int                          @default(0)
+  submittedAt   DateTime?
+  reviewedAt    DateTime?
+  verifiedAt    DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+  profile       Profile                      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, kind])
+  @@index([profileId, status, kind])
+  @@index([status, expiresAt])
 }
 
 model ProfileModule {

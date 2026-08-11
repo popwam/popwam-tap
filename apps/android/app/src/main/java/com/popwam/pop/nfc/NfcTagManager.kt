@@ -66,12 +66,12 @@ class NfcTagManager {
         val connectedNdef = ndef
         try {
             connectedNdef.connect()
-            if (!connectedNdef.isWritable) {
-                return@withContext NfcResult.Failure(NfcFailure.READ_ONLY)
-            }
-            if (connectedNdef.maxSize < message.toByteArray().size) {
-                return@withContext NfcResult.Failure(NfcFailure.TOO_SMALL)
-            }
+        } catch (_: Exception) {
+            return@withContext NfcResult.Failure(NfcFailure.CONNECT_FAILED)
+        }
+        try {
+            NfcWritePreflightPolicy.failure(connectedNdef.isWritable, connectedNdef.maxSize, message.toByteArray().size)
+                ?.let { return@withContext NfcResult.Failure(it) }
             connectedNdef.writeNdefMessage(message)
             val verified = firstUri(connectedNdef.ndefMessage)
             if (verified == uri) {

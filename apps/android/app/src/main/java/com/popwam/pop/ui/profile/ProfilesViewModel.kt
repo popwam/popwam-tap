@@ -44,6 +44,7 @@ interface ProfilesRepository {
     suspend fun create(name:String,kind:ProfileBackendKind,categorySlug:String?,templateId:String?,creationKey:String):String
     suspend fun archive(profileId:String,replacementId:String?):String?
     suspend fun upload(profileId:String,revision:Int,media:ProfileMediaUpload):ProfileMutationResult
+    suspend fun uploadDocument(profileId:String,revision:Int,document:ProfileDocumentUpload):ProfileMutationResult=throw UnsupportedOperationException("PROFILE_DOCUMENT_UPLOAD_UNAVAILABLE")
     suspend fun removeMedia(profileId:String,revision:Int,mediaId:String):ProfileMutationResult
 }
 
@@ -100,7 +101,11 @@ class AndroidProfilesRepository(
             else repository.updatePublishingVisibilityAndSlug(profileId,revision,access,ProfilePolicy.normalizedSlug(slug))
             ProfileRuntimeDiagnostics.parsed(ProfileRuntimeDiagnostics.Operation.VISIBILITY,true,result.error,profileId)
             if(!result.ok) throw ProfileDataException(result.error ?: "PROFILE_VISIBILITY_FAILED")
-            val mapped=ProfileMutationResult(result.draftRevision ?: revision+1,result.readiness.toCompletionOrNull())
+            val mapped=ProfileMutationResult(
+                draftRevision=result.draftRevision ?: revision+1,
+                completion=result.readiness.toCompletionOrNull(),
+                lifecycle=result.lifecycle ?: result.readiness?.lifecycle,
+            )
             ProfileRuntimeDiagnostics.success(ProfileRuntimeDiagnostics.Operation.VISIBILITY,profileId,mapped.draftRevision)
             return mapped
         } catch(error:HttpException) {
@@ -166,6 +171,12 @@ class AndroidProfilesRepository(
         return ProfileMutationResult(result.draftRevision ?: revision+1)
     }
 
+    override suspend fun uploadDocument(profileId:String,revision:Int,document:ProfileDocumentUpload):ProfileMutationResult {
+        val result=repository.uploadFile(profileId,document.titleAr,document.titleEn,document.fileName,document.mimeType,document.bytes)
+        if(!result.ok || result.file==null)throw ProfileDataException(result.error ?: "PROFILE_DOCUMENT_UPLOAD_FAILED")
+        return ProfileMutationResult(revision)
+    }
+
     override suspend fun removeMedia(profileId:String,revision:Int,mediaId:String):ProfileMutationResult {
         val result=repository.removeEditorMedia(profileId,mediaId,revision)
         if(!result.ok) throw ProfileDataException(result.error ?: "PROFILE_MEDIA_REMOVE_FAILED")
@@ -182,6 +193,7 @@ internal fun ProfileSelectorItemDto.toOwnedProfile(editor:ProfileEditorResponse?
         subtitle=editor?.preview?.identity?.title,avatarUrl=(avatarUrl ?: editor?.preview?.identity?.imageUrl)?.let(::absoluteMediaUrl),
         backendKind=backend,categoryKind=ProfilePolicy.categoryKind(profileKind,categoryKey),categoryKey=categoryKey,
         lifecycle=p?.lifecycle ?: lifecycle,visibility=p?.access ?: if(lifecycle=="PUBLISHED") "PUBLIC" else "PRIVATE",isPrimary=isPrimary,
+        verification=editor?.verification?.overallStatus.toVerificationState(),
         completion=ProfileCompletion(readiness?.ready==true,readiness?.issues.orEmpty().filter { it.blocking }.map { it.code }),
     )
 }
@@ -201,6 +213,17 @@ internal fun ProfileEditorResponse.toContent(summary:OwnedProfile,slug:String)=P
     modules=modules.map { ProfileModule(it.key,it.name,it.enabled,it.visibility,it.required,it.supported) },
     addableModules=addableModules.map { ProfileModuleOption(it.key,it.name) },
     pendingCapabilities=ProfilePolicy.pendingCapabilities(summary.categoryKind),
+    fieldCapabilities=fieldCapabilities.map { ProfileFieldCapability(it.key,it.moduleKey,it.label,ProfileStructuredPolicy.valueType(it.valueType),it.repeatable,it.requiredForCompletion,it.visibilitySupported,it.maxItems,runCatching{ProfileDataClassification.valueOf(it.classification)}.getOrDefault(ProfileDataClassification.UNKNOWN)) },
+    structuredEntries=structuredEntries.map { ProfileStructuredEntry(it.id,it.fieldKey,it.instanceKey,it.moduleKey,it.value.deepCopy(),it.visibility,it.sortOrder) },
+    contentCompletion=completion.toContentCompletion(),
+    verification=ProfileVerification(
+        verification.submissionSupported,verification.overallStatus,
+        verification.signals.map { ProfileVerificationSignal(it.kind,it.status,it.verifiedAt,it.expiresAt,it.reasonCode,it.publicBadge) },
+    ),
+    firstName=identity.firstName,lastName=identity.lastName,profession=identity.profession,customProfession=identity.customProfession,
+    company=identity.company,industryAr=identity.industryAr,industryEn=identity.industryEn,
+    documents=documents.map{ProfileDocument(it.id,it.originalFilename,it.publicUrl,it.mimeType,it.sizeBytes.toLongOrNull() ?: 0L,it.title.orEmpty(),it.displayTitleAr.orEmpty(),it.displayTitleEn.orEmpty(),it.visibility,it.sortOrder)},
+    documentCapability=ProfileDocumentCapability(documentCapability.uploadSupported,documentCapability.uploadEndpoint,documentCapability.replaceSupported,documentCapability.deleteSupported,documentCapability.visibilitySupported,documentCapability.unavailableReason),
 )
 
 private fun ProfileQuotaDto.toProfileQuota()=ProfileQuota(
@@ -209,13 +232,20 @@ private fun ProfileQuotaDto.toProfileQuota()=ProfileQuota(
     canCustomizeSlug=customSlugAllowed,allowedThemes=allowedThemes,blocker=blocker,
 )
 private fun PublishingReadinessDto?.toCompletionOrNull()=this?.let { ProfileCompletion(it.ready,it.issues.filter { issue->issue.blocking }.map { issue->issue.code }) }
-private fun com.popwam.pop.data.api.ApiResult.toMutationResult(previousRevision:Int)=ProfileMutationResult(draftRevision ?: previousRevision+1,readiness.toCompletionOrNull())
+private fun com.popwam.pop.data.api.ProfileContentCompletionDto.toContentCompletion()=ProfileContentCompletion(complete,issues.map { ProfileContentIssue(it.code,it.path,it.fieldKey,it.messageKey) })
+private fun String?.toVerificationState()=when(this){"VERIFIED"->ProfileVerificationState.VERIFIED;"PENDING","IN_PROGRESS","REQUIRED"->ProfileVerificationState.PENDING;"REJECTED","NEEDS_UPDATE","EXPIRED"->ProfileVerificationState.REJECTED;"NOT_STARTED"->ProfileVerificationState.UNVERIFIED;else->ProfileVerificationState.UNAVAILABLE}
+private fun com.popwam.pop.data.api.ApiResult.toMutationResult(previousRevision:Int)=ProfileMutationResult(
+    draftRevision=draftRevision ?: previousRevision+1,
+    completion=readiness.toCompletionOrNull(),
+    lifecycle=lifecycle ?: readiness?.lifecycle,
+    contentCompletion=completion?.toContentCompletion(),
+)
 private fun absoluteMediaUrl(value:String)=if(value.startsWith("http")) value else BuildConfig.API_BASE_URL.trimEnd('/')+"/"+value.trimStart('/')
 
 private fun ProfileEditorMutation.toJson()=JsonObject().also { json ->
     fun JsonObject.str(name:String,value:String)=addProperty(name,value)
     when(this) {
-        is ProfileEditorMutation.Identity->{json.str("type","IDENTITY_SAVE");json.str("displayName",displayName);json.str("displayLabel",displayLabel);json.str("displayNameAr",displayNameAr);json.str("displayNameEn",displayNameEn);json.str("jobTitleAr",jobTitleAr);json.str("jobTitleEn",jobTitleEn);json.str("organizationNameAr",organizationNameAr);json.str("organizationNameEn",organizationNameEn);json.str("primaryLanguage",primaryLanguage)}
+        is ProfileEditorMutation.Identity->{json.str("type","IDENTITY_SAVE");json.str("displayName",displayName);json.str("displayLabel",displayLabel);json.str("firstName",firstName);json.str("lastName",lastName);json.str("profession",profession);json.str("customProfession",customProfession);json.str("displayNameAr",displayNameAr);json.str("displayNameEn",displayNameEn);json.str("jobTitleAr",jobTitleAr);json.str("jobTitleEn",jobTitleEn);json.str("company",company);json.str("industryAr",industryAr);json.str("industryEn",industryEn);json.str("organizationNameAr",organizationNameAr);json.str("organizationNameEn",organizationNameEn);json.str("primaryLanguage",primaryLanguage)}
         is ProfileEditorMutation.About->{json.str("type","ABOUT_SAVE");json.str("title",title);json.str("bio",bio);json.str("bioAr",bioAr);json.str("bioEn",bioEn);json.str("descriptionAr",descriptionAr);json.str("descriptionEn",descriptionEn)}
         is ProfileEditorMutation.Contact->{json.str("type","CONTACT_SAVE");json.str("phone",phone);json.str("alternatePhone",alternatePhone);json.str("email",email);json.str("website",website);json.str("whatsappBusiness",whatsappBusiness);json.str("whatsappPrivate",whatsappPrivate);json.str("locationText",locationText);json.str("addressAr",addressAr);json.str("addressEn",addressEn);json.add("visibility",JsonObject().also { v->visibility.forEach(v::addProperty) })}
         is ProfileEditorMutation.LinkUpsert->{json.str("type","LINK_UPSERT");if(link.id.isNotBlank())json.str("id",link.id);json.str("title",link.title);json.str("titleAr",link.titleAr);json.str("titleEn",link.titleEn);json.str("destinationType",link.type);json.str("url",link.url);json.str("visibility",link.visibility)}
@@ -228,6 +258,9 @@ private fun ProfileEditorMutation.toJson()=JsonObject().also { json ->
         is ProfileEditorMutation.Appearance->{json.str("type","APPEARANCE_SAVE");json.str("theme",theme)}
         is ProfileEditorMutation.AddModule->{json.str("type","MODULE_ADD");json.str("key",key)}
         is ProfileEditorMutation.UpdateModule->{json.str("type","MODULE_UPDATE");json.str("key",key);json.addProperty("enabled",enabled);json.str("visibility",visibility)}
+        is ProfileEditorMutation.StructuredEntryUpsert->{json.str("type","SECTION_ENTRY_UPSERT");if(entry.id.isNotBlank())json.str("id",entry.id);json.str("fieldKey",entry.fieldKey);entry.instanceKey.takeIf(String::isNotBlank)?.let{json.str("instanceKey",it)};json.add("value",entry.value.deepCopy());json.str("visibility",entry.visibility)}
+        is ProfileEditorMutation.StructuredEntryDelete->{json.str("type","SECTION_ENTRY_DELETE");json.str("id",id)}
+        is ProfileEditorMutation.StructuredEntryReorder->{json.str("type","SECTION_ENTRY_REORDER");json.str("fieldKey",fieldKey);json.add("ids",JsonArray().also{array->ids.forEach(array::add)})}
     }
 }
 
@@ -263,6 +296,7 @@ class ProfilesViewModel(
         is ProfileEvent.CreateProfile->create(event)
         is ProfileEvent.ArchiveProfile->archive(event.id,event.replacementId)
         is ProfileEvent.UploadMedia->upload(event.media)
+        is ProfileEvent.UploadDocument->uploadDocument(event.document)
         is ProfileEvent.RemoveMedia->removeMedia(event.mediaId)
         is ProfileEvent.OpenShare->navigate(ProfileDestination.Share(event.id))
         is ProfileEvent.OpenQr->navigate(ProfileDestination.Qr(event.id))
@@ -375,6 +409,11 @@ class ProfilesViewModel(
         try{val result=repository.upload(content.summary.id,content.draftRevision,media);acceptMutation(content,result);_state.value=_state.value.copy(uploadProgress=1f);refreshBestEffort(content.summary.id)}catch(error:Exception){_state.value=_state.value.copy(uploadProgress=null);handleMutationFailure(error,ProfileOperation.SAVE)}
     }}
 
+    private fun uploadDocument(document:ProfileDocumentUpload){val content=_state.value.content?:return;viewModelScope.launch{
+        _state.value=_state.value.copy(saveState=ProfileSaveState.SAVING,uploadProgress=0f,errorCode=null,debugErrorCode=null)
+        try{repository.uploadDocument(content.summary.id,content.draftRevision,document);_state.value=_state.value.copy(uploadProgress=1f);refreshBestEffort(content.summary.id)}catch(error:Exception){_state.value=_state.value.copy(uploadProgress=null);handleMutationFailure(error,ProfileOperation.SAVE)}
+    }}
+
     private fun removeMedia(mediaId:String){val content=_state.value.content?:return;viewModelScope.launch{
         _state.value=_state.value.copy(saveState=ProfileSaveState.SAVING,errorCode=null,debugErrorCode=null)
         try{val result=repository.removeMedia(content.summary.id,content.draftRevision,mediaId);acceptMutation(content.copy(media=content.media.filterNot{it.id==mediaId}),result);if(result.completion==null)refreshBestEffort(content.summary.id)}catch(error:Exception){handleMutationFailure(error,ProfileOperation.SAVE)}
@@ -382,8 +421,9 @@ class ProfilesViewModel(
 
     private fun acceptMutation(local:ProfileContent,result:ProfileMutationResult){
         val completion=result.completion ?: local.summary.completion
+        val contentCompletion=result.contentCompletion ?: local.contentCompletion
         val lifecycle=result.lifecycle ?: local.summary.lifecycle
-        val updated=local.copy(summary=local.summary.copy(completion=completion,lifecycle=lifecycle),draftRevision=result.draftRevision)
+        val updated=local.copy(summary=local.summary.copy(completion=completion,lifecycle=lifecycle),contentCompletion=contentCompletion,draftRevision=result.draftRevision)
         _state.value=_state.value.copy(
             profiles=_state.value.profiles.map{if(it.id==updated.summary.id)updated.summary else it},
             content=updated,editorDirty=false,saveState=ProfileSaveState.SUCCESS,errorCode=null,debugErrorCode=null,uploadProgress=null,
@@ -391,7 +431,8 @@ class ProfilesViewModel(
     }
     private fun acceptReadiness(content:ProfileContent,result:ProfileMutationResult){
         val completion=result.completion ?: content.summary.completion
-        val updated=content.copy(summary=content.summary.copy(completion=completion),draftRevision=result.draftRevision)
+        val contentCompletion=result.contentCompletion ?: content.contentCompletion
+        val updated=content.copy(summary=content.summary.copy(completion=completion),contentCompletion=contentCompletion,draftRevision=result.draftRevision)
         _state.value=_state.value.copy(content=updated,profiles=_state.value.profiles.map{if(it.id==updated.summary.id)updated.summary else it})
     }
     private suspend fun refreshBestEffort(id:String){
@@ -431,11 +472,12 @@ private fun ProfileEditorMutation.requiresProjectionRefresh()=when(this){
     is ProfileEditorMutation.ServiceUpsert->service.id.isBlank()
     is ProfileEditorMutation.LocationUpsert->location.id.isBlank()
     is ProfileEditorMutation.AddModule->true
+    is ProfileEditorMutation.StructuredEntryUpsert->entry.id.isBlank()
     else->false
 }
 
 private fun ProfileContent.applyMutation(mutation:ProfileEditorMutation)=when(mutation){
-    is ProfileEditorMutation.Identity->copy(displayName=mutation.displayName,displayLabel=mutation.displayLabel,displayNameAr=mutation.displayNameAr,displayNameEn=mutation.displayNameEn,jobTitleAr=mutation.jobTitleAr,jobTitleEn=mutation.jobTitleEn,organizationNameAr=mutation.organizationNameAr,organizationNameEn=mutation.organizationNameEn,primaryLanguage=mutation.primaryLanguage,summary=summary.copy(name=mutation.displayName))
+    is ProfileEditorMutation.Identity->copy(displayName=mutation.displayName,displayLabel=mutation.displayLabel,displayNameAr=mutation.displayNameAr,displayNameEn=mutation.displayNameEn,jobTitleAr=mutation.jobTitleAr,jobTitleEn=mutation.jobTitleEn,organizationNameAr=mutation.organizationNameAr,organizationNameEn=mutation.organizationNameEn,primaryLanguage=mutation.primaryLanguage,firstName=mutation.firstName,lastName=mutation.lastName,profession=mutation.profession,customProfession=mutation.customProfession,company=mutation.company,industryAr=mutation.industryAr,industryEn=mutation.industryEn,summary=summary.copy(name=mutation.displayName))
     is ProfileEditorMutation.About->copy(title=mutation.title,bio=mutation.bio,bioAr=mutation.bioAr,bioEn=mutation.bioEn,descriptionAr=mutation.descriptionAr,descriptionEn=mutation.descriptionEn)
     is ProfileEditorMutation.Contact->copy(phone=mutation.phone,alternatePhone=mutation.alternatePhone,email=mutation.email,website=mutation.website,whatsappBusiness=mutation.whatsappBusiness,whatsappPrivate=mutation.whatsappPrivate,locationText=mutation.locationText,addressAr=mutation.addressAr,addressEn=mutation.addressEn,contactVisibility=mutation.visibility)
     is ProfileEditorMutation.LinkUpsert->if(mutation.link.id.isBlank())this else copy(links=links.filterNot{it.id==mutation.link.id}+mutation.link)
@@ -448,6 +490,16 @@ private fun ProfileContent.applyMutation(mutation:ProfileEditorMutation)=when(mu
     is ProfileEditorMutation.Appearance->copy(theme=mutation.theme)
     is ProfileEditorMutation.AddModule->this
     is ProfileEditorMutation.UpdateModule->copy(modules=modules.map{if(it.key==mutation.key)it.copy(enabled=mutation.enabled,visibility=mutation.visibility)else it})
+    is ProfileEditorMutation.StructuredEntryUpsert->if(mutation.entry.id.isBlank())this else copy(structuredEntries=structuredEntries.filterNot{it.id==mutation.entry.id}+mutation.entry)
+    is ProfileEditorMutation.StructuredEntryDelete->copy(structuredEntries=structuredEntries.filterNot{it.id==mutation.id})
+    is ProfileEditorMutation.StructuredEntryReorder->copy(
+        structuredEntries=structuredEntries.map{entry->
+            if(entry.fieldKey!=mutation.fieldKey)entry else mutation.ids.indexOf(entry.id)
+                .takeIf{it>=0}
+                ?.let{entry.copy(sortOrder=it*10)}
+                ?: entry
+        },
+    )
 }
 
 private fun HttpException.apiCode()=runCatching{JsonParser.parseString(response()?.errorBody()?.string()).asJsonObject.get("error")?.asString}.getOrNull()?:"HTTP_${code()}"

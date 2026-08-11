@@ -38,6 +38,9 @@ import com.popwam.pop.ui.home.HomeViewModelFactory
 import com.popwam.pop.ui.profile.AndroidProfilesRepository
 import com.popwam.pop.ui.profile.ProfilesViewModel
 import com.popwam.pop.ui.profile.ProfilesViewModelFactory
+import com.popwam.pop.ui.share.AndroidShareRepository
+import com.popwam.pop.ui.share.ShareViewModel
+import com.popwam.pop.ui.share.ShareViewModelFactory
 import com.popwam.pop.ui.currentLocale
 import com.popwam.pop.ui.auth.AuthenticationFlowFactory
 import com.popwam.pop.ui.auth.AuthenticationFlowViewModel
@@ -118,9 +121,10 @@ class MainActivity : AppCompatActivity() {
                     val main: MainViewModel = viewModel(factory = MainFactory(app.container.repository, app.container.sessions.role,app.container.analytics))
                     val home: HomeViewModel = viewModel(factory = HomeViewModelFactory(AndroidHomeRepository(app.container.repository, ::currentLocale),app.container.analytics,launchState.persisted.activeProfileId,launchViewModel::selectActiveProfile))
                     val profiles: ProfilesViewModel = viewModel(factory = ProfilesViewModelFactory(AndroidProfilesRepository(app.container.repository, ::currentLocale),app.container.analytics,launchState.persisted.activeProfileId){profileId->launchViewModel.selectActiveProfile(profileId);home.selectActiveProfile(profileId)})
+                    val share: ShareViewModel = viewModel(factory = ShareViewModelFactory(app,AndroidShareRepository(app.container.repository,::currentLocale),app.container.analytics))
                     PopwamTheme(launchState.persisted.selectedBaseTheme.name,"DEFAULT",launchState.persisted.selectedPopStyle.name) {
                     PopwamApp(
-                        auth, main, home, profiles, NfcDeepLinkPolicy.route(intent?.dataString), appearanceStore, app.container.phoneCountries,
+                        auth, main, home, profiles, share, NfcDeepLinkPolicy.route(intent?.dataString), appearanceStore, app.container.phoneCountries,
                         onThemeModeSelected = launchViewModel::selectBaseTheme,
                         onPaletteSelected = launchViewModel::selectPopStyle,
                     )

@@ -11,6 +11,7 @@ import com.popwam.pop.data.repository.AuthSetupRepository
 import com.popwam.pop.data.localization.LocalizationAuthorityStore
 import com.popwam.pop.data.launch.AndroidLaunchStatePersistence
 import com.popwam.pop.data.launch.LegacyLaunchStateMigrator
+import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.ui.applyPopLanguage
 import com.popwam.mobile.foundation.launch.PersistedLaunchStateStore
 import kotlinx.coroutines.CoroutineScope
@@ -90,7 +91,10 @@ class AppContainer(application:Application){
         lifecycleScope.launch {
             runCatching { pushTokens.uploadPendingIfAuthenticated() }
         }
-    },{ pushTokens.revokeBeforeLogout() }) }
+    },{
+        HceConfig.clearForLogout(application)
+        pushTokens.revokeBeforeLogout()
+    }) }
     val repository=PopwamRepository(api)
     val authSetup=AuthSetupRepository(api)
     fun persistSelectedLanguage(language:String){lifecycleScope.launch{launchState.update{it.copy(hasSelectedLanguage=true,selectedLanguageTag=language)}}}

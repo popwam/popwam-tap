@@ -16,6 +16,10 @@ export function shareTargetKind(destinationType: string) {
   return SOCIAL_DESTINATIONS.has(destinationType) ? "SOCIAL" as const : "LINK" as const;
 }
 
+export function shareKeyAfterCompareAndSet(generated: string, updatedCount: number, persisted: string | null) {
+  return updatedCount === 1 ? generated : persisted;
+}
+
 export function cardCanResolve(status: string) {
   return status === "ACTIVE";
 }

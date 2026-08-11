@@ -4,7 +4,7 @@
     <string name="pop_slogan">Your world. One POP.</string>
     <string name="app_version">Version 0.0.12</string>
     <string name="nav_virtual_cards">Virtual Cards</string><string name="nav_products">My Products</string><string name="nav_menu">Menu</string>
-    <string name="activate_product">Activate product</string><string name="set_device_card">Use via this phone</string><string name="hce_experimental">Experimental on supported Android NFC devices</string>
+    <string name="activate_product">Activate product</string>
     <string name="about_app">About POP</string><string name="logout_all">Log out all devices</string><string name="nearby_users">Nearby POP users</string><string name="activity_identity">Share my identity when viewing POP profiles</string>
     <string name="hce_service_description">POPWAM virtual NFC card</string><string name="hce_aid_description">POPWAM public URL</string>
     <string name="sign_in">Sign in</string><string name="phone_number">Phone number</string><string name="phone_hint">Phone number</string><string name="send_code">Send verification code</string><string name="verification_code">Verification code</string><string name="verify_continue">Verify and continue</string><string name="phone_help">Choose any country. Your number is normalized to canonical E.164 and remains your primary POP identity.</string><string name="google_optional">Google is available only as an optional connected account after phone sign-in.</string><string name="logout">Log out</string>
@@ -16,7 +16,7 @@
     <string name="personal">Personal</string><string name="organization">Organization</string><string name="arabic_name">Arabic name</string><string name="english_name">English name</string><string name="arabic_bio">Arabic bio / description</string><string name="english_bio">English bio / description</string><string name="phone">Phone</string><string name="email">Email</string><string name="website">Website</string><string name="whatsapp">WhatsApp</string><string name="theme">Theme</string><string name="links_files">Links and files</string><string name="new_profile">New profile</string><string name="edit_profile">Edit profile</string><string name="profile_saved">Profile saved</string><string name="image_logo">Profile image / logo</string><string name="cover_image">Cover image</string><string name="choose_upload">Choose and upload</string><string name="vcard_current">The Save Contact destination always uses current profile data.</string>
     <string name="write_nfc">Write NFC</string><string name="read_verify_nfc">Read and verify NFC</string><string name="programming_cards">Unprogrammed cards</string><string name="approach_tag">Approach an NFC tag now</string><string name="nfc_unavailable">NFC is not available on this device.</string><string name="nfc_disabled">Enable NFC in Android settings.</string><string name="write_success">NFC URL written and verified.</string><string name="verify_success">The tag contains the exact POPWAM URL.</string><string name="wrong_url">The tag URL does not match the selected card.</string><string name="unsupported_tag">This tag does not support compatible NDEF writing.</string><string name="tag_read_only">This NFC tag is already read-only.</string><string name="tag_too_small">The NFC tag does not have enough capacity.</string><string name="lock_read_only">Lock read-only</string><string name="lock_warning">Read-only locking is normally permanent and cannot be undone. The URL will be verified again before locking.</string><string name="type_lock">Type LOCK to continue</string><string name="lock_confirm">Lock permanently</string><string name="lock_success">The NFC tag is now read-only and the server was updated.</string><string name="program_staff_only">NFC programming is available only to authorized staff and administrators.</string>
     <string name="read_uri">Read URI</string><string name="programmed_at">Programmed at</string><string name="locked_at">Locked at</string><string name="exact_match">Exact match</string><string name="mismatch">Mismatch</string><string name="scan_activation_separately">Activation QR verification is separate from NFC URL verification.</string>
-    <string name="hce_title">HCE virtual card</string><string name="hce_explanation">Shares only the selected public POPWAM URL using NFC Forum Type 4 NDEF. It is not a payment card and has no EMV or banking functions.</string><string name="hce_compatibility">HCE depends on the phone manufacturer, NFC controller, reader behavior and screen/unlock policy. Some phones and readers are incompatible.</string><string name="enable_hce">Enable virtual card</string><string name="disable_hce">Disable virtual card</string><string name="select_hce_card">Select active public URL</string>
+    <string name="hce_title">HCE virtual card</string><string name="hce_explanation">Shares only the selected public POPWAM URL using NFC Forum Type 4 NDEF. It is not a payment card and has no EMV or banking functions.</string><string name="hce_compatibility">HCE depends on the phone manufacturer, NFC controller, reader behavior and screen/unlock policy. Some phones and readers are incompatible.</string><string name="enable_hce">Enable virtual card</string><string name="disable_hce">Disable virtual card</string>
     <string name="language">Language</string><string name="device_language">Device language</string><string name="arabic">العربية</string><string name="english">English</string><string name="privacy_note">Analytics are limited to total opens, last opened time and optional daily totals. The app does not collect location, browser, device fingerprint or IP analytics.</string>
     <string name="generic_error">The request could not be completed. Please try again.</string><string name="auth_expired">Your session expired. Sign in again.</string><string name="limit_reached">Your plan limit has been reached.</string><string name="not_configured">This feature is not configured.</string><string name="confirm">Confirm</string><string name="close">Close</string><string name="card_claimed">Card added to your account.</string><string name="upload_complete">Upload complete.</string><string name="destination_saved">Destination saved.</string>
     <string name="add_link">Add link</string><string name="link_title">Link title</string><string name="link_url">Link URL or value</string><string name="link_type">Destination type</string><string name="icon">Icon</string><string name="search_icons">Search icons</string><string name="category_all">All</string><string name="category_contact">Contact</string><string name="category_social">Social</string><string name="category_business">Business</string><string name="category_documents">Documents</string><string name="category_location">Location</string><string name="category_communication">Communication</string><string name="category_shopping">Shopping</string><string name="category_media">Media</string><string name="category_custom">Custom</string>
@@ -332,6 +332,29 @@
     <string name="share_scratch_code">6-digit scratch code</string>
     <string name="share_activate_securely">Verify and activate</string>
     <string name="share_scan_another">Scan another product</string>
+    <string name="share_profile_private">This profile is private. Make it Public or Unlisted before sharing.</string>
+    <string name="share_unlisted_notice">This profile is Unlisted. Anyone with its link can open it, but search engines should not index it.</string>
+    <string name="share_privacy_note">Only the active profile’s public URL is shared. POP access tokens, account data, and verification evidence are never included.</string>
+    <string name="share_write_nfc">Write NFC tag</string>
+    <string name="share_phone_tap">Phone tap (HCE)</string>
+    <string name="share_hce_ready">Ready while this unlocked screen is active. Reader compatibility varies.</string>
+    <string name="share_hce_observability">A tap can be detected, but Android cannot guarantee that the other device opened the link.</string>
+    <string name="share_download_qr">Save QR</string>
+    <string name="share_opened">Android sharing opened.</string>
+    <string name="share_qr_saved">QR saved to Pictures/POP.</string>
+    <string name="share_qr_shared">QR sharing opened.</string>
+    <string name="share_qr_failed">The QR action could not be completed.</string>
+    <string name="share_nfc_public_only">The tag will contain one public NDEF URI only. No account or authentication data is written.</string>
+    <string name="share_enable_nfc">Open NFC settings</string>
+    <string name="share_start_nfc_write">Start writing</string>
+    <string name="share_nfc_waiting">Hold the phone near one compatible NFC tag.</string>
+    <string name="share_nfc_writing">Writing and reading the tag back…</string>
+    <string name="share_nfc_locking">Verifying the URL and locking the tag…</string>
+    <string name="share_nfc_write_success">The public profile URL was written and verified.</string>
+    <string name="share_nfc_locked">The tag is now permanently read-only.</string>
+    <string name="share_nfc_lock_warning">Making a tag read-only is normally permanent and cannot be undone. Present the same verified tag again only if you accept this.</string>
+    <string name="share_nfc_lock_unsupported">This tag cannot be safely locked read-only.</string>
+    <string name="share_nfc_verify_failed">The tag could not be read back with the exact profile URL.</string>
     <string name="settings_center_title">Settings</string>
     <string name="settings_center_help">Manage how POP looks, communicates, and protects your account.</string>
     <string name="settings_appearance">Appearance</string>
@@ -734,4 +757,120 @@
     <string name="profile_readiness_module_incomplete">Complete the required profile section.</string>
     <string name="profile_readiness_archived">An archived profile cannot be published.</string>
     <string name="profile_readiness_generic">Review this publishing requirement.</string>
+    <string name="profile_field_required">This field is required.</string>
+    <string name="profile_field_too_long">This value is too long.</string>
+    <string name="profile_field_phone_invalid">Enter a valid phone number.</string>
+    <string name="profile_field_email_invalid">Enter a valid email address.</string>
+    <string name="profile_field_url_invalid">Enter a valid web address.</string>
+    <string name="profile_field_slug_invalid">Use at least 3 lowercase letters, numbers, or hyphens.</string>
+    <string name="profile_field_number_invalid">Enter a valid whole number.</string>
+    <string name="profile_field_time_invalid">Use 24-hour time in HH:MM format.</string>
+    <string name="profile_field_too_many_items">Remove one or more items before saving.</string>
+    <string name="profile_field_unsupported">This field type cannot be edited in this app version.</string>
+    <string name="profile_type_details">Profile details</string>
+    <string name="profile_required">Required</string>
+    <string name="profile_value_empty">No value</string>
+    <string name="profile_add_value">Add value</string>
+    <string name="profile_list_one_per_line">Enter one item per line</string>
+    <string name="profile_institution">Institution</string>
+    <string name="profile_qualification">Qualification</string>
+    <string name="profile_study_field">Field of study</string>
+    <string name="profile_start_year">Start year</string>
+    <string name="profile_end_year">End year</string>
+    <string name="profile_organization">Organization</string>
+    <string name="profile_role">Role</string>
+    <string name="profile_summary">Summary</string>
+    <string name="profile_current_role">I currently work here</string>
+    <string name="profile_closed">Closed</string>
+    <string name="profile_opens_at">Opens at (HH:MM)</string>
+    <string name="profile_closes_at">Closes at (HH:MM)</string>
+    <string name="profile_monday">Monday</string><string name="profile_tuesday">Tuesday</string><string name="profile_wednesday">Wednesday</string><string name="profile_thursday">Thursday</string><string name="profile_friday">Friday</string><string name="profile_saturday">Saturday</string><string name="profile_sunday">Sunday</string>
+    <string name="move_up">Move up</string><string name="move_down">Move down</string>
+    <string name="profile_verification_not_started">Verification not started</string>
+    <string name="profile_verification_required">Verification required</string>
+    <string name="profile_verification_in_progress">Verification in progress</string>
+    <string name="profile_verification_pending">Verification pending</string>
+    <string name="profile_verification_rejected">Verification rejected</string>
+    <string name="profile_verification_needs_update">Verification needs an update</string>
+    <string name="profile_verification_expired">Verification expired</string>
+    <string name="profile_verification_identity">Identity</string><string name="profile_verification_business">Business</string><string name="profile_verification_professional">Professional credential</string><string name="profile_verification_medical">Medical credential</string><string name="profile_verification_contact">Contact</string><string name="profile_verification_domain">Domain</string>
+    <string name="profile_first_name">First name</string>
+    <string name="profile_last_name">Last name</string>
+    <string name="profile_profession">Profession</string>
+    <string name="profile_custom_profession">Specialization or custom profession</string>
+    <string name="profile_company">Company</string>
+    <string name="profile_industry_ar">Industry (Arabic)</string>
+    <string name="profile_industry_en">Industry (English)</string>
+    <string name="profile_field_selection_invalid">Choose a supported value</string>
+    <string name="profile_profession_personal">Personal</string>
+    <string name="profile_profession_business_owner">Business owner</string>
+    <string name="profile_profession_company">Company</string>
+    <string name="profile_profession_developer">Developer</string>
+    <string name="profile_profession_designer">Designer</string>
+    <string name="profile_profession_creator">Creator</string>
+    <string name="profile_profession_marketer">Marketer</string>
+    <string name="profile_profession_real_estate">Real estate</string>
+    <string name="profile_profession_doctor">Doctor</string>
+    <string name="profile_profession_lawyer">Lawyer</string>
+    <string name="profile_profession_musician">Musician</string>
+    <string name="profile_profession_photographer">Photographer</string>
+    <string name="profile_profession_freelancer">Freelancer</string>
+    <string name="settings_login_security">Login &amp; Security</string>
+    <string name="settings_saved_devices">Saved Devices</string>
+    <string name="settings_language_region">Language &amp; Region</string>
+    <string name="settings_support_group">Support and information</string>
+    <string name="settings_help_center">Help Center</string>
+    <string name="settings_manage_profiles">Manage Profiles</string>
+    <string name="settings_logout_confirm_title">Log out of POP?</string>
+    <string name="settings_logout_confirm_body">Your local session and sensitive cached account data will be cleared. Your Profiles and preferences stay safe.</string>
+    <string name="settings_language_help">Choose from the languages currently available to this POP installation. The interface updates immediately.</string>
+    <string name="settings_region">Device region</string>
+    <string name="settings_region_help">Region is informative and never changes your verified phone identity.</string>
+    <string name="settings_open_notification_settings">Open notification settings</string>
+    <string name="settings_profile_privacy_separate">Public, Unlisted, and Private visibility belong to each Profile, not to the private account.</string>
+    <string name="settings_manage_profile_visibility">Manage Profile visibility</string>
+    <string name="settings_passcode_biometrics">Passcode &amp; Biometrics</string>
+    <string name="settings_biometric_status">Device security status</string>
+    <string name="settings_device_security_help">POP relies on Android device credentials and enrolled biometrics. It never stores your fingerprint, face data, or device passcode.</string>
+    <string name="settings_manage_passkeys">Manage passkeys</string>
+    <string name="settings_enroll_biometrics">Set up device security</string>
+    <string name="settings_open_device_security">Open device security</string>
+    <string name="settings_biometric_ready">Available and enrolled</string>
+    <string name="settings_biometric_not_enrolled">Supported, not enrolled</string>
+    <string name="settings_biometric_temporary">Temporarily unavailable</string>
+    <string name="settings_manage_device_sessions">Manage sessions (%1$d)</string>
+    <string name="settings_account_name">Account name</string>
+    <string name="settings_account_email">Private account email</string>
+    <string name="settings_account_language">Account language</string>
+    <string name="settings_account_status">Account status</string>
+    <string name="settings_feedback_roadmap">Feedback and roadmap</string>
+    <string name="settings_help_no_direct_support">No separate support address is configured in the current product. Feedback uses POP\'s existing authenticated roadmap.</string>
+    <string name="settings_version_name">App version</string>
+    <string name="settings_build_number">Build number</string>
+    <string name="settings_company_attribution">POP by POPWAM. Product and platform by POPWAM.</string>
+    <string name="settings_legal_help">These links open the current production legal pages securely in your browser.</string>
+    <string name="profile_profession_restaurant">Restaurant</string>
+    <string name="profile_profession_shop">Shop</string>
+    <string name="profile_documents">Documents</string>
+    <string name="profile_documents_help">Upload only public-profile documents you intentionally want associated with this profile. Trust evidence is handled separately.</string>
+    <string name="profile_document_title_ar">Document title (Arabic)</string>
+    <string name="profile_document_title_en">Document title (English)</string>
+    <string name="profile_document_upload">Choose and upload document</string>
+    <string name="profile_document_upload_unavailable">Document upload is not available for this profile.</string>
+    <string name="profile_document_manage_unavailable">Mobile replacement and deletion are not supported yet. Existing documents are shown read-only.</string>
+    <string name="profile_document_too_large">The document must be 10 MB or smaller.</string>
+    <string name="profile_document_type_invalid">Choose a PDF, text, vCard, JPEG, PNG, or WebP file whose extension matches its type.</string>
+    <string name="profile_document_empty">The selected document is empty or could not be read.</string>
+    <string name="profile_document_upload_failed">The document could not be prepared for upload.</string>
+    <string name="profile_document_metadata">%1$s · %2$s</string>
+    <string name="profile_module_identity">Identity</string>
+    <string name="profile_module_social_links">Social links</string>
+    <string name="profile_module_portfolio">Portfolio</string>
+    <string name="profile_module_catalog">Catalog</string>
+    <string name="profile_module_personal_details">Personal details</string>
+    <string name="profile_module_professional_details">Professional details</string>
+    <string name="profile_module_business_details">Business details</string>
+    <string name="profile_module_restaurant_details">Restaurant details</string>
+    <string name="profile_module_medical_details">Medical details</string>
+    <string name="profile_additional_details">Additional details</string>
 </resources>

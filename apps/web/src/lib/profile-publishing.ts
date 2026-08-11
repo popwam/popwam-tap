@@ -1,4 +1,4 @@
-import { OrgRole, Prisma, prisma, type ProfileAccess, type ProfileLifecycle } from "@popwam/db";
+import { OrgRole, Prisma, prisma, type ProfileAccess, type ProfileLifecycle, type ProfileModuleVisibility } from "@popwam/db";
 import { createHash, randomUUID } from "node:crypto";
 import { isDraftStorageEnabled } from "@popwam/storage";
 import { validateProfileSlug } from "./profile-slugs";
@@ -28,6 +28,8 @@ export const draftProfileInclude = {
   services: { orderBy: { sortOrder: "asc" } },
   branches: { orderBy: { sortOrder: "asc" } },
   mediaAssets: { where: { state: { in: ["DRAFT_ATTACHED", "PUBLISHED"] } }, orderBy: { sortOrder: "asc" } },
+  sectionEntries: { include: { moduleDefinition: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+  verificationCases: { orderBy: { kind: "asc" } },
   modules: { include: { moduleDefinition: true }, orderBy: { sortOrder: "asc" } },
   template: { include: { moduleRules: { include: { moduleDefinition: true } } } },
   category: true,
@@ -52,6 +54,8 @@ export function profileDraftFingerprint(profile: DraftProfileData) {
     slug: profile.draftSlug ?? profile.slug, displayName: profile.displayName, displayLabel: profile.displayLabel, type: profile.type,
     profileKind: profile.profileKind, categoryId: profile.categoryId, templateId: profile.templateId,
     access: profile.access, primaryLanguage: profile.primaryLanguage, theme: profile.theme,
+    profession: profile.profession, customProfession: profile.customProfession,
+    firstName: profile.firstName, lastName: profile.lastName,
     displayNameAr: profile.displayNameAr, displayNameEn: profile.displayNameEn, title: profile.title,
     jobTitleAr: profile.jobTitleAr, jobTitleEn: profile.jobTitleEn, company: profile.company,
     bio: profile.bio, bioAr: profile.bioAr, bioEn: profile.bioEn,
@@ -71,6 +75,7 @@ export function profileDraftFingerprint(profile: DraftProfileData) {
     services: profile.services.map((item) => [item.id, item.nameAr, item.nameEn, item.descriptionAr, item.descriptionEn, item.isVisible, item.sortOrder]),
     branches: profile.branches.map((item) => [item.id, item.nameAr, item.nameEn, item.addressAr, item.addressEn, item.isVisible, item.sortOrder]),
     media: profile.mediaAssets.map((item) => [item.id, item.purpose, item.visibility, item.sortOrder]),
+    sectionEntries: profile.sectionEntries.map((item) => [item.id, item.moduleDefinition.key, item.fieldKey, item.instanceKey, item.value, item.visibility, item.sortOrder, item.schemaVersion]),
   };
   return createHash("sha256").update(JSON.stringify(scalar)).digest("hex");
 }
@@ -165,31 +170,47 @@ const revisionInclude = {
   services: { orderBy: { sortOrder: "asc" } },
   branches: { orderBy: { sortOrder: "asc" } },
   media: { orderBy: { sortOrder: "asc" } },
+  sectionEntries: { orderBy: { sortOrder: "asc" } },
 } satisfies Prisma.ProfileRevisionInclude;
 
 export type PublishedRevisionData = Prisma.ProfileRevisionGetPayload<{ include: typeof revisionInclude }>;
 
-export function revisionToProfileForAudience(profile: DraftProfileData, revision: PublishedRevisionData, audience: "PUBLIC" | "FRIEND") {
-  const template = revision.templateSlug ? {
-    id: `revision:${revision.id}`,
-    slug: revision.templateSlug,
-    configuration: revision.templateConfiguration,
-  } : null;
-  const modules = new Set(revision.modules.filter((item) => item.enabled && canReadModuleForAudience(item.visibility, audience)).map((item) => item.key));
+const socialDestinationTypes = new Set(["FACEBOOK", "LINKEDIN", "GITHUB", "TIKTOK", "INSTAGRAM", "X", "YOUTUBE", "TELEGRAM", "SOCIAL"]);
+
+export function destinationModuleKey(type: string) {
+  return socialDestinationTypes.has(type) ? "SOCIAL" : "LINKS";
+}
+
+export function revisionToProfileForAudience(profile: DraftProfileData, revision: PublishedRevisionData, audience: "PUBLIC" | "FRIEND", effectiveState?: { access: ProfileAccess; lifecycle: ProfileLifecycle }) {
+  const template = revision.templateSlug ? { slug: revision.templateSlug, configuration: revision.templateConfiguration } : null;
+  const readableModules = revision.modules.filter((item) => item.enabled && canReadModuleForAudience(item.visibility, audience));
+  const modules = new Set(readableModules.map((item) => item.key));
   const identity = modules.has("IDENTITY");
   const about = modules.has("ABOUT");
   const contact = modules.has("CONTACT");
   const social = modules.has("SOCIAL");
+  const access = effectiveState?.access ?? profile.access;
+  const lifecycle = effectiveState?.lifecycle ?? profile.lifecycle;
+  const readable = lifecycle === "PUBLISHED" && access !== "PRIVATE";
+  const canReadEntry = (visibility: ProfileModuleVisibility) => canReadModuleForAudience(visibility, audience);
   return {
-    ...profile,
-    ...revision,
     id: profile.id,
-    userId: profile.userId,
-    lifecycle: profile.lifecycle,
-    canonicalPublication: true,
-    isPublic: revision.access !== "PRIVATE",
-    publishedAt: revision.publishedAt,
+    slug: revision.slug,
     displayName: identity && revision.showDisplayName ? revision.displayName : "",
+    displayLabel: null,
+    type: revision.type,
+    profileKind: revision.profileKind,
+    categorySlug: revision.categorySlug,
+    lifecycle,
+    access,
+    canonicalPublication: true,
+    isPublic: readable,
+    publishedAt: revision.publishedAt,
+    primaryLanguage: revision.primaryLanguage,
+    profession: identity && revision.showTitle ? revision.profession : "PERSONAL",
+    customProfession: identity && revision.showTitle ? revision.customProfession : null,
+    firstName: identity && revision.showDisplayName ? revision.firstName : null,
+    lastName: identity && revision.showDisplayName ? revision.lastName : null,
     displayNameAr: identity && revision.showDisplayName ? revision.displayNameAr : null,
     displayNameEn: identity && revision.showDisplayName ? revision.displayNameEn : null,
     organizationNameAr: identity && revision.showDisplayName ? revision.organizationNameAr : null,
@@ -197,6 +218,7 @@ export function revisionToProfileForAudience(profile: DraftProfileData, revision
     title: identity && revision.showTitle ? revision.title : null,
     jobTitleAr: identity && revision.showTitle ? revision.jobTitleAr : null,
     jobTitleEn: identity && revision.showTitle ? revision.jobTitleEn : null,
+    company: identity && revision.showTitle ? revision.company : null,
     industryAr: identity && revision.showTitle ? revision.industryAr : null,
     industryEn: identity && revision.showTitle ? revision.industryEn : null,
     bio: about && revision.showBio ? revision.bio : null,
@@ -222,27 +244,129 @@ export function revisionToProfileForAudience(profile: DraftProfileData, revision
     linkedin: social && revision.showSocialLinks ? revision.linkedin : null,
     github: social && revision.showSocialLinks ? revision.github : null,
     tiktok: social && revision.showSocialLinks ? revision.tiktok : null,
-    fields: revision.fields.map((field) => ({ ...field, id: field.sourceId, profileId: profile.id, userId: profile.userId, isVisible: true, createdAt: revision.createdAt, updatedAt: revision.createdAt })),
-    uploads: revision.files.map((file) => ({ ...file, id: file.sourceId, profileId: profile.id, uploaderUserId: profile.userId, sizeBytes: 0n, isVisible: true, createdAt: revision.createdAt, updatedAt: revision.createdAt, storageKey: `revision:${file.sourceId}` })),
-    destinations: revision.destinations.map((item) => ({ ...item, id: item.sourceId, profileId: profile.id, userId: profile.userId, organizationId: null, isVisible: true, isActive: true, isOfflineCapable: false, linkPlatformId: null, customIconStorageKey: null, customIconType: null, createdAt: revision.createdAt, updatedAt: revision.createdAt })),
-    services: revision.services.map((item) => ({ ...item, id: item.sourceId, profileId: profile.id, isVisible: true, createdAt: revision.createdAt, updatedAt: revision.createdAt })),
-    branches: revision.branches.map((item) => ({ ...item, id: item.sourceId, profileId: profile.id, isVisible: true, createdAt: revision.createdAt, updatedAt: revision.createdAt })),
-    modules: revision.modules.map((module) => ({
-      ...module,
-      profileId: profile.id,
-      moduleDefinitionId: module.key,
-      instanceKey: "default",
-      configurationVersion: 1,
-      createdAt: revision.createdAt,
-      updatedAt: revision.createdAt,
-      moduleDefinition: { id: module.key, key: module.key, nameEn: module.key, nameAr: module.key, schemaVersion: 1, isActive: true, supportsVisibility: true, supportsMultiple: false, createdAt: revision.createdAt, updatedAt: revision.createdAt },
-    })),
-    virtualCard: template ? { id: `revision:${revision.id}`, profileId: profile.id, templateId: template.id, template, createdAt: revision.createdAt, updatedAt: revision.createdAt } : null,
+    theme: revision.theme,
+    showAvatar: revision.showAvatar,
+    showCover: revision.showCover,
+    showDisplayName: revision.showDisplayName,
+    showTitle: revision.showTitle,
+    showBio: revision.showBio,
+    showPhone: revision.showPhone,
+    showEmail: revision.showEmail,
+    showWebsite: revision.showWebsite,
+    showLocation: revision.showLocation,
+    showWhatsappBusiness: revision.showWhatsappBusiness,
+    showWhatsappPrivate: revision.showWhatsappPrivate,
+    showSocialLinks: revision.showSocialLinks,
+    showCustomFields: revision.showCustomFields,
+    showUploadedFiles: revision.showUploadedFiles,
+    showSaveContact: revision.showSaveContact,
+    allowInstallable: revision.allowInstallable,
+    fields: about ? revision.fields.map((field) => ({ id: field.sourceId, label: field.label, labelAr: field.labelAr, labelEn: field.labelEn, value: field.value, type: field.type, iconKey: field.iconKey, customIconUrl: field.customIconUrl, actionUrl: field.actionUrl, sortOrder: field.sortOrder, isVisible: true })) : [],
+    uploads: modules.has("GALLERY") ? revision.files.map((file) => ({ id: file.sourceId, publicUrl: file.publicUrl, originalFilename: file.originalFilename, originalName: file.originalName, mimeType: file.mimeType, title: file.title, displayTitleAr: file.displayTitleAr, displayTitleEn: file.displayTitleEn, sortOrder: file.sortOrder, isVisible: true })) : [],
+    destinations: revision.destinations.filter((item) => modules.has(destinationModuleKey(item.type))).map((item) => ({ id: item.sourceId, title: item.title, titleAr: item.titleAr, titleEn: item.titleEn, type: item.type, url: item.url, icon: item.icon, iconKey: item.iconKey, customIconUrl: item.customIconUrl, sortOrder: item.sortOrder, isVisible: true, isActive: true })),
+    services: modules.has("SERVICES") ? revision.services.map((item) => ({ id: item.sourceId, nameAr: item.nameAr, nameEn: item.nameEn, descriptionAr: item.descriptionAr, descriptionEn: item.descriptionEn, url: item.url, iconKey: item.iconKey, sortOrder: item.sortOrder, isVisible: true })) : [],
+    branches: modules.has("BRANCHES") ? revision.branches.map((item) => ({ id: item.sourceId, nameAr: item.nameAr, nameEn: item.nameEn, addressAr: item.addressAr, addressEn: item.addressEn, phone: item.phone, mapUrl: item.mapUrl, sortOrder: item.sortOrder, isVisible: true })) : [],
+    sectionEntries: revision.sectionEntries.filter((item) => modules.has(item.moduleKey) && canReadEntry(item.visibility)).map((item) => ({ id: item.sourceId, moduleKey: item.moduleKey, fieldKey: item.fieldKey, instanceKey: item.instanceKey, value: item.value, visibility: item.visibility, sortOrder: item.sortOrder })),
+    modules: readableModules.map((module) => ({ id: module.id, key: module.key, enabled: module.enabled, visibility: module.visibility, sortOrder: module.sortOrder, configuration: module.configuration, moduleDefinition: { key: module.key } })),
+    media: revision.media.filter((item) => canReadEntry(item.visibility) && modules.has(item.purpose === "GALLERY" ? "GALLERY" : "IDENTITY")).map((item) => ({ id: item.mediaId, mediaId: item.mediaId, purpose: item.purpose, visibility: item.visibility, publicUrl: item.publicUrl, sortOrder: item.sortOrder })),
+    virtualCard: template ? { template } : null,
   };
 }
 
 export function revisionToPublicProfile(profile: DraftProfileData, revision: PublishedRevisionData) {
   return revisionToProfileForAudience(profile, revision, "PUBLIC");
+}
+
+/** Legacy compatibility is converted into the same explicit public allowlist;
+ * live ORM records are never returned as a public projection. */
+export function legacyDraftToPublicProfile(profile: DraftProfileData) {
+  const publishedAt = profile.publishedAt || profile.updatedAt;
+  const legacyModules = profile.modules.length ? profile.modules.map((item) => ({ id: item.id, revisionId: `legacy:${profile.id}`, key: item.moduleDefinition.key, enabled: item.enabled, visibility: item.visibility, sortOrder: item.sortOrder, configuration: item.configuration }))
+    : ["IDENTITY", "ABOUT", "CONTACT", "SOCIAL", "LINKS", "GALLERY", "SERVICES", "BRANCHES"].map((key, index) => ({ id: `legacy:${key}`, revisionId: `legacy:${profile.id}`, key, enabled: true, visibility: "PUBLIC" as const, sortOrder: index * 10, configuration: null }));
+  const revision = {
+    id: `legacy:${profile.id}`,
+    profileId: profile.id,
+    revisionNumber: 0,
+    sourceDraftRevision: profile.draftRevision,
+    draftFingerprint: "legacy",
+    status: "PUBLISHED",
+    access: "PUBLIC",
+    slug: profile.slug,
+    displayName: profile.displayName,
+    displayLabel: profile.displayLabel,
+    type: profile.type,
+    profileKind: profile.profileKind,
+    categorySlug: profile.category?.slug || null,
+    primaryLanguage: profile.primaryLanguage,
+    profession: profile.profession,
+    customProfession: profile.customProfession,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    displayNameAr: profile.displayNameAr,
+    displayNameEn: profile.displayNameEn,
+    title: profile.title,
+    jobTitleAr: profile.jobTitleAr,
+    jobTitleEn: profile.jobTitleEn,
+    company: profile.company,
+    bio: profile.bio,
+    bioAr: profile.bioAr,
+    bioEn: profile.bioEn,
+    organizationNameAr: profile.organizationNameAr,
+    organizationNameEn: profile.organizationNameEn,
+    industryAr: profile.industryAr,
+    industryEn: profile.industryEn,
+    descriptionAr: profile.descriptionAr,
+    descriptionEn: profile.descriptionEn,
+    avatarUrl: profile.avatarUrl,
+    coverUrl: profile.coverUrl,
+    logoUrl: profile.logoUrl,
+    phone: profile.phone,
+    alternatePhone: profile.alternatePhone,
+    whatsappBusiness: profile.whatsappBusiness,
+    whatsappPrivate: profile.whatsappPrivate,
+    email: profile.email,
+    website: profile.website,
+    facebook: profile.facebook,
+    linkedin: profile.linkedin,
+    github: profile.github,
+    tiktok: profile.tiktok,
+    vcfUrl: profile.vcfUrl,
+    locationText: profile.locationText,
+    addressAr: profile.addressAr,
+    addressEn: profile.addressEn,
+    contactNotesAr: profile.contactNotesAr,
+    contactNotesEn: profile.contactNotesEn,
+    theme: profile.theme,
+    showAvatar: profile.showAvatar,
+    showCover: profile.showCover,
+    showDisplayName: profile.showDisplayName,
+    showTitle: profile.showTitle,
+    showBio: profile.showBio,
+    showPhone: profile.showPhone,
+    showEmail: profile.showEmail,
+    showWebsite: profile.showWebsite,
+    showLocation: profile.showLocation,
+    showWhatsappBusiness: profile.showWhatsappBusiness,
+    showWhatsappPrivate: profile.showWhatsappPrivate,
+    showSocialLinks: profile.showSocialLinks,
+    showCustomFields: profile.showCustomFields,
+    showUploadedFiles: profile.showUploadedFiles,
+    showSaveContact: profile.showSaveContact,
+    allowInstallable: profile.allowInstallable,
+    templateSlug: profile.template?.slug || profile.virtualCard?.template?.slug || null,
+    templateConfiguration: profile.template?.configuration || profile.virtualCard?.template?.configuration || null,
+    publishedAt,
+    createdAt: profile.createdAt,
+    modules: legacyModules,
+    fields: profile.fields.filter((item) => item.isVisible).map((item) => ({ id: item.id, revisionId: `legacy:${profile.id}`, sourceId: item.id, label: item.label, labelAr: item.labelAr, labelEn: item.labelEn, value: item.value, type: item.type, iconKey: item.iconKey, customIconUrl: item.customIconUrl, actionUrl: item.actionUrl, sortOrder: item.sortOrder })),
+    destinations: profile.destinations.filter((item) => item.isActive && item.isVisible).map((item) => ({ id: item.id, revisionId: `legacy:${profile.id}`, sourceId: item.id, title: item.title, titleAr: item.titleAr, titleEn: item.titleEn, type: item.type, url: item.url, icon: item.icon, iconKey: item.iconKey, customIconUrl: item.customIconUrl, sortOrder: item.sortOrder })),
+    files: profile.uploads.filter((item) => item.isVisible).map((item) => ({ id: item.id, revisionId: `legacy:${profile.id}`, sourceId: item.id, publicUrl: item.publicUrl, originalFilename: item.originalFilename, originalName: item.originalName, mimeType: item.mimeType, title: item.title, displayTitleAr: item.displayTitleAr, displayTitleEn: item.displayTitleEn, sortOrder: item.sortOrder })),
+    services: profile.services.filter((item) => item.isVisible).map((item) => ({ id: item.id, revisionId: `legacy:${profile.id}`, sourceId: item.id, nameAr: item.nameAr, nameEn: item.nameEn, descriptionAr: item.descriptionAr, descriptionEn: item.descriptionEn, url: item.url, iconKey: item.iconKey, sortOrder: item.sortOrder })),
+    branches: profile.branches.filter((item) => item.isVisible).map((item) => ({ id: item.id, revisionId: `legacy:${profile.id}`, sourceId: item.id, nameAr: item.nameAr, nameEn: item.nameEn, addressAr: item.addressAr, addressEn: item.addressEn, phone: item.phone, mapUrl: item.mapUrl, sortOrder: item.sortOrder })),
+    media: profile.mediaAssets.filter((item) => item.visibility === "PUBLIC" && item.publicUrl).map((item) => ({ id: item.id, revisionId: `legacy:${profile.id}`, mediaId: item.id, purpose: item.purpose, visibility: item.visibility, publicUrl: item.publicUrl!, sortOrder: item.sortOrder })),
+    sectionEntries: profile.sectionEntries.filter((item) => item.visibility === "PUBLIC").map((item) => ({ id: item.id, revisionId: `legacy:${profile.id}`, sourceId: item.id, moduleKey: item.moduleDefinition.key, fieldKey: item.fieldKey, instanceKey: item.instanceKey, value: item.value, visibility: item.visibility, sortOrder: item.sortOrder })),
+  } as PublishedRevisionData;
+  return revisionToProfileForAudience(profile, revision, "PUBLIC", { access: "PUBLIC", lifecycle: "PUBLISHED" });
 }
 
 export async function publishProfile(userId: string, profileId: string, expectedDraftRevision: number) {
@@ -271,6 +395,13 @@ export async function publishProfile(userId: string, profileId: string, expected
     const snapshotModules = profile.modules.filter((item) => item.enabled && (item.visibility === "PUBLIC" || item.visibility === "FRIENDS"));
     const snapshotModuleKeys = new Set(snapshotModules.map((item) => item.moduleDefinition.key));
     const publicModuleKeys = new Set(snapshotModules.filter((item) => item.visibility === "PUBLIC").map((item) => item.moduleDefinition.key));
+    const snapshotModuleVisibility = new Map(snapshotModules.map((item) => [item.moduleDefinitionId, item.visibility]));
+    const snapshotSectionEntries = profile.sectionEntries.flatMap((item) => {
+      const moduleVisibility = snapshotModuleVisibility.get(item.moduleDefinitionId);
+      if (!moduleVisibility || (item.visibility !== "PUBLIC" && item.visibility !== "FRIENDS")) return [];
+      const visibility = moduleVisibility === "FRIENDS" || item.visibility === "FRIENDS" ? "FRIENDS" as const : "PUBLIC" as const;
+      return [{ item, visibility }];
+    });
     const publicAssets = profile.mediaAssets.filter((item) => item.visibility === "PUBLIC" && (item.state === "DRAFT_ATTACHED" || item.state === "PUBLISHED") && (
       item.purpose === "GALLERY" ? publicModuleKeys.has("GALLERY") : publicModuleKeys.has("IDENTITY")
     ));
@@ -290,7 +421,9 @@ export async function publishProfile(userId: string, profileId: string, expected
         access: profile.access,
         slug: slug.slug,
         displayName: profile.displayName, displayLabel: profile.displayLabel, type: profile.type,
-        profileKind: profile.profileKind, primaryLanguage: profile.primaryLanguage,
+        profileKind: profile.profileKind, categorySlug: profile.category?.slug || null, primaryLanguage: profile.primaryLanguage,
+        profession: profile.profession, customProfession: profile.customProfession,
+        firstName: profile.firstName, lastName: profile.lastName,
         displayNameAr: profile.displayNameAr, displayNameEn: profile.displayNameEn, title: profile.title,
         jobTitleAr: profile.jobTitleAr, jobTitleEn: profile.jobTitleEn, company: profile.company,
         bio: profile.bio, bioAr: profile.bioAr, bioEn: profile.bioEn,
@@ -317,11 +450,12 @@ export async function publishProfile(userId: string, profileId: string, expected
         templateConfiguration: profile.template?.configuration ?? profile.virtualCard?.template?.configuration ?? Prisma.JsonNull,
         modules: { create: snapshotModules.map((item) => ({ key: item.moduleDefinition.key, enabled: true, visibility: item.visibility, sortOrder: item.sortOrder, configuration: item.configuration ?? Prisma.JsonNull })) },
         fields: { create: snapshotModuleKeys.has("ABOUT") ? profile.fields.filter((item) => item.isVisible).map((item) => ({ sourceId: item.id, label: item.label, labelAr: item.labelAr, labelEn: item.labelEn, value: item.value, type: item.type, iconKey: item.iconKey, customIconUrl: item.customIconUrl, actionUrl: item.actionUrl, sortOrder: item.sortOrder })) : [] },
-        destinations: { create: snapshotModuleKeys.has("LINKS") ? profile.destinations.filter((item) => item.isActive && item.isVisible).map((item) => ({ sourceId: item.id, title: item.title, titleAr: item.titleAr, titleEn: item.titleEn, type: item.type, url: item.url, icon: item.icon, iconKey: item.iconKey, customIconUrl: item.customIconUrl, sortOrder: item.sortOrder })) : [] },
+        destinations: { create: profile.destinations.filter((item) => item.isActive && item.isVisible && snapshotModuleKeys.has(destinationModuleKey(item.type))).map((item) => ({ sourceId: item.id, title: item.title, titleAr: item.titleAr, titleEn: item.titleEn, type: item.type, url: item.url, icon: item.icon, iconKey: item.iconKey, customIconUrl: item.customIconUrl, sortOrder: item.sortOrder })) },
         files: { create: publicModuleKeys.has("GALLERY") ? profile.uploads.filter((item) => item.isVisible).map((item) => ({ sourceId: item.id, publicUrl: item.publicUrl, originalFilename: item.originalFilename, originalName: item.originalName, mimeType: item.mimeType, title: item.title, displayTitleAr: item.displayTitleAr, displayTitleEn: item.displayTitleEn, sortOrder: item.sortOrder })) : [] },
         services: { create: snapshotModuleKeys.has("SERVICES") ? profile.services.filter((item) => item.isVisible).map((item) => ({ sourceId: item.id, nameAr: item.nameAr, nameEn: item.nameEn, descriptionAr: item.descriptionAr, descriptionEn: item.descriptionEn, url: item.url, iconKey: item.iconKey, sortOrder: item.sortOrder })) : [] },
         branches: { create: snapshotModuleKeys.has("BRANCHES") ? profile.branches.filter((item) => item.isVisible).map((item) => ({ sourceId: item.id, nameAr: item.nameAr, nameEn: item.nameEn, addressAr: item.addressAr, addressEn: item.addressEn, phone: item.phone, mapUrl: item.mapUrl, sortOrder: item.sortOrder })) : [] },
         media: { create: publicAssets.map((item) => ({ mediaId: item.id, purpose: item.purpose, visibility: "PUBLIC", publicUrl: mediaUrl(item.id), sortOrder: item.sortOrder })) },
+        sectionEntries: { create: snapshotSectionEntries.map(({ item, visibility }) => ({ sourceId: item.id, moduleKey: item.moduleDefinition.key, fieldKey: item.fieldKey, instanceKey: item.instanceKey, value: item.value === null ? Prisma.JsonNull : item.value as Prisma.InputJsonValue, visibility, sortOrder: item.sortOrder })) },
       },
     });
     if (profile.slug && profile.slug !== slug.slug) {

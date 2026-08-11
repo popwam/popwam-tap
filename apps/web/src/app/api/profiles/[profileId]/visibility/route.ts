@@ -33,7 +33,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
   try {
     const { effective } = await getUserEntitlements(user.id);
     const result = await prisma.$transaction(async (tx) => {
-      const profile = await tx.profile.findFirst({ where: managedProfileWhere(user.id, profileId), select: { slug: true, draftSlug: true, draftRevision: true } });
+      const profile = await tx.profile.findFirst({ where: managedProfileWhere(user.id, profileId), select: { slug: true, draftSlug: true, draftRevision: true, lifecycle: true } });
       if (!profile) throw new Error("PROFILE_NOT_FOUND");
       if (profile.draftRevision !== body.expectedDraftRevision) throw new Error("STALE_DRAFT");
       if (normalizedSlug) {
@@ -65,7 +65,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
       return tx.profile.updateMany({
         where: { id: profileId, draftRevision: body.expectedDraftRevision },
         data: {
-          ...(body.access ? { access: body.access } : {}),
+          ...(body.access ? {
+            access: body.access,
+            isPublic: body.access !== "PRIVATE" && profile.lifecycle === "PUBLISHED",
+          } : {}),
           ...(normalizedSlug ? { draftSlug: normalizedSlug } : {}),
           draftRevision: { increment: 1 },
         },

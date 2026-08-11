@@ -3,7 +3,7 @@ package com.popwam.pop.data.api
 import com.google.gson.JsonObject
 import com.google.gson.JsonElement
 
-data class ApiResult(val ok:Boolean=false,val error:String?=null,val url:String?=null,val draftRevision:Int?=null,val readiness:PublishingReadinessDto?=null)
+data class ApiResult(val ok:Boolean=false,val error:String?=null,val url:String?=null,val draftRevision:Int?=null,val lifecycle:String?=null,val readiness:PublishingReadinessDto?=null,val completion:ProfileContentCompletionDto?=null)
 data class UserDto(val id:String="",val name:String?=null,val phone:String?=null,val email:String="",val role:String="USER",val locale:String?=null)
 data class FirebasePhoneExchangeRequest(val deviceName:String)
 data class AuthResponse(val ok:Boolean=false,val accessToken:String="",val refreshToken:String="",val accessExpiresIn:Int=0,val refreshExpiresIn:Int=0,val tokenType:String="Bearer",val user:UserDto?=null,val error:String?=null)
@@ -169,7 +169,7 @@ data class ProfileSelectorResponse(val ok:Boolean=false,val profiles:List<Profil
 data class EditorProfileDto(val id:String="",val label:String="",val displayLabel:String="",val displayName:String="",val profileKind:String="PERSONAL",val categoryKey:String?=null,val lifecycle:String="DRAFT",val access:String="PRIVATE",val isPrimary:Boolean=false,val draftRevision:Int=0,val publishedRevision:Int?=null,val draftChanged:Boolean=false,val changedSections:List<String> = emptyList(),val primaryLanguage:String="ar")
 data class EditorModuleDto(val id:String="",val key:String="",val name:String="",val enabled:Boolean=true,val visibility:String="ONLY_ME",val sortOrder:Int=0,val required:Boolean=false,val supported:Boolean=false,val modified:Boolean=false)
 data class EditorAddableModuleDto(val key:String="",val name:String="")
-data class EditorIdentityDto(val displayLabel:String="",val displayName:String="",val displayNameAr:String="",val displayNameEn:String="",val jobTitleAr:String="",val jobTitleEn:String="",val organizationNameAr:String="",val organizationNameEn:String="",val primaryLanguage:String="ar")
+data class EditorIdentityDto(val displayLabel:String="",val displayName:String="",val firstName:String="",val lastName:String="",val profession:String="PERSONAL",val customProfession:String="",val displayNameAr:String="",val displayNameEn:String="",val jobTitleAr:String="",val jobTitleEn:String="",val company:String="",val industryAr:String="",val industryEn:String="",val organizationNameAr:String="",val organizationNameEn:String="",val primaryLanguage:String="ar")
 data class EditorAboutDto(val title:String="",val bio:String="",val bioAr:String="",val bioEn:String="",val descriptionAr:String="",val descriptionEn:String="")
 data class EditorContactDto(val phone:String="",val alternatePhone:String="",val email:String="",val website:String="",val whatsappBusiness:String="",val whatsappPrivate:String="",val locationText:String="",val addressAr:String="",val addressEn:String="",val visibility:Map<String,String> = emptyMap())
 data class EditorLinkDto(val id:String="",val title:String="",val titleAr:String="",val titleEn:String="",val type:String="WEBSITE",val url:String="",val visibility:String="ONLY_ME",val sortOrder:Int=0)
@@ -178,7 +178,46 @@ data class EditorBranchDto(val id:String="",val name:String="",val nameAr:String
 data class EditorMediaDto(val id:String="",val purpose:String="",val visibility:String="ONLY_ME",val sortOrder:Int=0,val previewUrl:String="")
 data class EditorPreviewDto(val identity:PreviewIdentityDto=PreviewIdentityDto(),val links:List<PreviewLinkDto> = emptyList(),val services:List<EditorServiceDto> = emptyList(),val branches:List<EditorBranchDto> = emptyList(),val media:List<EditorMediaDto> = emptyList())
 data class EditorAppearanceDto(val theme:String="CLASSIC_DARK",val templateId:String?=null,val templateSlug:String?=null,val templateName:String="",val previewImageUrl:String?=null)
-data class ProfileEditorResponse(val ok:Boolean=false,val profile:EditorProfileDto=EditorProfileDto(),val readiness:PublishingReadinessDto=PublishingReadinessDto(),val appearance:EditorAppearanceDto=EditorAppearanceDto(),val preview:EditorPreviewDto=EditorPreviewDto(),val identity:EditorIdentityDto=EditorIdentityDto(),val about:EditorAboutDto=EditorAboutDto(),val contact:EditorContactDto=EditorContactDto(),val links:List<EditorLinkDto> = emptyList(),val services:List<EditorServiceDto> = emptyList(),val branches:List<EditorBranchDto> = emptyList(),val media:List<EditorMediaDto> = emptyList(),val modules:List<EditorModuleDto> = emptyList(),val addableModules:List<EditorAddableModuleDto> = emptyList(),val error:String?=null)
+data class ProfileFieldCapabilityDto(
+    val key:String="",
+    val moduleKey:String="",
+    val label:String="",
+    val valueType:String="TEXT",
+    val repeatable:Boolean=false,
+    val requiredForCompletion:Boolean=false,
+    val visibilitySupported:Boolean=false,
+    val maxItems:Int=1,
+    val classification:String="PUBLIC_PROFILE",
+)
+data class ProfileStructuredEntryDto(
+    val id:String="",
+    val fieldKey:String="",
+    val instanceKey:String="",
+    val moduleKey:String="",
+    val value:JsonElement=JsonObject(),
+    val visibility:String="ONLY_ME",
+    val sortOrder:Int=0,
+)
+data class ProfileContentIssueDto(val code:String="",val path:String="",val fieldKey:String?=null,val messageKey:String="")
+data class ProfileContentCompletionDto(val complete:Boolean=false,val issues:List<ProfileContentIssueDto> = emptyList())
+data class ProfileVerificationSignalDto(
+    val kind:String="IDENTITY",
+    val status:String="NOT_STARTED",
+    val verifiedAt:String?=null,
+    val expiresAt:String?=null,
+    val reasonCode:String?=null,
+    val publicBadge:Boolean=false,
+)
+data class ProfileVerificationDto(
+    val submissionSupported:Boolean=false,
+    val overallStatus:String="NOT_STARTED",
+    val signals:List<ProfileVerificationSignalDto> = emptyList(),
+)
+data class EditorDocumentDto(val id:String="",val originalFilename:String="",val originalName:String="",val publicUrl:String="",val mimeType:String="",val sizeBytes:String="0",val title:String?=null,val displayTitleAr:String?=null,val displayTitleEn:String?=null,val visibility:String="ONLY_ME",val sortOrder:Int=0,val createdAt:String="")
+data class EditorDocumentCapabilityDto(val uploadSupported:Boolean=false,val uploadEndpoint:String="",val replaceSupported:Boolean=false,val deleteSupported:Boolean=false,val visibilitySupported:Boolean=false,val unavailableReason:String?=null,val videoSupported:Boolean=false)
+data class ProfileEditorResponse(val ok:Boolean=false,val profile:EditorProfileDto=EditorProfileDto(),val readiness:PublishingReadinessDto=PublishingReadinessDto(),val appearance:EditorAppearanceDto=EditorAppearanceDto(),val preview:EditorPreviewDto=EditorPreviewDto(),val identity:EditorIdentityDto=EditorIdentityDto(),val about:EditorAboutDto=EditorAboutDto(),val contact:EditorContactDto=EditorContactDto(),val links:List<EditorLinkDto> = emptyList(),val services:List<EditorServiceDto> = emptyList(),val branches:List<EditorBranchDto> = emptyList(),val media:List<EditorMediaDto> = emptyList(),val documents:List<EditorDocumentDto> = emptyList(),val documentCapability:EditorDocumentCapabilityDto=EditorDocumentCapabilityDto(),val modules:List<EditorModuleDto> = emptyList(),val addableModules:List<EditorAddableModuleDto> = emptyList(),val fieldCapabilities:List<ProfileFieldCapabilityDto> = emptyList(),val structuredEntries:List<ProfileStructuredEntryDto> = emptyList(),val completion:ProfileContentCompletionDto=ProfileContentCompletionDto(),val verification:ProfileVerificationDto=ProfileVerificationDto(),val error:String?=null)
+data class ProfileFileUploadDto(val id:String="",val originalFilename:String="",val displayTitleAr:String?=null,val displayTitleEn:String?=null,val publicUrl:String="",val mimeType:String="",val sizeBytes:String="0",val isVisible:Boolean=false)
+data class ProfileFileUploadResponse(val ok:Boolean=false,val file:ProfileFileUploadDto?=null,val error:String?=null)
 data class ProfileEditorMutationRequest(val expectedDraftRevision:Int,val action:JsonObject)
 data class AdditionalProfileCreateRequest(val displayName:String,val displayLabel:String?=null,val profileKind:String,val categorySlug:String?=null,val templateId:String?=null,val primaryLanguage:String="ar",val creationKey:String)
 data class AdditionalProfileCreateResponse(val ok:Boolean=false,val profileId:String?=null,val error:String?=null)
@@ -404,12 +443,21 @@ data class NearbyResultsResponse(val ok:Boolean=false,val results:List<NearbyRes
 data class SecurityCountDto(val active:Int=0)
 data class SecurityPasskeyCountDto(val configured:Boolean=false,val count:Int=0)
 data class SecurityRecoveryDto(val phoneVerified:Boolean=false)
+data class SecurityAccountDto(
+    val name:String?=null,
+    val email:String?=null,
+    val phone:String?=null,
+    val phoneVerified:Boolean=false,
+    val locale:String?=null,
+    val status:String="ACTIVE",
+)
 data class SecurityOverviewResponse(
     val ok:Boolean=false,
     val passkey:SecurityPasskeyCountDto=SecurityPasskeyCountDto(),
     val devices:SecurityCountDto=SecurityCountDto(),
     val sessions:SecurityCountDto=SecurityCountDto(),
     val recovery:SecurityRecoveryDto=SecurityRecoveryDto(),
+    val account:SecurityAccountDto=SecurityAccountDto(),
     val currentSessionContext:String="UPGRADE_REQUIRED",
     val error:String?=null,
 )

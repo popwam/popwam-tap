@@ -17,7 +17,6 @@ import com.popwam.pop.data.api.ProfileDto
 import com.popwam.pop.data.api.ProfileTemplateDto
 import com.popwam.pop.data.api.ProfileWriteRequest
 import com.popwam.pop.data.api.PublishingStatusResponse
-import com.popwam.pop.data.api.ProfileSelectorResponse
 import com.popwam.pop.data.api.ProfileEditorResponse
 import com.popwam.pop.data.api.VirtualCardCreateRequest
 import com.popwam.pop.data.api.WalletCapabilitiesDto
@@ -29,10 +28,6 @@ import com.popwam.pop.data.api.ProfileBootstrapTemplateDto
 import com.popwam.pop.data.api.LegalDocumentDto
 import com.popwam.pop.data.api.OnboardingCurrentResponse
 import com.popwam.pop.data.api.OnboardingProgressRequest
-import com.popwam.pop.data.api.ShareTargetsResponse
-import com.popwam.pop.data.api.ShareProductDto
-import com.popwam.pop.data.api.ShareProductUpdateRequest
-import com.popwam.pop.data.api.ScratchActivationInspectResponse
 import com.popwam.pop.data.api.SettingsPreferencesResponse
 import com.popwam.pop.data.api.NotificationPreferencesDto
 import com.popwam.pop.data.api.SecurityOverviewResponse
@@ -504,11 +499,6 @@ data class MainUiState(
     val activation: ActivationInspectResponse? = null,
     val nfcUri: String? = null,
     val nfcVerification: VerifyNfcResponse? = null,
-    val profileSelector: ProfileSelectorResponse? = null,
-    val shareTargets: ShareTargetsResponse? = null,
-    val shareProducts: List<ShareProductDto> = emptyList(),
-    val shareActivation: ScratchActivationInspectResponse? = null,
-    val selectedShareProfileId: String? = null,
     val settingsPreferences: SettingsPreferencesResponse? = null,
     val notificationPreferences: NotificationPreferencesDto? = null,
     val securityOverview: SecurityOverviewResponse? = null,
@@ -961,90 +951,6 @@ class MainViewModel(
         working {
             val result=repo.reportProductLost(id,grant)
             if(result.ok){card(id);reload()}else fail(result.error)
-        }
-    }
-
-    fun loadShareCenter(locale:String,selectedProfileId:String?=null)=viewModelScope.launch {
-        working {
-            val selector=repo.profileSelector(selectedProfileId ?: _state.value.selectedShareProfileId)
-            if(!selector.ok){fail(selector.error);return@working}
-            val profileId=selector.selectedProfileId
-            val products=repo.shareProducts()
-            if(!products.ok){fail(products.error);return@working}
-            val targets=profileId?.let{repo.shareTargets(it,locale)}
-            if(targets!=null&&!targets.ok){fail(targets.error);return@working}
-            _state.value=_state.value.copy(profileSelector=selector,selectedShareProfileId=profileId,shareTargets=targets,shareProducts=products.products)
-            analytics.track("share_center_viewed",mapOf("platform" to "android"))
-        }
-    }
-
-    fun adoptActiveProfile(profileId:String) {
-        if (profileId.isNotBlank() && profileId != _state.value.selectedShareProfileId) {
-            _state.value = _state.value.copy(selectedShareProfileId = profileId)
-        }
-    }
-
-    fun switchShareProfile(profileId:String,locale:String)=viewModelScope.launch {
-        working {
-            val targets=repo.shareTargets(profileId,locale)
-            if(!targets.ok){fail(targets.error);return@working}
-            _state.value=_state.value.copy(selectedShareProfileId=profileId,shareTargets=targets)
-            analytics.track("share_profile_selected",mapOf("platform" to "android"))
-        }
-    }
-
-    fun trackShareTargetSelected(){analytics.track("share_target_selected",mapOf("platform" to "android"))}
-    fun trackShareQrOpened(){analytics.track("share_qr_opened",mapOf("platform" to "android","method" to "qr"))}
-    fun trackShareLinkCopied(){analytics.track("share_link_copied",mapOf("platform" to "android","method" to "copy"))}
-    fun trackNativeShareOpened(){analytics.track("native_share_opened",mapOf("platform" to "android","method" to "native_share"))}
-    fun trackHceTargetSelected(){analytics.track("hce_target_selected",mapOf("platform" to "android","method" to "nfc"))}
-    fun trackActivationStarted(){analytics.track("activation_started",mapOf("platform" to "android","method" to "manual"))}
-
-    fun updateShareProduct(id:String,body:ShareProductUpdateRequest)=viewModelScope.launch {
-        working {
-            val result=repo.updateShareProduct(id,body)
-            val product=result.product
-            if(!result.ok||product==null){fail(result.error);return@working}
-            _state.value=_state.value.copy(shareProducts=_state.value.shareProducts.map{if(it.id==product.id)product else it},message=if(body.action=="TARGET_CHANGE")"SHARE_TARGET_UPDATED" else "PRODUCT_STATUS_UPDATED")
-            analytics.track("physical_product_target_updated",mapOf("platform" to "android","outcome" to "success"))
-        }
-    }
-
-    fun inspectScratchActivation(identifier:String)=viewModelScope.launch {
-        working {
-            val result=repo.inspectScratchActivation(identifier)
-            _state.value=_state.value.copy(shareActivation=result)
-            analytics.track("activation_scanned",mapOf("platform" to "android","method" to "qr","outcome" to if(result.eligible)"eligible" else "unavailable"))
-            if(!result.ok)fail(result.error)
-        }
-    }
-
-    fun claimScratchActivation(scratch:String,targetId:String,locale:String,onSuccess:()->Unit={})=viewModelScope.launch {
-        val identifier=_state.value.shareActivation?.identifier ?: return@launch
-        val profileId=_state.value.selectedShareProfileId ?: return@launch
-        working {
-            val result=repo.claimScratchActivation(identifier,scratch,profileId,targetId,locale)
-            if(!result.ok){analytics.track("activation_failed",mapOf("platform" to "android","method" to "manual","outcome" to if(result.error=="ACTIVATION_COOLDOWN")"cooldown" else "rejected"));fail(result.error);return@working}
-            val product=result.product
-            _state.value=_state.value.copy(shareActivation=null,shareProducts=if(product==null)_state.value.shareProducts else listOf(product)+_state.value.shareProducts.filterNot{it.id==product.id},message="PRODUCT_ACTIVATED")
-            analytics.track("activation_completed",mapOf("platform" to "android","method" to "manual","outcome" to "success"))
-            onSuccess()
-        }
-    }
-
-    fun clearShareActivation(){_state.value=_state.value.copy(shareActivation=null)}
-
-    fun inspectActivationTag(tag:Tag)=viewModelScope.launch {
-        working {
-            when(val result=nfc.read(tag)){
-                is NfcResult.Success->{
-                    val inspected=repo.inspectScratchActivation(result.uri)
-                    _state.value=_state.value.copy(shareActivation=inspected)
-                    analytics.track("activation_scanned",mapOf("platform" to "android","method" to "nfc","outcome" to if(inspected.eligible)"eligible" else "unavailable"))
-                    if(!inspected.ok)fail(inspected.error)
-                }
-                is NfcResult.Failure->fail("NFC_${result.reason}")
-            }
         }
     }
 

@@ -19,14 +19,13 @@ class PopwamHostApduService : HostApduService() {
             ?.takeIf(PermanentUrlPolicy::isValid)
             ?: return NOT_FOUND
 
-        if (commandApdu.contentEquals(SELECT_APP)) {
+        if (Type4NdefApduPolicy.selectsNdefApplication(commandApdu)) {
             selected = SelectedFile.NONE
             return OK
         }
 
         if (isSelectFile(commandApdu)) {
-            val id = ((commandApdu[5].toInt() and 0xff) shl 8) or
-                (commandApdu[6].toInt() and 0xff)
+            val id = Type4NdefApduPolicy.selectedFileId(commandApdu) ?: return NOT_FOUND
             selected = when (id) {
                 0xE103 -> SelectedFile.CC
                 0xE104 -> SelectedFile.NDEF
@@ -38,14 +37,14 @@ class PopwamHostApduService : HostApduService() {
         if (isReadBinary(commandApdu)) {
             val offset = ((commandApdu[2].toInt() and 0xff) shl 8) or
                 (commandApdu[3].toInt() and 0xff)
-            val length = commandApdu[4].toInt() and 0xff
+            val requested = commandApdu[4].toInt() and 0xff
             val file = when (selected) {
                 SelectedFile.CC -> CC_FILE
                 SelectedFile.NDEF -> ndefFile(url)
                 SelectedFile.NONE -> return CONDITIONS
             }
-            if (offset > file.size) return WRONG_PARAMS
-            return file.copyOfRange(offset, minOf(offset + length, file.size)) + OK
+            val response = Type4NdefApduPolicy.read(file, offset, requested) ?: return WRONG_PARAMS
+            return response + OK
         }
 
         return NOT_FOUND
@@ -60,11 +59,7 @@ class PopwamHostApduService : HostApduService() {
         return byteArrayOf((bytes.size shr 8).toByte(), bytes.size.toByte()) + bytes
     }
 
-    private fun isSelectFile(command: ByteArray) =
-        command.size >= 7 &&
-            command[0] == 0.toByte() &&
-            command[1] == 0xA4.toByte() &&
-            command[2] == 0.toByte()
+    private fun isSelectFile(command: ByteArray) = Type4NdefApduPolicy.selectedFileId(command) != null
 
     private fun isReadBinary(command: ByteArray) =
         command.size >= 5 &&
@@ -78,7 +73,6 @@ class PopwamHostApduService : HostApduService() {
             .map { it.toInt(16).toByte() }
             .toByteArray()
 
-        private val SELECT_APP = hex("00A4040007D276000085010100")
         private val OK = hex("9000")
         private val NOT_FOUND = hex("6A82")
         private val WRONG_PARAMS = hex("6B00")

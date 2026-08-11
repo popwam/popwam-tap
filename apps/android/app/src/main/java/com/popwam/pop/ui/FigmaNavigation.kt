@@ -46,7 +46,15 @@ import com.popwam.pop.ui.home.HomePrimaryTab
 import com.popwam.pop.ui.home.HomeRoute
 import com.popwam.pop.ui.home.HomeViewModel
 import com.popwam.pop.ui.home.selectedHomeTab
+import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.ui.profile.*
+import com.popwam.pop.ui.share.ActiveShareProfile
+import com.popwam.pop.ui.share.ShareCenterScreen as ProductionShareCenterScreen
+import com.popwam.pop.ui.share.ShareInitialPanel
+import com.popwam.pop.ui.share.ShareProfileAccess
+import com.popwam.pop.ui.share.ShareActivationScreen as ProductionShareActivationScreen
+import com.popwam.pop.ui.share.ShareEffect
+import com.popwam.pop.ui.share.ShareViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +62,7 @@ fun FigmaMainNavigation(
     vm: MainViewModel,
     home: HomeViewModel,
     profiles: ProfilesViewModel,
+    share: ShareViewModel,
     initialRoute: String = "home",
     onLogout: () -> Unit,
     appearanceStore:AppearanceStore,
@@ -65,14 +74,33 @@ fun FigmaMainNavigation(
     val state by vm.state.collectAsStateWithLifecycle()
     val homeState by home.state.collectAsStateWithLifecycle()
     val profileState by profiles.state.collectAsStateWithLifecycle()
+    val shareState by share.state.collectAsStateWithLifecycle()
     val current by nav.currentBackStackEntryAsState()
     val topRoutes = PopNavigationPolicy.bottomRoutes
     val currentRoute = current?.destination?.route
     LaunchedEffect(homeState.activeProfileId) {
         homeState.activeProfileId?.let { id ->
-            vm.adoptActiveProfile(id)
             if (profileState.activeProfileId != id) profiles.onEvent(ProfileEvent.SelectProfile(id))
         }
+    }
+    val activeShareProfile = homeState.activeProfileId?.let { id ->
+        val owned = profileState.profiles.firstOrNull { it.id == id }
+        val homeProfile = homeState.profiles.firstOrNull { it.id == id }
+        ActiveShareProfile(
+            id = id,
+            name = owned?.name ?: homeProfile?.name,
+            access = ShareProfileAccess.from(owned?.visibility ?: homeProfile?.visibility),
+            lifecycle = owned?.lifecycle ?: homeProfile?.lifecycle,
+        )
+    }
+    LaunchedEffect(activeShareProfile) {
+        if (activeShareProfile == null) share.clearActiveProfile() else share.activateProfile(activeShareProfile)
+    }
+    LaunchedEffect(shareState.hce.requested, shareState.hce.activeForProfile, shareState.hce.availability) {
+        HceConfig.refreshPreferredService(context)
+    }
+    LaunchedEffect(share) {
+        share.effects.collect { if (it == ShareEffect.SessionExpired) onLogout() }
     }
     LaunchedEffect(profiles) {
         profiles.effects.collect { effect ->
@@ -157,15 +185,36 @@ fun FigmaMainNavigation(
                 }
                 composable("profiles") { ProfileListScreen(profileState,profiles::onEvent) }
                 composable("profiles/create") { ProfileCreationScreen(profileState,nav::popBackStack,profiles::onEvent) }
-                composable("share") { ShareCenterScreen(state,vm,{nav.navigate("share-activate")},{nav.navigate(it)}) }
-                composable("profile/share/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ShareCenterScreen(state,vm,{nav.navigate("share-activate")},{nav.navigate(it)},entry.arguments?.getString("id"))}
-                composable("profile/qr/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ShareCenterScreen(state,vm,{nav.navigate("share-activate")},{nav.navigate(it)},entry.arguments?.getString("id"))}
-                composable("profile/nfc/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){FutureHomeDestination(stringResource(R.string.profile_nfc),nav::popBackStack)}
-                composable("share-activate") { ShareActivationScreen(state,vm){nav.popBackStack()} }
+                composable("share") { ProductionShareCenterScreen(shareState,share,activeShareProfile,{nav.navigate("share-activate")},{nav.navigate(it)}) }
+                composable("profile/share/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
+                    val id=entry.arguments?.getString("id").orEmpty()
+                    val owned=profileState.profiles.firstOrNull{it.id==id}
+                    val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle)
+                    LaunchedEffect(id){home.selectActiveProfile(id)}
+                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)})
+                }
+                composable("profile/qr/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
+                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle)
+                    LaunchedEffect(id){home.selectActiveProfile(id)}
+                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.QR)
+                }
+                composable("profile/nfc/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
+                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle)
+                    LaunchedEffect(id){home.selectActiveProfile(id)}
+                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.NFC)
+                }
+                composable("share-activate") { ProductionShareActivationScreen(shareState,share){nav.popBackStack()} }
                 composable("virtual-cards") { VirtualProfiles(state, vm::reload, { nav.navigate("virtual-card/$it") }, { nav.navigate("create-card/start") }) }
                 composable("products") { PhysicalCards(state, vm::reload) { nav.navigate("card/$it") } }
                 composable("activity") { ActivityFeed(state, vm::reload) }
-                composable("menu") { PopMenu(onLogout,{nav.navigate(it)},{howItWorks=true}) }
+                composable("menu") {
+                    val active = profileState.profiles.firstOrNull { it.id == profileState.activeProfileId }
+                    PopMenuScreen(
+                        profile = active?.let { MenuProfileContext(it.name, it.categoryKind.name.lowercase().replaceFirstChar(Char::uppercase), it.avatarUrl) },
+                        navigate = { nav.navigate(it) },
+                        logout = onLogout,
+                    )
+                }
                 composable("friends") { FriendsScreen(state,vm) }
                 composable("friends/{tab}",arguments=listOf(navArgument("tab"){type=NavType.StringType})){entry->FriendsScreen(state,vm,entry.arguments?.getString("tab") ?: "friends")}
                 composable("nearby") { NearbyScreen(state,vm){nav.navigate(it)} }
@@ -201,11 +250,11 @@ fun FigmaMainNavigation(
                 // NFC services remain contextual for activation, device-card selection and authorized programming; there is no public NFC Tools route.
                 composable("programming") { LaunchedEffect(Unit) { vm.loadProgramming() }; LegacyProgrammingList(state.programmingCards) { nav.navigate("program/$it") } }
                 composable("program/{id}") { entry -> state.programmingCards.firstOrNull { it.id == entry.arguments?.getString("id") }?.let { LegacyProgramming(it, state, vm) } }
-                composable("hce") { LegacyHce(state.cards) }
-                composable("settings") { SecuritySettingsScreen("root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it=="nearby"||it.startsWith("legal/"))nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout) }
-                composable("settings/{section}",arguments=listOf(navArgument("section"){type=NavType.StringType})){entry->SecuritySettingsScreen(entry.arguments?.getString("section") ?: "root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it=="nearby"||it.startsWith("legal/"))nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout)}
+                composable("hce") { ProductionShareCenterScreen(shareState,share,activeShareProfile,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.HCE) }
+                composable("settings") { SecuritySettingsScreen("root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it=="nearby"||it=="profiles")nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true}) }
+                composable("settings/{section}",arguments=listOf(navArgument("section"){type=NavType.StringType})){entry->SecuritySettingsScreen(entry.arguments?.getString("section") ?: "root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it=="nearby"||it=="profiles")nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true})}
                 composable("integrations") { SecurePortal(R.string.connected_accounts,"dashboard/integrations",R.string.connected_accounts_help) }
-                composable("passkeys") { SecuritySettingsScreen("passkeys",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{nav.navigate("settings/$it")},nav::popBackStack,onLogout) }
+                composable("passkeys") { SecuritySettingsScreen("passkeys",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true}) }
                 composable("legal/terms"){NativeLegalScreen(PreAuthLegalKind.TERMS,onBack=nav::popBackStack)}
                 composable("legal/privacy"){NativeLegalScreen(PreAuthLegalKind.PRIVACY,onBack=nav::popBackStack)}
             }
@@ -351,42 +400,7 @@ private fun ActivityFeed(state: MainUiState, refresh: () -> Unit) = RefreshScree
     }
 }
 
-@Composable
-private fun PopMenu(onLogout:()->Unit,navigate:(String)->Unit,howItWorks:()->Unit){
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-        item{Text(stringResource(R.string.nav_menu),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)}
-        item{Text(stringResource(R.string.settings_social_group),fontWeight=FontWeight.Black)}
-        item{MenuRow(Icons.Default.People,stringResource(R.string.friends)){navigate("friends")}}
-        item{MenuRow(Icons.Default.LocationOn,stringResource(R.string.nearby_title)){navigate("nearby")}}
-        item{MenuRow(Icons.Default.Chat,stringResource(R.string.chats),null)}
-        item{HorizontalDivider()}
-        item{Text(stringResource(R.string.settings_security_group),fontWeight=FontWeight.Black)}
-        item{MenuRow(Icons.Default.Security,stringResource(R.string.settings_security)){navigate("settings/security")}}
-        item{MenuRow(Icons.Default.Devices,stringResource(R.string.settings_devices)){navigate("settings/devices")}}
-        item{MenuRow(Icons.Default.LockClock,stringResource(R.string.settings_sessions)){navigate("settings/sessions")}}
-        item{MenuRow(Icons.Default.Key,stringResource(R.string.settings_passkeys)){navigate("settings/passkeys")}}
-        item{HorizontalDivider()}
-        item{Text(stringResource(R.string.settings_preferences_group),fontWeight=FontWeight.Black)}
-        item{MenuRow(Icons.Default.Palette,stringResource(R.string.settings_appearance)){navigate("settings/appearance")}}
-        item{MenuRow(Icons.Default.Notifications,stringResource(R.string.settings_notifications)){navigate("settings/notifications")}}
-        item{MenuRow(Icons.Default.PrivacyTip,stringResource(R.string.settings_privacy)){navigate("settings/privacy")}}
-        item{MenuRow(Icons.Default.AdminPanelSettings,stringResource(R.string.settings_permissions)){navigate("settings/permissions")}}
-        item{HorizontalDivider()}
-        item{Text(stringResource(R.string.settings_profile_integrations_group),fontWeight=FontWeight.Black)}
-        item{MenuRow(Icons.Default.Link,stringResource(R.string.connected_accounts)){navigate("integrations")}}
-        item{HorizontalDivider()}
-        item{Text(stringResource(R.string.settings_account_group),fontWeight=FontWeight.Black)}
-        item{MenuRow(Icons.Default.AccountCircle,stringResource(R.string.settings_account)){navigate("settings/account")}}
-        item{MenuRow(Icons.Default.HelpOutline,stringResource(R.string.how_it_works),howItWorks)}
-        item{HorizontalDivider(Modifier.padding(vertical=8.dp))}
-        item{Text(stringResource(R.string.about_app),fontWeight=FontWeight.Bold);Text(stringResource(R.string.app_version),color=Color(0xFF6E6E6E),style=MaterialTheme.typography.bodySmall)}
-        item{OutlinedButton(onLogout,Modifier.fillMaxWidth()){Icon(Icons.Default.Logout,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.logout))}}
-    }
-}
-
 @Composable private fun SecurePortal(title:Int,path:String,help:Int){val context=LocalContext.current;Box(Modifier.fillMaxSize().padding(20.dp),contentAlignment=Alignment.Center){Surface(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp),border=androidx.compose.foundation.BorderStroke(1.dp,Color(0xFFEDEDED))){Column(Modifier.padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(16.dp)){Icon(Icons.Default.Security,null,tint=Color(0xFFD4AF37));Text(stringResource(title),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold);Text(stringResource(help),color=Color(0xFF6E6E6E));Button({openWeb(context,path)},Modifier.fillMaxWidth()){Icon(Icons.Default.OpenInBrowser,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.open_secure_portal))}}}}}
-
-@Composable private fun MenuRow(icon:androidx.compose.ui.graphics.vector.ImageVector,label:String,click:(()->Unit)?){val modifier=if(click!=null)Modifier.fillMaxWidth().clickable(onClick=click) else Modifier.fillMaxWidth();Row(modifier.padding(vertical=13.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,tint=Color(0xFFD4AF37));Spacer(Modifier.width(14.dp));Text(label,Modifier.weight(1f));if(click!=null)Icon(Icons.Default.ChevronRight,null,tint=Color(0xFF999999))}}
 
 @Composable private fun EmptyCard(text: Int, icon: androidx.compose.ui.graphics.vector.ImageVector) { Surface(Modifier.fillMaxWidth(), color = Color(0xFFFCFCFC), shape = RoundedCornerShape(22.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEDEDED))) { Column(Modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) { Icon(icon, null, Modifier.size(38.dp), tint = Color(0xFFB0B0B0)); Text(stringResource(text), color = Color(0xFF6E6E6E), textAlign = androidx.compose.ui.text.style.TextAlign.Center) } } }
 

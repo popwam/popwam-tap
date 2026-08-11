@@ -12,6 +12,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!(file instanceof File)) return Response.json({ ok: false, error: "FILE_REQUIRED" }, { status: 400 });
   const validation = validateFileUpload({ filename: file.name, contentType: file.type, size: file.size });
   if (!validation.valid) return Response.json({ ok: false, error: validation.error }, { status: 400 });
+  const titleAr = String(data.get("titleAr") || "").trim() || null;
+  const titleEn = String(data.get("titleEn") || "").trim() || null;
+  if ((titleAr?.length || 0) > 120 || (titleEn?.length || 0) > 120) return Response.json({ ok: false, error: "FIELD_TOO_LONG" }, { status: 400 });
   const { effective } = await getUserEntitlements(user.id);
   if (!effective.allowFileUploads) return Response.json({ ok: false, error: "FILE_UPLOAD_NOT_ALLOWED" }, { status: 403 });
   const key = createStorageKey({ userId: user.id, type: "files", filename: file.name });
@@ -24,13 +27,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!locked.allowFileUploads) throw new Error("FILE_UPLOAD_NOT_ALLOWED");
       if (!await tx.profile.findFirst({ where: { id, userId: user.id }, select: { id: true } })) throw new Error("PROFILE_NOT_FOUND");
       await assertStorageWithinLimitLocked(tx, user.id, BigInt(file.size));
-      const titleAr = String(data.get("titleAr") || "").trim() || null; const titleEn = String(data.get("titleEn") || "").trim() || null;
       const sortOrder = await tx.uploadedFile.count({ where: { profileId: id } });
       const created = await tx.uploadedFile.create({ data: { profileId: id, uploaderUserId: user.id, storageKey: key, publicUrl: uploaded.url, originalFilename: file.name, originalName: file.name, mimeType: file.type, sizeBytes: file.size, title: titleAr || titleEn, displayTitleAr: titleAr, displayTitleEn: titleEn, sortOrder } });
       await tx.destination.create({ data: { userId: user.id, profileId: id, type: "FILE", title: created.title || file.name, titleAr, titleEn, url: uploaded.url, iconKey: "file", sortOrder: await tx.destination.count({ where: { profileId: id } }) } });
       return created;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    return Response.json({ ok: true, file: { ...record, sizeBytes: record.sizeBytes.toString() } }, { status: 201, headers: { "cache-control": "no-store" } });
+    return Response.json({
+      ok: true,
+      file: {
+        id: record.id,
+        originalFilename: record.originalFilename,
+        displayTitleAr: record.displayTitleAr,
+        displayTitleEn: record.displayTitleEn,
+        publicUrl: record.publicUrl,
+        mimeType: record.mimeType,
+        sizeBytes: record.sizeBytes.toString(),
+        isVisible: record.isVisible,
+      },
+    }, { status: 201, headers: { "cache-control": "no-store" } });
   } catch (error) {
     await deleteObject(key).catch(() => undefined);
     const code = error instanceof Error ? error.message : "";

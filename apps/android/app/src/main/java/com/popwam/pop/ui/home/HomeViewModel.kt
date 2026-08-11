@@ -68,8 +68,8 @@ class AndroidHomeRepository(
         HomeSnapshot(
             profiles = profiles,
             selectedProfileId = selected,
-            completionPercent = editor?.takeIf { it.ok }?.let { if (it.readiness.ready) 100 else null },
-            profileReady = editor?.ok == true && editor.readiness.ready,
+            completionPercent = editor?.takeIf { it.ok }?.let { if (it.completion.complete) 100 else null },
+            profileReady = editor?.ok == true && editor.completion.complete,
             activeProductCount = cardsResponse?.cards.orEmpty().count { it.cardStatus == "ACTIVE" },
             totalOpenCount = cardsResponse?.cards.orEmpty().sumOf { it.openCount },
             partial = cardsResponse?.ok != true || selectorResponse?.ok != true || selected != null && editor?.ok != true,

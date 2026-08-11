@@ -1,20 +1,10 @@
-import { Prisma, prisma } from "@popwam/db";
+import { prisma } from "@popwam/db";
 import { isPublicModuleReadable, isPublicProfileReadable } from "./profile-authorization";
-import { draftProfileInclude, loadPublishedRevision, revisionToProfileForAudience, revisionToPublicProfile, type DraftProfileData } from "./profile-publishing";
+import { draftProfileInclude, legacyDraftToPublicProfile, loadPublishedRevision, revisionToProfileForAudience, revisionToPublicProfile, type DraftProfileData } from "./profile-publishing";
 import { normalizeProfileSlug } from "./profile-slugs";
 import { relationshipStateForUsers } from "./friends-domain";
 
-export const publicProfileInclude = {
-  fields: { orderBy: { sortOrder: "asc" } },
-  uploads: { orderBy: { sortOrder: "asc" } },
-  destinations: { orderBy: { sortOrder: "asc" } },
-  services: { orderBy: { sortOrder: "asc" } },
-  branches: { orderBy: { sortOrder: "asc" } },
-  modules: { include: { moduleDefinition: true }, orderBy: { sortOrder: "asc" } },
-  virtualCard: { include: { template: true } },
-} satisfies Prisma.ProfileInclude;
-
-export type PublicProfileProjectionData = Prisma.ProfileGetPayload<{ include: typeof publicProfileInclude }>;
+export type PublicProfileProjectionData = ReturnType<typeof revisionToPublicProfile>;
 
 export function moduleUsesCanonicalPublicState(profile: PublicProfileProjectionData, moduleKey: string, legacyFallback: boolean, audience: "PUBLIC" | "FRIEND" = "PUBLIC") {
   const matching = profile.modules.filter((module) => module.moduleDefinition.key === moduleKey);
@@ -23,9 +13,10 @@ export function moduleUsesCanonicalPublicState(profile: PublicProfileProjectionD
     : ((profile as PublicProfileProjectionData & { canonicalPublication?: boolean }).canonicalPublication ? false : legacyFallback);
 }
 
-export function buildPublicProfileProjection(profile: PublicProfileProjectionData) {
+export function buildPublicProfileProjection(profile: PublicProfileProjectionData, ownerId?: string) {
   return {
     profile,
+    ownerId: ownerId || null,
     publicModuleKeys: profile.modules.filter(isPublicModuleReadable).map((module) => module.moduleDefinition.key),
     publiclyReadable: isPublicProfileReadable(profile),
   };
@@ -65,6 +56,7 @@ export async function getProfileProjectionBySlugForViewer(slug: string, viewerId
         const projected = revisionToProfileForAudience(profile, revision, "FRIEND") as unknown as PublicProfileProjectionData;
         return {
           profile: projected,
+          ownerId: profile.userId,
           publicModuleKeys: projected.modules.filter((item) => item.enabled && (item.visibility === "PUBLIC" || item.visibility === "FRIENDS")).map((item) => item.moduleDefinition.key),
           publiclyReadable: true,
           canonicalSlug: profile.slug,
@@ -86,17 +78,20 @@ export async function getPublicProfileProjectionById(id: string) {
 async function buildCanonicalOrLegacyProjection(profile: DraftProfileData | null) {
   if (!profile) return null;
   if (profile.lifecycle === "PAUSED" || profile.lifecycle === "ARCHIVED") {
-    return { profile: profile as unknown as PublicProfileProjectionData, publicModuleKeys: [], publiclyReadable: false };
+    return { profile: legacyDraftToPublicProfile(profile), ownerId: profile.userId, publicModuleKeys: [], publiclyReadable: false };
+  }
+  if (profile.profileKind != null && (profile.lifecycle !== "PUBLISHED" || profile.access === "PRIVATE")) {
+    return { profile: legacyDraftToPublicProfile(profile), ownerId: profile.userId, publicModuleKeys: [], publiclyReadable: false };
   }
   const revision = await loadPublishedRevision(profile.id);
   if (revision) {
-    const projected = revisionToPublicProfile(profile, revision) as unknown as PublicProfileProjectionData;
-    return buildPublicProfileProjection(projected);
+    const projected = revisionToPublicProfile(profile, revision);
+    return buildPublicProfileProjection(projected, profile.userId);
   }
   // Compatibility is intentionally restricted to pre-canonical legacy rows.
   // New profiles always have profileKind and therefore cannot leak draft rows.
   if (profile.profileKind == null && profile.isPublic) {
-    return buildPublicProfileProjection(profile as unknown as PublicProfileProjectionData);
+    return buildPublicProfileProjection(legacyDraftToPublicProfile(profile), profile.userId);
   }
-  return { profile: profile as unknown as PublicProfileProjectionData, publicModuleKeys: [], publiclyReadable: false };
+  return { profile: legacyDraftToPublicProfile(profile), ownerId: profile.userId, publicModuleKeys: [], publiclyReadable: false };
 }

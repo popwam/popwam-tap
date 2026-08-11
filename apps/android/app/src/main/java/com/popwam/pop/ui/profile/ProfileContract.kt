@@ -1,10 +1,13 @@
 package com.popwam.pop.ui.profile
 
+import com.google.gson.JsonElement
+import com.google.gson.JsonPrimitive
+
 enum class ProfileLoadState { INITIAL_LOADING, CONTENT, EMPTY, ERROR }
 enum class ProfileBackendKind { PERSONAL, BUSINESS }
 enum class ProfileCategoryKind { PERSONAL, PROFESSIONAL, BUSINESS, RESTAURANT, CLINIC, SERVICES, CREATOR, OTHER }
 enum class ProfileVerificationState { UNAVAILABLE, UNVERIFIED, PENDING, VERIFIED, REJECTED }
-enum class ProfileEditorSection { BASIC_INFORMATION, ABOUT, CONTACT_LINKS, MEDIA, APPEARANCE, VERIFICATION, VISIBILITY, SERVICES, LOCATIONS }
+enum class ProfileEditorSection { BASIC_INFORMATION, ABOUT, CONTACT_LINKS, TYPE_DETAILS, MEDIA, APPEARANCE, VERIFICATION, VISIBILITY, SERVICES, LOCATIONS }
 enum class ProfileSaveState { IDLE, SAVING, SUCCESS, FAILURE }
 enum class ProfilePendingCapability { WORKING_HOURS, TEAM, EDUCATION, EXPERIENCE, SKILLS, PROJECTS, CERTIFICATES, MENU, DELIVERY_RESERVATION, DOCTORS, BOOKING, LICENSE_VERIFICATION }
 
@@ -19,6 +22,7 @@ data class ProfileMutationResult(
     val lifecycle: String? = null,
     val successful: Boolean = true,
     val errorCode: String? = null,
+    val contentCompletion: ProfileContentCompletion? = null,
 )
 
 data class OwnedProfile(
@@ -78,6 +82,27 @@ data class ProfileMedia(
     val sortOrder: Int,
 )
 
+data class ProfileDocument(
+    val id:String,
+    val originalFilename:String,
+    val publicUrl:String,
+    val mimeType:String,
+    val sizeBytes:Long,
+    val title:String,
+    val displayTitleAr:String,
+    val displayTitleEn:String,
+    val visibility:String,
+    val sortOrder:Int,
+)
+data class ProfileDocumentCapability(
+    val uploadSupported:Boolean=false,
+    val uploadEndpoint:String="",
+    val replaceSupported:Boolean=false,
+    val deleteSupported:Boolean=false,
+    val visibilitySupported:Boolean=false,
+    val unavailableReason:String?=null,
+)
+
 data class ProfileModule(
     val key: String,
     val name: String,
@@ -87,6 +112,36 @@ data class ProfileModule(
     val supported: Boolean,
 )
 data class ProfileModuleOption(val key:String,val name:String)
+
+enum class ProfileStructuredValueType { TEXT, LONG_TEXT, URL, EMAIL, INTEGER, STRING_LIST, EDUCATION, EXPERIENCE, PROJECT, WEEKLY_HOURS, UNKNOWN }
+enum class ProfileDataClassification { PUBLIC_PROFILE, OWNER_PRIVATE, TRUST_VERIFICATION, UNKNOWN }
+
+data class ProfileFieldCapability(
+    val key:String,
+    val moduleKey:String,
+    val label:String,
+    val valueType:ProfileStructuredValueType,
+    val repeatable:Boolean,
+    val requiredForCompletion:Boolean,
+    val visibilitySupported:Boolean,
+    val maxItems:Int,
+    val classification:ProfileDataClassification=ProfileDataClassification.PUBLIC_PROFILE,
+)
+
+data class ProfileStructuredEntry(
+    val id:String="",
+    val fieldKey:String,
+    val instanceKey:String="",
+    val moduleKey:String,
+    val value:JsonElement=JsonPrimitive(""),
+    val visibility:String="ONLY_ME",
+    val sortOrder:Int=0,
+)
+
+data class ProfileContentIssue(val code:String,val path:String,val fieldKey:String?,val messageKey:String)
+data class ProfileContentCompletion(val complete:Boolean=false,val issues:List<ProfileContentIssue> = emptyList())
+data class ProfileVerificationSignal(val kind:String,val status:String,val verifiedAt:String?,val expiresAt:String?,val reasonCode:String?,val publicBadge:Boolean)
+data class ProfileVerification(val submissionSupported:Boolean=false,val overallStatus:String="NOT_STARTED",val signals:List<ProfileVerificationSignal> = emptyList())
 
 data class ProfileContent(
     val summary: OwnedProfile,
@@ -126,6 +181,19 @@ data class ProfileContent(
     val modules: List<ProfileModule>,
     val addableModules: List<ProfileModuleOption> = emptyList(),
     val pendingCapabilities: Set<ProfilePendingCapability> = emptySet(),
+    val fieldCapabilities: List<ProfileFieldCapability> = emptyList(),
+    val structuredEntries: List<ProfileStructuredEntry> = emptyList(),
+    val contentCompletion: ProfileContentCompletion = ProfileContentCompletion(),
+    val verification: ProfileVerification = ProfileVerification(),
+    val firstName: String = "",
+    val lastName: String = "",
+    val profession: String = "PERSONAL",
+    val customProfession: String = "",
+    val company: String = "",
+    val industryAr: String = "",
+    val industryEn: String = "",
+    val documents: List<ProfileDocument> = emptyList(),
+    val documentCapability: ProfileDocumentCapability = ProfileDocumentCapability(),
 )
 
 data class ProfileCategoryOption(
@@ -165,7 +233,24 @@ data class ProfilesUiState(
 )
 
 sealed interface ProfileEditorMutation {
-    data class Identity(val displayName:String,val displayLabel:String,val displayNameAr:String,val displayNameEn:String,val jobTitleAr:String,val jobTitleEn:String,val organizationNameAr:String,val organizationNameEn:String,val primaryLanguage:String):ProfileEditorMutation
+    data class Identity(
+        val displayName:String,
+        val displayLabel:String,
+        val displayNameAr:String,
+        val displayNameEn:String,
+        val jobTitleAr:String,
+        val jobTitleEn:String,
+        val organizationNameAr:String,
+        val organizationNameEn:String,
+        val primaryLanguage:String,
+        val firstName:String="",
+        val lastName:String="",
+        val profession:String="PERSONAL",
+        val customProfession:String="",
+        val company:String="",
+        val industryAr:String="",
+        val industryEn:String="",
+    ):ProfileEditorMutation
     data class About(val title:String,val bio:String,val bioAr:String,val bioEn:String,val descriptionAr:String,val descriptionEn:String):ProfileEditorMutation
     data class Contact(val phone:String,val alternatePhone:String,val email:String,val website:String,val whatsappBusiness:String,val whatsappPrivate:String,val locationText:String,val addressAr:String,val addressEn:String,val visibility:Map<String,String>):ProfileEditorMutation
     data class LinkUpsert(val link:ProfileLink):ProfileEditorMutation
@@ -178,9 +263,13 @@ sealed interface ProfileEditorMutation {
     data class Appearance(val theme:String):ProfileEditorMutation
     data class AddModule(val key:String):ProfileEditorMutation
     data class UpdateModule(val key:String,val enabled:Boolean,val visibility:String):ProfileEditorMutation
+    data class StructuredEntryUpsert(val entry:ProfileStructuredEntry):ProfileEditorMutation
+    data class StructuredEntryDelete(val id:String):ProfileEditorMutation
+    data class StructuredEntryReorder(val fieldKey:String,val ids:List<String>):ProfileEditorMutation
 }
 
 data class ProfileMediaUpload(val purpose:String,val fileName:String,val mimeType:String,val bytes:ByteArray)
+data class ProfileDocumentUpload(val titleAr:String,val titleEn:String,val fileName:String,val mimeType:String,val bytes:ByteArray)
 
 sealed interface ProfileEvent {
     data object Refresh:ProfileEvent
@@ -199,6 +288,7 @@ sealed interface ProfileEvent {
     data class CreateProfile(val name:String,val kind:ProfileBackendKind,val categorySlug:String?,val templateId:String?):ProfileEvent
     data class ArchiveProfile(val id:String,val replacementId:String?):ProfileEvent
     data class UploadMedia(val media:ProfileMediaUpload):ProfileEvent
+    data class UploadDocument(val document:ProfileDocumentUpload):ProfileEvent
     data class RemoveMedia(val mediaId:String):ProfileEvent
     data class OpenShare(val id:String):ProfileEvent
     data class OpenQr(val id:String):ProfileEvent

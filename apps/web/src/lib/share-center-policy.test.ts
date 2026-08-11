@@ -7,6 +7,7 @@ import {
   approvedPublicShareUrl,
   cardCanResolve,
   shareTargetKind,
+  shareKeyAfterCompareAndSet,
 } from "./share-center-policy";
 
 describe("share center public URL policy", () => {
@@ -42,6 +43,12 @@ describe("share center public URL policy", () => {
     expect(shareTargetKind("VCF")).toBe("CONTACT");
     expect(shareTargetKind("INSTAGRAM")).toBe("SOCIAL");
     expect(shareTargetKind("CUSTOM_URL")).toBe("LINK");
+  });
+
+  it("returns a newly stored share key immediately and adopts a racing writer's key", () => {
+    expect(shareKeyAfterCompareAndSet("generated", 1, null)).toBe("generated");
+    expect(shareKeyAfterCompareAndSet("generated", 0, "persisted-by-racer")).toBe("persisted-by-racer");
+    expect(shareKeyAfterCompareAndSet("generated", 0, null)).toBeNull();
   });
 
   it("uses an escalating capped cooldown after the product attempt limit", () => {

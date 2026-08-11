@@ -16,8 +16,8 @@ export async function publicProfileVCardResponse(profileId: string) {
     : localized(profile.displayNameAr, profile.displayNameEn, profile.displayName)!;
   const body = createVCard({
     kind: profile.type === "ORGANIZATION" ? "org" : "individual",
-    firstName: null,
-    lastName: null,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
     displayName,
     organization: profile.type === "ORGANIZATION" ? displayName : profile.company,
     title: localized(profile.jobTitleAr, profile.jobTitleEn, profile.title),

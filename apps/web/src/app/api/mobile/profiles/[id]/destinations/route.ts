@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await getMobileUser(request); if (!user) return mobileUnauthorized(); const { id } = await params;
   const body = await request.json().catch(() => ({})); const type = String(body.type || "") as DestinationType;
   if (!Object.values(DestinationType).includes(type) || type === "PROFILE") return Response.json({ ok: false, error: "DESTINATION_INVALID" }, { status: 400 });
-  const normalized = normalizeAndValidate(type, String(body.url || ""));
+  const normalized = normalizeAndValidate(type, String(body.url || ""), typeof body.countryIso2 === "string" ? body.countryIso2 : null);
   if (!normalized.valid) return Response.json({ ok: false, error: "DESTINATION_URL_INVALID" }, { status: 400 });
   const title = String(body.titleAr || body.titleEn || "").trim();
   if (!title) return Response.json({ ok: false, error: "DESTINATION_TITLE_REQUIRED" }, { status: 400 });

@@ -10,7 +10,7 @@ export const PLATFORM_DEFAULT_PLAN_SLUG = "free";
 const CORE_CONTACT_DESTINATION_TYPE_LIST: DestinationType[] = ["PROFILE", "PHONE", "EMAIL", "WEBSITE", "WHATSAPP_BUSINESS", "WHATSAPP_PRIVATE", "VCF"];
 const CORE_CONTACT_DESTINATION_TYPES = new Set<string>(CORE_CONTACT_DESTINATION_TYPE_LIST);
 export function countsTowardLinkLimit(type: string) { return !CORE_CONTACT_DESTINATION_TYPES.has(type); }
-const EXTRA_LINK_FILTER = { type: { notIn: CORE_CONTACT_DESTINATION_TYPE_LIST } } as const;
+const EXTRA_LINK_FILTER = { type: { notIn: CORE_CONTACT_DESTINATION_TYPE_LIST }, isActive: true } as const;
 
 export function mergeEntitlements<T extends Record<string, unknown>, U extends Record<string, unknown>>(plan: T, override?: U | null) {
   const result = { ...plan } as T & U;

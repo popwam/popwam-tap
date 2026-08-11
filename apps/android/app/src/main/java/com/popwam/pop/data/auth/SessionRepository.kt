@@ -40,7 +40,25 @@ class SessionRepository(private val authApi:AuthApi,private val store:SessionSto
             throw error
         }
     }
-    suspend fun refresh():String?=mutex.withLock{val before=store.snapshot()?:return null;val response=runCatching{authApi.refresh(RefreshRequest(before.refreshToken,deviceName()))}.getOrNull();if(response?.ok==true){store.save(before.copy(accessToken=response.accessToken,refreshToken=response.refreshToken));response.accessToken}else{store.clear();null}}
+    suspend fun refresh():String? {
+        var invalidated = false
+        val token = mutex.withLock {
+            val before = store.snapshot() ?: return@withLock null
+            val response = runCatching {
+                authApi.refresh(RefreshRequest(before.refreshToken, deviceName()))
+            }.getOrNull()
+            if (response?.ok == true) {
+                store.save(before.copy(accessToken = response.accessToken, refreshToken = response.refreshToken))
+                response.accessToken
+            } else {
+                store.clear()
+                invalidated = true
+                null
+            }
+        }
+        if (invalidated) runCatching { beforeLogout() }
+        return token
+    }
     suspend fun logout(){val refresh=store.snapshot()?.refreshToken;runCatching{beforeLogout()};store.clear();if(refresh!=null)runCatching{authApi.logout(LogoutRequest(refresh))}}
     private suspend fun acceptAuthenticated(response:AuthResponse,passkey:Boolean=false):AuthResponse{if(response.ok&&response.user!=null&&response.accessToken.isNotBlank()&&response.refreshToken.isNotBlank()){store.save(SessionTokens(response.accessToken,response.refreshToken,response.user.id,response.user.role));AuthRuntimeDiagnostics.mark(AuthRuntimeStage.POP_SESSION_SAVE,"success");if(passkey)AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SESSION_SAVE,"success");runCatching{afterAuthentication()}};return response}
     private fun deviceName()="${Build.MANUFACTURER} ${Build.MODEL}".take(120)

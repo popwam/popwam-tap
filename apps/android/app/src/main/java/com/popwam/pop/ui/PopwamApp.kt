@@ -65,13 +65,13 @@ import com.popwam.pop.data.auth.PasskeyCoordinator
 import com.popwam.pop.data.auth.AuthRuntimeDiagnostics
 import com.popwam.pop.data.auth.AuthRuntimeStage
 import com.popwam.pop.data.auth.biometricUnlockEligibility
-import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.nfc.NfcCoordinator
 import com.popwam.pop.ui.theme.AppearanceStore
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.ThemeMode
 import com.popwam.pop.ui.home.HomeViewModel
 import com.popwam.pop.ui.profile.ProfilesViewModel
+import com.popwam.pop.ui.share.ShareViewModel
 import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -83,6 +83,7 @@ import com.google.gson.JsonParser
     main:MainViewModel,
     home:HomeViewModel,
     profiles:ProfilesViewModel,
+    share:ShareViewModel,
     initialRoute:String="home",
     appearanceStore:AppearanceStore,
     phoneCountries:PhoneCountryStore,
@@ -118,7 +119,7 @@ import com.google.gson.JsonParser
     // continuation UI must never reopen after a passkey operation.
     LaunchedEffect(authState.authenticated){if(pendingActivation.isNotBlank()){main.inspectActivation(pendingActivation);pendingActivation=""}}
     FigmaMainNavigation(
-        main, home, profiles, initialRoute=pendingRoute, onLogout={destination=UnauthenticatedDestination.PHONE_AUTH.name;auth.logout()}, appearanceStore=appearanceStore,
+        main, home, profiles, share, initialRoute=pendingRoute, onLogout={destination=UnauthenticatedDestination.PHONE_AUTH.name;share.clearForLogout();auth.logout()}, appearanceStore=appearanceStore,
         onThemeModeSelected=onThemeModeSelected, onPaletteSelected=onPaletteSelected,
     )
 }
@@ -518,9 +519,6 @@ private fun passkeyErrorString(error:PasskeyLoginError)=when(error){
 
 @Composable private fun ProgrammingScreen(card:CardDto,state:MainUiState,vm:MainViewModel){var lockText by remember{mutableStateOf("")};LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text(stringResource(R.string.write_nfc),style=MaterialTheme.typography.headlineMedium)};item{LtrText(card.serialNumber,MaterialTheme.typography.titleLarge);LtrText(card.permanentUrl)};item{Text(stringResource(R.string.approach_tag))};item{Button({NfcCoordinator.register{vm.write(it,card)}},Modifier.fillMaxWidth()){Text(stringResource(R.string.write_nfc))}};item{HorizontalDivider();Text(stringResource(R.string.lock_warning),color=MaterialTheme.colorScheme.error)};item{OutlinedTextField(lockText,{lockText=it},label={Text(stringResource(R.string.type_lock))},modifier=Modifier.fillMaxWidth())};item{Button({NfcCoordinator.register{vm.lock(it,card)}},Modifier.fillMaxWidth(),enabled=lockText=="LOCK",colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.lock_confirm))}};state.message?.let{item{Text(it)}}}}
 
-@Composable private fun HceScreen(cards:List<CardDto>){val context=LocalContext.current;var enabled by remember{mutableStateOf(HceConfig.enabled(context))};var selected by remember{mutableStateOf(HceConfig.url(context)?:cards.firstOrNull()?.permanentUrl.orEmpty())};val supported=context.packageManager.hasSystemFeature("android.hardware.nfc.hce");LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text(stringResource(R.string.hce_title),style=MaterialTheme.typography.headlineMedium)};item{Text(stringResource(R.string.hce_explanation))};item{Text(stringResource(R.string.hce_compatibility),style=MaterialTheme.typography.bodySmall)};if(!supported)item{ErrorText("NFC_UNAVAILABLE")};items(cards,key={it.id}){card->Row(Modifier.fillMaxWidth().clickable{selected=card.permanentUrl}.padding(8.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(selected==card.permanentUrl,{selected=card.permanentUrl});Column{LtrText(card.serialNumber);LtrText(card.permanentUrl,MaterialTheme.typography.bodySmall)}}};item{Button({enabled=!enabled;HceConfig.save(context,enabled,selected)},Modifier.fillMaxWidth(),enabled=supported&&selected.isNotBlank()){Text(stringResource(if(enabled)R.string.disable_hce else R.string.enable_hce))}}}}
-
-@Composable private fun SettingsScreen(logout:()->Unit){LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text(stringResource(R.string.settings),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Black)};item{Text(stringResource(R.string.language),style=MaterialTheme.typography.titleMedium)};item{OutlinedButton({AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())},Modifier.fillMaxWidth()){Text(stringResource(R.string.device_language))}};item{OutlinedButton({AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ar"))},Modifier.fillMaxWidth()){Text(stringResource(R.string.arabic))}};item{OutlinedButton({AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))},Modifier.fillMaxWidth()){Text(stringResource(R.string.english))}};item{Text(stringResource(R.string.privacy_note))};item{Button(logout,Modifier.fillMaxWidth()){Text(stringResource(R.string.logout))}}}}
 
 @Composable private fun Field(value:String,onChange:(String)->Unit,label:Int,multiline:Boolean=false,keyboard:KeyboardType=KeyboardType.Text){if(keyboard==KeyboardType.Phone||keyboard==KeyboardType.Email||keyboard==KeyboardType.Uri)CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr){OutlinedTextField(value,onChange,label={Text(stringResource(label))},modifier=Modifier.fillMaxWidth(),minLines=if(multiline)3 else 1,keyboardOptions=KeyboardOptions(keyboardType=keyboard))}else OutlinedTextField(value,onChange,label={Text(stringResource(label))},modifier=Modifier.fillMaxWidth(),minLines=if(multiline)3 else 1,keyboardOptions=KeyboardOptions(keyboardType=keyboard))}
 @Composable private fun LtrField(value:String,onChange:(String)->Unit,label:Int,placeholder:Int?,keyboard:KeyboardType,enabled:Boolean,placeholderText:String?=null){CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr){OutlinedTextField(value,onChange,label={Text(stringResource(label))},placeholder={Text(placeholderText ?: placeholder?.let{stringResource(it)}.orEmpty())},keyboardOptions=KeyboardOptions(keyboardType=keyboard),modifier=Modifier.fillMaxWidth(),enabled=enabled)}}
@@ -580,5 +578,3 @@ private fun shareQr(context: Context, value: String, bitmap: android.graphics.Bi
 @Composable fun LegacyNfcTools(state:MainUiState,vm:MainViewModel,program:()->Unit,hce:()->Unit)=NfcToolsScreen(state,vm,program,hce)
 @Composable fun LegacyProgrammingList(cards:List<CardDto>,open:(String)->Unit)=ProgrammingList(cards,open)
 @Composable fun LegacyProgramming(card:CardDto,state:MainUiState,vm:MainViewModel)=ProgrammingScreen(card,state,vm)
-@Composable fun LegacyHce(cards:List<CardDto>)=HceScreen(cards)
-@Composable fun LegacySettings(logout:()->Unit)=SettingsScreen(logout)

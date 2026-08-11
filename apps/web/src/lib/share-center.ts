@@ -6,7 +6,7 @@ import { createOpaqueToken, activationScratchSecretMatches, hashActivationToken 
 import { managedProfileWhere } from "./profile-publishing";
 import { getPublicProfileProjectionById, moduleUsesCanonicalPublicState } from "./profile-projection";
 import { isSafeDestinationUrl } from "./url";
-import { activationClaimGate, activationCooldownMs, activationIdentifierFrom, activationRateLimited, SCRATCH_ATTEMPT_LIMITS, shareTargetKind } from "./share-center-policy";
+import { activationClaimGate, activationCooldownMs, activationIdentifierFrom, activationRateLimited, SCRATCH_ATTEMPT_LIMITS, shareKeyAfterCompareAndSet, shareTargetKind } from "./share-center-policy";
 
 const productSelect = {
   id: true,
@@ -74,23 +74,26 @@ export function productProjection(card: ProductData) {
 
 async function ensureShareKeys(profileId: string, destinationIds: string[]) {
   const rows = await prisma.destination.findMany({
-    where: { id: { in: destinationIds }, profileId, isActive: true, isVisible: true },
-    select: { id: true, publicShareKey: true, type: true, title: true, titleAr: true, titleEn: true, url: true },
+    where: { id: { in: destinationIds }, profileId },
+    select: { id: true, publicShareKey: true },
   });
   for (const row of rows) {
     if (row.publicShareKey) continue;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const publicShareKey = createOpaqueToken(12);
-        await prisma.destination.updateMany({ where: { id: row.id, profileId, publicShareKey: null }, data: { publicShareKey } });
-        row.publicShareKey = publicShareKey;
-        break;
+        const updated = await prisma.destination.updateMany({ where: { id: row.id, profileId, publicShareKey: null }, data: { publicShareKey } });
+        const persisted = updated.count === 1
+          ? null
+          : (await prisma.destination.findFirst({ where: { id: row.id, profileId }, select: { publicShareKey: true } }))?.publicShareKey || null;
+        row.publicShareKey = shareKeyAfterCompareAndSet(publicShareKey, updated.count, persisted);
+        if (row.publicShareKey) break;
       } catch (error) {
         if (!(typeof error === "object" && error && "code" in error && error.code === "P2002") || attempt === 2) throw error;
       }
     }
   }
-  return rows;
+  return new Map(rows.flatMap((row) => row.publicShareKey ? [[row.id, row.publicShareKey] as const] : []));
 }
 
 export async function getShareTargets(userId: string, profileId: string, locale: "ar" | "en") {
@@ -142,16 +145,17 @@ export async function getShareTargets(userId: string, profileId: string, locale:
   const publishedDestinationIds = profile.destinations
     .filter(item => item.type !== "PROFILE" && item.type !== "VCF" && isSafeDestinationUrl(item.url))
     .map(item => item.id);
-  const rows = await ensureShareKeys(profileId, publishedDestinationIds);
-  for (const row of rows) {
-    if (!row.publicShareKey || !isSafeDestinationUrl(row.url)) continue;
+  const shareKeys = await ensureShareKeys(profileId, publishedDestinationIds);
+  for (const destination of profile.destinations) {
+    const publicShareKey = shareKeys.get(destination.id);
+    if (!publicShareKey || !isSafeDestinationUrl(destination.url) || destination.type === "PROFILE" || destination.type === "VCF") continue;
     targets.push({
-      id: `destination:${row.id}`,
-      type: shareTargetKind(row.type),
-      label: localized(locale, row.titleAr, row.titleEn, row.title),
-      canonicalUrl: `${publicBase()}/s/${encodeURIComponent(row.publicShareKey)}`,
+      id: `destination:${destination.id}`,
+      type: shareTargetKind(destination.type),
+      label: localized(locale, destination.titleAr, destination.titleEn, destination.title),
+      canonicalUrl: `${publicBase()}/s/${encodeURIComponent(publicShareKey)}`,
       hceCompatible: true,
-      destinationType: row.type,
+      destinationType: destination.type,
     });
   }
 
@@ -451,8 +455,14 @@ export async function updateShareProduct(userId: string, cardId: string, input: 
   return updated ? productProjection(updated) : null;
 }
 
+export function publishedShareDestination(projection: Awaited<ReturnType<typeof getPublicProfileProjectionById>>, destinationId: string) {
+  if (!projection?.publiclyReadable) return null;
+  const destination = projection.profile.destinations.find((item) => item.id === destinationId);
+  return destination && isSafeDestinationUrl(destination.url) ? destination : null;
+}
+
 export function shareDestinationIsCurrentlyPublished(projection: Awaited<ReturnType<typeof getPublicProfileProjectionById>>, destinationId: string) {
-  return Boolean(projection?.publiclyReadable && projection.profile.destinations.some(item => item.id === destinationId));
+  return Boolean(publishedShareDestination(projection, destinationId));
 }
 
 export function activationAttemptFingerprintForTest(value: string) {

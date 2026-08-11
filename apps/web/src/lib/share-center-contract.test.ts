@@ -19,9 +19,11 @@ describe("Phase G server contract", () => {
     expect(service).toContain("publicShareKey");
     expect(service).toContain("createOpaqueToken(12)");
     expect(service).toContain("/p/${encodeURIComponent(slug)}");
-    expect(service).toContain("/s/${encodeURIComponent(row.publicShareKey)}");
+    expect(service).toContain("/s/${encodeURIComponent(publicShareKey)}");
     expect(publicLink).toContain("publicShareKey");
     expect(publicLink).toContain("getPublicProfileProjectionById");
+    expect(publicLink).toContain("publishedShareDestination");
+    expect(publicLink).not.toContain("destination.url");
   });
 
   it("protects activation by four server-side rate scopes and generic failures", () => {
@@ -74,7 +76,8 @@ describe("Phase G server contract", () => {
     expect(resolver).toContain('card.cardStatus==="LOST"||card.cardStatus==="STOLEN"');
     expect(resolver).toContain('card.cardStatus==="DISABLED"||card.cardStatus==="ARCHIVED"||card.cardStatus==="TRANSFER_PENDING"');
     expect(resolver).toContain("getPublicProfileProjectionById");
-    expect(resolver).toContain("projection.profile.destinations.some");
+    expect(resolver).toContain("publishedShareDestination");
+    expect(resolver).toContain("redirect(published.url)");
     expect(schema).toContain("activationSecretState");
     expect(schema).toContain("activationLockoutUntil");
   });

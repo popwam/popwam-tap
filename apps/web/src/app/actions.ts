@@ -154,7 +154,7 @@ export async function deleteDestination(data: FormData) {
   if (!await canManageDestination(user, id)) throw new Error("DESTINATION_NOT_FOUND");
   const current = await prisma.destination.findUnique({ where: { id }, include: { profile: { select: { id: true, slug: true } } } });
   if (current?.type === DestinationType.PROFILE) throw new Error("PROFILE_DESTINATION_REQUIRED");
-  await prisma.destination.delete({ where: { id } });
+  await prisma.destination.update({ where: { id }, data: { isActive: false, isVisible: false } });
   revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); if (current?.profile) publicRevalidate(current.profile);
 }
 

@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ medi
       visibility: "PUBLIC",
       revisionId,
       revision: {
-        currentFor: { is: { profile: { lifecycle: "PUBLISHED" } } },
+        currentFor: { is: { profile: { lifecycle: "PUBLISHED", access: { not: "PRIVATE" }, isPublic: true } } },
         access: { in: ["PUBLIC", "UNLISTED"] },
       },
     },

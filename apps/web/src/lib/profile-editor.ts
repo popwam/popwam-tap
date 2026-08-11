@@ -4,8 +4,10 @@ import {
   Prisma,
   ProfileTheme,
   ProfileModuleVisibility,
+  ProfessionType,
   prisma,
 } from "@popwam/db";
+import { randomUUID } from "node:crypto";
 import { assertWithinLimitLocked, getUserEntitlements } from "./plans";
 import { buildOwnerPreviewProjection } from "./profile-preview";
 import {
@@ -18,6 +20,14 @@ import {
   type PublishedRevisionData,
 } from "./profile-publishing";
 import { normalizeAndValidate } from "./url";
+import { normalizeProfilePhone } from "./url";
+import {
+  allowedStructuredModuleKeys,
+  profileFieldCapabilities,
+  validateProfileStructuredValue,
+  type CanonicalProfileKind,
+} from "./profile-data-capabilities";
+import { buildVerificationProjection, evaluateProfileCompletion } from "./profile-data";
 
 export const PROFILE_EDITOR_MODULE_KEYS = [
   "IDENTITY",
@@ -29,6 +39,7 @@ export const PROFILE_EDITOR_MODULE_KEYS = [
   "PORTFOLIO",
   "GALLERY",
   "BRANCHES",
+  "CATALOG",
 ] as const;
 
 export type ProfileEditorModuleKey = (typeof PROFILE_EDITOR_MODULE_KEYS)[number];
@@ -46,32 +57,48 @@ type EditorLocale = "ar" | "en";
 export type ProfileEditorAction =
   | { type: "TEMPLATE_SELECT"; templateId?: unknown }
   | { type: "APPEARANCE_SAVE"; theme?: unknown }
-  | { type: "IDENTITY_SAVE"; displayLabel?: unknown; displayName?: unknown; displayNameAr?: unknown; displayNameEn?: unknown; jobTitleAr?: unknown; jobTitleEn?: unknown; organizationNameAr?: unknown; organizationNameEn?: unknown; primaryLanguage?: unknown }
+  | { type: "IDENTITY_SAVE"; displayLabel?: unknown; displayName?: unknown; firstName?: unknown; lastName?: unknown; profession?: unknown; customProfession?: unknown; displayNameAr?: unknown; displayNameEn?: unknown; jobTitleAr?: unknown; jobTitleEn?: unknown; company?: unknown; industryAr?: unknown; industryEn?: unknown; organizationNameAr?: unknown; organizationNameEn?: unknown; primaryLanguage?: unknown }
   | { type: "ABOUT_SAVE"; title?: unknown; bio?: unknown; bioAr?: unknown; bioEn?: unknown; descriptionAr?: unknown; descriptionEn?: unknown }
-  | { type: "CONTACT_SAVE"; phone?: unknown; alternatePhone?: unknown; email?: unknown; website?: unknown; whatsappBusiness?: unknown; whatsappPrivate?: unknown; locationText?: unknown; addressAr?: unknown; addressEn?: unknown; visibility?: unknown }
-  | { type: "LINK_UPSERT"; id?: unknown; title?: unknown; titleAr?: unknown; titleEn?: unknown; destinationType?: unknown; url?: unknown; visibility?: unknown }
+  | { type: "CONTACT_SAVE"; phone?: unknown; alternatePhone?: unknown; email?: unknown; website?: unknown; whatsappBusiness?: unknown; whatsappPrivate?: unknown; locationText?: unknown; addressAr?: unknown; addressEn?: unknown; countryIso2?: unknown; visibility?: unknown }
+  | { type: "LINK_UPSERT"; id?: unknown; title?: unknown; titleAr?: unknown; titleEn?: unknown; destinationType?: unknown; url?: unknown; countryIso2?: unknown; visibility?: unknown }
   | { type: "LINK_DELETE"; id?: unknown }
   | { type: "LINK_REORDER"; ids?: unknown }
   | { type: "SERVICE_UPSERT"; id?: unknown; nameAr?: unknown; nameEn?: unknown; descriptionAr?: unknown; descriptionEn?: unknown; url?: unknown; visibility?: unknown }
   | { type: "SERVICE_DELETE"; id?: unknown }
   | { type: "SERVICE_REORDER"; ids?: unknown }
-  | { type: "BRANCH_UPSERT"; id?: unknown; nameAr?: unknown; nameEn?: unknown; addressAr?: unknown; addressEn?: unknown; phone?: unknown; mapUrl?: unknown; visibility?: unknown }
+  | { type: "BRANCH_UPSERT"; id?: unknown; nameAr?: unknown; nameEn?: unknown; addressAr?: unknown; addressEn?: unknown; phone?: unknown; countryIso2?: unknown; mapUrl?: unknown; visibility?: unknown }
   | { type: "BRANCH_DELETE"; id?: unknown }
   | { type: "BRANCH_REORDER"; ids?: unknown }
   | { type: "MODULE_ADD"; key?: unknown }
   | { type: "MODULE_UPDATE"; key?: unknown; enabled?: unknown; visibility?: unknown }
   | { type: "MODULE_REORDER"; keys?: unknown }
   | { type: "MEDIA_VISIBILITY"; id?: unknown; visibility?: unknown }
-  | { type: "MEDIA_REORDER"; ids?: unknown };
+  | { type: "MEDIA_REORDER"; ids?: unknown }
+  | { type: "SECTION_ENTRY_UPSERT"; id?: unknown; fieldKey?: unknown; instanceKey?: unknown; value?: unknown; visibility?: unknown }
+  | { type: "SECTION_ENTRY_DELETE"; id?: unknown }
+  | { type: "SECTION_ENTRY_REORDER"; fieldKey?: unknown; ids?: unknown };
 
 const CORE_TEMPLATE_FALLBACK_MODULES = new Set(["IDENTITY", "ABOUT", "CONTACT", "LINKS"]);
 const profileThemes = new Set<ProfileTheme>([
   "CLASSIC_DARK", "CLASSIC_LIGHT", "ELEGANT_DARK", "ELEGANT_LIGHT", "BUSINESS_DARK", "BUSINESS_LIGHT",
 ]);
-function templateAllowsModule(profile: { templateId: string | null; template?: { moduleRules: Array<{ moduleDefinition: { key: string }; allowed: boolean }> } | null }, key: string) {
-  if (!profile.templateId) return true;
+type ProfileCapabilityContext = {
+  profileKind?: string | null;
+  type?: string | null;
+  category?: { slug: string } | null;
+};
+
+function canonicalProfileKind(profile: ProfileCapabilityContext): CanonicalProfileKind {
+  return profile.profileKind === "BUSINESS" || profile.type === "ORGANIZATION" ? "BUSINESS" : "PERSONAL";
+}
+
+export function templateAllowsModule(profile: ProfileCapabilityContext & { templateId: string | null; template?: { moduleRules: Array<{ moduleDefinition: { key: string }; allowed: boolean }> } | null }, key: string) {
+  const capabilityAllowed = allowedStructuredModuleKeys(canonicalProfileKind(profile), profile.category?.slug || null).has(key);
+  if (!profile.templateId) return CORE_TEMPLATE_FALLBACK_MODULES.has(key) || capabilityAllowed;
   const rules = profile.template?.moduleRules || [];
-  return rules.length === 0 ? CORE_TEMPLATE_FALLBACK_MODULES.has(key) : rules.some((rule) => rule.moduleDefinition.key === key && rule.allowed);
+  const explicit = rules.find((rule) => rule.moduleDefinition.key === key);
+  if (explicit) return explicit.allowed;
+  return CORE_TEMPLATE_FALLBACK_MODULES.has(key) || capabilityAllowed;
 }
 
 function bounded(value: unknown, maximum: number, required = false) {
@@ -115,6 +142,14 @@ function safeHttpUrl(value: unknown, required = false) {
   return parsed.toString();
 }
 
+function optionalProfilePhone(value: unknown, countryIso2?: unknown) {
+  const raw = bounded(value, 64);
+  if (!raw) return null;
+  const normalized = normalizeProfilePhone(raw, typeof countryIso2 === "string" ? countryIso2 : null);
+  if (!normalized) throw new Error("PHONE_INVALID");
+  return normalized;
+}
+
 function editorCanManage(profile: { userId: string; organization?: { memberships: Array<{ role: string }> } | null }, userId: string) {
   const role = profile.organization?.memberships[0]?.role;
   return profile.userId === userId || role === OrgRole.OWNER || role === OrgRole.ORG_ADMIN;
@@ -154,11 +189,15 @@ export function changedEditorSections(profile: DraftProfileData, published: Publ
   const changed = new Set<string>();
   if (same([
     profile.displayName, profile.displayLabel, profile.displayNameAr, profile.displayNameEn,
+    profile.firstName, profile.lastName, profile.profession, profile.customProfession,
     profile.jobTitleAr, profile.jobTitleEn, profile.organizationNameAr, profile.organizationNameEn,
+    profile.company, profile.industryAr, profile.industryEn,
     profile.avatarUrl, profile.logoUrl, profile.coverUrl,
   ]) !== same([
     published.displayName, published.displayLabel, published.displayNameAr, published.displayNameEn,
+    published.firstName, published.lastName, published.profession, published.customProfession,
     published.jobTitleAr, published.jobTitleEn, published.organizationNameAr, published.organizationNameEn,
+    published.company, published.industryAr, published.industryEn,
     published.avatarUrl, published.logoUrl, published.coverUrl,
   ])) changed.add("IDENTITY");
   if (same([profile.title, profile.bio, profile.bioAr, profile.bioEn, profile.descriptionAr, profile.descriptionEn])
@@ -174,7 +213,9 @@ export function changedEditorSections(profile: DraftProfileData, published: Publ
     published.showPhone, published.showEmail, published.showWebsite, published.showWhatsappBusiness,
     published.showWhatsappPrivate, published.showLocation,
   ])) changed.add("CONTACT");
-  const draftLinks = profile.destinations.map((item) => [item.id, item.title, item.titleAr, item.titleEn, item.type, item.url, item.isVisible, item.sortOrder]);
+  const draftLinks = profile.destinations
+    .filter((item) => item.isActive)
+    .map((item) => [item.id, item.title, item.titleAr, item.titleEn, item.type, item.url, item.isVisible, item.sortOrder]);
   const publicLinks = published.destinations.map((item) => [item.sourceId, item.title, item.titleAr, item.titleEn, item.type, item.url, true, item.sortOrder]);
   if (same(draftLinks) !== same(publicLinks)) { changed.add("LINKS"); changed.add("SOCIAL"); }
   if (same(profile.services.map((item) => [item.id, item.nameAr, item.nameEn, item.descriptionAr, item.descriptionEn, item.url, item.isVisible, item.sortOrder]))
@@ -183,6 +224,19 @@ export function changedEditorSections(profile: DraftProfileData, published: Publ
     !== same(published.branches.map((item) => [item.sourceId, item.nameAr, item.nameEn, item.addressAr, item.addressEn, item.phone, item.mapUrl, true, item.sortOrder]))) changed.add("BRANCHES");
   if (same(profile.mediaAssets.map((item) => [item.id, item.purpose, item.visibility, item.sortOrder]))
     !== same(published.media.map((item) => [item.mediaId, item.purpose, "PUBLIC", item.sortOrder]))) changed.add("GALLERY");
+  const structuredModuleKeys = new Set([
+    ...profile.sectionEntries.map((item) => item.moduleDefinition.key),
+    ...published.sectionEntries.map((item) => item.moduleKey),
+  ]);
+  for (const moduleKey of structuredModuleKeys) {
+    const draftEntries = profile.sectionEntries
+      .filter((item) => item.moduleDefinition.key === moduleKey)
+      .map((item) => [item.id, item.fieldKey, item.instanceKey, item.value, item.visibility, item.sortOrder]);
+    const publishedEntries = published.sectionEntries
+      .filter((item) => item.moduleKey === moduleKey)
+      .map((item) => [item.sourceId, item.fieldKey, item.instanceKey, item.value, item.visibility, item.sortOrder]);
+    if (same(draftEntries) !== same(publishedEntries)) changed.add(moduleKey);
+  }
   const publishedModules = new Map(published.modules.map((item) => [item.key, item]));
   for (const module of profile.modules) {
     const previous = publishedModules.get(module.moduleDefinition.key);
@@ -276,6 +330,10 @@ export async function getProfileEditor(userId: string, profileId: string, locale
     .map((definition) => ({ key: definition.key, name: localized(locale, definition.nameAr, definition.nameEn, definition.key) }));
   const changedSections = changedEditorSections(profile, published);
   const readiness = evaluateProfileReadiness(profile);
+  const kind = canonicalProfileKind(profile);
+  const categoryKey = profile.category?.slug || null;
+  const completion = evaluateProfileCompletion(profile);
+  const verification = buildVerificationProjection(kind, categoryKey, profile.verificationCases);
   return {
     ok: true,
     profile: {
@@ -298,6 +356,18 @@ export async function getProfileEditor(userId: string, profileId: string, locale
     },
     permissions: { canEdit: true, canSetPrimary: false },
     readiness,
+    completion,
+    verification,
+    fieldCapabilities: profileFieldCapabilities(kind, categoryKey, locale),
+    structuredEntries: profile.sectionEntries.map((item) => ({
+      id: item.id,
+      fieldKey: item.fieldKey,
+      instanceKey: item.instanceKey,
+      moduleKey: item.moduleDefinition.key,
+      value: item.value,
+      visibility: item.visibility,
+      sortOrder: item.sortOrder,
+    })),
     appearance: {
       theme: profile.theme,
       templateId: profile.templateId,
@@ -309,10 +379,17 @@ export async function getProfileEditor(userId: string, profileId: string, locale
     identity: {
       displayLabel: profile.displayLabel || "",
       displayName: profile.displayName,
+      firstName: profile.firstName || "",
+      lastName: profile.lastName || "",
+      profession: profile.profession,
+      customProfession: profile.customProfession || "",
       displayNameAr: profile.displayNameAr || "",
       displayNameEn: profile.displayNameEn || "",
       jobTitleAr: profile.jobTitleAr || "",
       jobTitleEn: profile.jobTitleEn || "",
+      company: profile.company || "",
+      industryAr: profile.industryAr || "",
+      industryEn: profile.industryEn || "",
       organizationNameAr: profile.organizationNameAr || "",
       organizationNameEn: profile.organizationNameEn || "",
       primaryLanguage: profile.primaryLanguage,
@@ -345,11 +422,34 @@ export async function getProfileEditor(userId: string, profileId: string, locale
       },
     },
     links: profile.destinations
-      .filter((item) => item.type !== "PROFILE" && item.type !== "VCF" && item.type !== "FILE")
+      .filter((item) => item.isActive && item.type !== "PROFILE" && item.type !== "VCF" && item.type !== "FILE")
       .map((item) => ({ id: item.id, title: localized(locale, item.titleAr, item.titleEn, item.title), titleAr: item.titleAr || "", titleEn: item.titleEn || "", type: item.type, url: item.url, visibility: item.isVisible ? "PUBLIC" : "ONLY_ME", sortOrder: item.sortOrder })),
     services: profile.services.map((item) => ({ ...item, name: localized(locale, item.nameAr, item.nameEn), description: localized(locale, item.descriptionAr, item.descriptionEn), visibility: item.isVisible ? "PUBLIC" : "ONLY_ME" })),
     branches: profile.branches.map((item) => ({ ...item, name: localized(locale, item.nameAr, item.nameEn), address: localized(locale, item.addressAr, item.addressEn), visibility: item.isVisible ? "PUBLIC" : "ONLY_ME" })),
     media: profile.mediaAssets.map((item) => ({ id: item.id, purpose: item.purpose, visibility: item.visibility, sortOrder: item.sortOrder, previewUrl: `/api/profiles/${profile.id}/media/${item.id}` })),
+    documents: profile.uploads.map((item) => ({
+      id: item.id,
+      originalFilename: item.originalFilename,
+      originalName: item.originalName,
+      publicUrl: item.publicUrl,
+      mimeType: item.mimeType,
+      sizeBytes: item.sizeBytes.toString(),
+      title: item.title,
+      displayTitleAr: item.displayTitleAr,
+      displayTitleEn: item.displayTitleEn,
+      visibility: item.isVisible ? "PUBLIC" : "ONLY_ME",
+      sortOrder: item.sortOrder,
+      createdAt: item.createdAt.toISOString(),
+    })),
+    documentCapability: {
+      uploadSupported: true,
+      uploadEndpoint: `/api/mobile/profiles/${profile.id}/files`,
+      replaceSupported: false,
+      deleteSupported: false,
+      visibilitySupported: false,
+      unavailableReason: "MOBILE_DOCUMENT_REPLACE_DELETE_NOT_IMPLEMENTED",
+      videoSupported: false,
+    },
     modules: profile.modules.map((module) => ({
       id: module.id,
       key: module.moduleDefinition.key,
@@ -372,6 +472,8 @@ async function loadLockedProfile(tx: Tx, userId: string, profileId: string, expe
       organization: { select: { memberships: { where: { userId }, select: { role: true } } } },
       template: { include: { moduleRules: { include: { moduleDefinition: true } } } },
       modules: { include: { moduleDefinition: true }, orderBy: { sortOrder: "asc" } },
+      category: true,
+      sectionEntries: { include: { moduleDefinition: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
     },
   });
   if (!authorized || !editorCanManage(authorized, userId)) throw new Error("PROFILE_NOT_FOUND");
@@ -450,15 +552,24 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
       case "IDENTITY_SAVE": {
         const displayName = bounded(action.displayName, 120, true)!;
         const displayLabel = bounded(action.displayLabel, 80);
+        const profession = String(action.profession ?? profile.profession) as ProfessionType;
+        if (!Object.values(ProfessionType).includes(profession)) throw new Error("PROFESSION_INVALID");
         await tx.profile.update({
           where: { id: profileId },
           data: {
             displayName,
             displayLabel,
+            firstName: action.firstName === undefined ? profile.firstName : bounded(action.firstName, 80),
+            lastName: action.lastName === undefined ? profile.lastName : bounded(action.lastName, 80),
+            profession,
+            customProfession: action.customProfession === undefined ? profile.customProfession : bounded(action.customProfession, 120),
             displayNameAr: bounded(action.displayNameAr, 120),
             displayNameEn: bounded(action.displayNameEn, 120),
             jobTitleAr: bounded(action.jobTitleAr, 120),
             jobTitleEn: bounded(action.jobTitleEn, 120),
+            company: action.company === undefined ? profile.company : bounded(action.company, 160),
+            industryAr: action.industryAr === undefined ? profile.industryAr : bounded(action.industryAr, 160),
+            industryEn: action.industryEn === undefined ? profile.industryEn : bounded(action.industryEn, 160),
             organizationNameAr: profile.profileKind === "BUSINESS" ? bounded(action.organizationNameAr, 120) : null,
             organizationNameEn: profile.profileKind === "BUSINESS" ? bounded(action.organizationNameEn, 120) : null,
             primaryLanguage: action.primaryLanguage === "en" ? "en" : "ar",
@@ -490,12 +601,12 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
         await tx.profile.update({
           where: { id: profileId },
           data: {
-            phone: bounded(action.phone, 32),
-            alternatePhone: bounded(action.alternatePhone, 32),
+            phone: optionalProfilePhone(action.phone, action.countryIso2),
+            alternatePhone: optionalProfilePhone(action.alternatePhone, action.countryIso2),
             email,
             website,
-            whatsappBusiness: bounded(action.whatsappBusiness, 32),
-            whatsappPrivate: bounded(action.whatsappPrivate, 32),
+            whatsappBusiness: optionalProfilePhone(action.whatsappBusiness, action.countryIso2),
+            whatsappPrivate: optionalProfilePhone(action.whatsappPrivate, action.countryIso2),
             locationText: bounded(action.locationText, 300),
             addressAr: bounded(action.addressAr, 500),
             addressEn: bounded(action.addressEn, 500),
@@ -514,7 +625,7 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
       case "LINK_UPSERT": {
         const destinationType = String(action.destinationType || "CUSTOM_URL") as DestinationType;
         if (!editableDestinationTypes.has(destinationType)) throw new Error("DESTINATION_TYPE_INVALID");
-        const normalized = normalizeAndValidate(destinationType, bounded(action.url, 2048, true)!);
+        const normalized = normalizeAndValidate(destinationType, bounded(action.url, 2048, true)!, typeof action.countryIso2 === "string" ? action.countryIso2 : null);
         if (!normalized.valid) throw new Error("URL_INVALID");
         const titleAr = bounded(action.titleAr, 120);
         const titleEn = bounded(action.titleEn, 120);
@@ -539,7 +650,7 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
       }
       case "LINK_DELETE": {
         const id = requiredId(action.id);
-        const deleted = await tx.destination.deleteMany({ where: { id, profileId, type: { notIn: ["PROFILE", "VCF", "FILE"] } } });
+        const deleted = await tx.destination.updateMany({ where: { id, profileId, type: { notIn: ["PROFILE", "VCF", "FILE"] } }, data: { isActive: false, isVisible: false } });
         if (!deleted.count) throw new Error("ITEM_NOT_FOUND");
         auditTarget = id; auditOperation = "profile.link.removed";
         break;
@@ -581,7 +692,7 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
         const nameAr = bounded(action.nameAr, 160);
         const nameEn = bounded(action.nameEn, 160);
         if (!nameAr && !nameEn) throw new Error("FIELD_REQUIRED");
-        const data = { nameAr, nameEn, addressAr: bounded(action.addressAr, 500), addressEn: bounded(action.addressEn, 500), phone: bounded(action.phone, 32), mapUrl: action.mapUrl ? safeHttpUrl(action.mapUrl) : null, isVisible: booleanVisibility(action.visibility) };
+        const data = { nameAr, nameEn, addressAr: bounded(action.addressAr, 500), addressEn: bounded(action.addressEn, 500), phone: optionalProfilePhone(action.phone, action.countryIso2), mapUrl: action.mapUrl ? safeHttpUrl(action.mapUrl) : null, isVisible: booleanVisibility(action.visibility) };
         if (action.id) {
           const id = requiredId(action.id);
           const updated = await tx.profileBranch.updateMany({ where: { id, profileId }, data });
@@ -606,6 +717,97 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
         await reorderExact(tx, "profileBranch", profileId, uniqueStringList(action.ids));
         auditOperation = "profile.branch.reordered";
         break;
+      case "SECTION_ENTRY_UPSERT": {
+        const fieldKey = String(action.fieldKey || "").trim().toLowerCase();
+        if (!/^[a-z0-9_]{1,64}$/.test(fieldKey)) throw new Error("PROFILE_FIELD_INVALID");
+        const kind = canonicalProfileKind(profile);
+        const categoryKey = profile.category?.slug || null;
+        const validated = validateProfileStructuredValue(kind, categoryKey, fieldKey, action.value);
+        const moduleKey = validated.definition.moduleKey;
+        const moduleDefinition = await tx.profileModuleDefinition.findUnique({ where: { key: moduleKey } });
+        if (!moduleDefinition?.isActive || !editorKeys.has(moduleKey) || !templateAllowsModule(profile, moduleKey)) {
+          throw new Error("MODULE_NOT_ALLOWED");
+        }
+        const id = action.id ? requiredId(action.id) : null;
+        const existing = id
+          ? await tx.profileSectionEntry.findFirst({ where: { id, profileId, fieldKey } })
+          : null;
+        if (id && !existing) throw new Error("ITEM_NOT_FOUND");
+        const visibility = action.visibility === undefined
+          ? existing?.visibility || "ONLY_ME"
+          : audience(action.visibility);
+        let module = profile.modules.find((item) => item.moduleDefinitionId === moduleDefinition.id);
+        if (!module) {
+          const maximum = profile.modules.reduce((value, item) => Math.max(value, item.sortOrder), -10);
+          module = await tx.profileModule.create({
+            data: {
+              profileId,
+              moduleDefinitionId: moduleDefinition.id,
+              enabled: true,
+              visibility,
+              sortOrder: maximum + 10,
+              configurationVersion: moduleDefinition.schemaVersion,
+            },
+            include: { moduleDefinition: true },
+          });
+        }
+        if (existing) {
+          const instanceKey = action.instanceKey === undefined ? existing.instanceKey : requiredId(action.instanceKey);
+          await tx.profileSectionEntry.update({
+            where: { id: existing.id },
+            data: { instanceKey, value: validated.value as Prisma.InputJsonValue, visibility, schemaVersion: moduleDefinition.schemaVersion },
+          });
+          auditTarget = existing.id;
+          auditOperation = "profile.section_entry.updated";
+        } else {
+          const count = await tx.profileSectionEntry.count({ where: { profileId, fieldKey } });
+          const maximum = validated.definition.maxItems ?? (validated.definition.repeatable ? 20 : 1);
+          if (count >= maximum) throw new Error("PROFILE_FIELD_LIMIT_REACHED");
+          const sortOrder = count * 10;
+          const instanceKey = validated.definition.repeatable
+            ? (action.instanceKey ? requiredId(action.instanceKey) : randomUUID())
+            : "default";
+          const created = await tx.profileSectionEntry.create({
+            data: {
+              profileId,
+              moduleDefinitionId: moduleDefinition.id,
+              fieldKey,
+              instanceKey,
+              value: validated.value as Prisma.InputJsonValue,
+              visibility,
+              sortOrder,
+              schemaVersion: moduleDefinition.schemaVersion,
+            },
+          });
+          auditTarget = created.id;
+          auditOperation = "profile.section_entry.created";
+        }
+        auditMetadata = { fieldKey, moduleKey, visibility };
+        break;
+      }
+      case "SECTION_ENTRY_DELETE": {
+        const id = requiredId(action.id);
+        const existing = await tx.profileSectionEntry.findFirst({ where: { id, profileId }, select: { fieldKey: true, moduleDefinition: { select: { key: true } } } });
+        if (!existing) throw new Error("ITEM_NOT_FOUND");
+        await tx.profileSectionEntry.delete({ where: { id } });
+        auditTarget = id;
+        auditOperation = "profile.section_entry.removed";
+        auditMetadata = { fieldKey: existing.fieldKey, moduleKey: existing.moduleDefinition.key };
+        break;
+      }
+      case "SECTION_ENTRY_REORDER": {
+        const fieldKey = String(action.fieldKey || "").trim().toLowerCase();
+        if (!/^[a-z0-9_]{1,64}$/.test(fieldKey)) throw new Error("PROFILE_FIELD_INVALID");
+        const ids = uniqueStringList(action.ids);
+        const existing = await tx.profileSectionEntry.findMany({ where: { profileId, fieldKey }, select: { id: true } });
+        if (existing.length !== ids.length || existing.some((item) => !ids.includes(item.id))) throw new Error("ORDER_INVALID");
+        for (const [index, id] of ids.entries()) {
+          await tx.profileSectionEntry.update({ where: { id }, data: { sortOrder: index * 10 } });
+        }
+        auditOperation = "profile.section_entry.reordered";
+        auditMetadata = { fieldKey };
+        break;
+      }
       case "MODULE_ADD": {
         const key = String(action.key || "").toUpperCase();
         const definition = await tx.profileModuleDefinition.findUnique({ where: { key } });
@@ -627,7 +829,7 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
         const enabled = typeof action.enabled === "boolean" ? action.enabled : instance.enabled;
         const visibility = action.visibility === undefined ? instance.visibility : audience(action.visibility);
         const rule = profile.template?.moduleRules.find((item) => item.moduleDefinitionId === instance.moduleDefinitionId);
-        const decision = moduleUpdateDecision({ key, supported: editorKeys.has(key), allowed: !profile.templateId || Boolean(rule?.allowed), required: requiredKeys.has(key), enabled });
+        const decision = moduleUpdateDecision({ key, supported: editorKeys.has(key), allowed: templateAllowsModule(profile, key), required: requiredKeys.has(key), enabled });
         if (!decision.allowed) throw new Error(decision.error);
         await tx.profileModule.update({ where: { id: instance.id }, data: { enabled, visibility } });
         auditTarget = instance.id; auditOperation = enabled ? "profile.module.updated" : "profile.module.disabled"; auditMetadata = { moduleKey: key, visibility };
@@ -663,6 +865,11 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
     if (changed.count !== 1) throw new Error("STALE_DRAFT");
     if (auditOperation) await tx.auditLog.create({ data: { actorId: userId, operation: auditOperation, targetId: auditTarget, metadata: auditMetadata } });
     const updated = await tx.profile.findFirst({ where: managedProfileWhere(userId, profileId), include: draftProfileInclude });
-    return { ok: true, draftRevision: expectedRevision + 1, readiness: updated ? evaluateProfileReadiness(updated) : undefined };
+    return {
+      ok: true,
+      draftRevision: expectedRevision + 1,
+      readiness: updated ? evaluateProfileReadiness(updated) : undefined,
+      completion: updated ? evaluateProfileCompletion(updated) : undefined,
+    };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10_000, timeout: 30_000 });
 }

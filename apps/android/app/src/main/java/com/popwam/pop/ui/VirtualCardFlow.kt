@@ -40,7 +40,6 @@ import coil3.compose.AsyncImage
 import com.google.gson.Gson
 import com.popwam.pop.BuildConfig
 import com.popwam.pop.R
-import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.data.api.CardLinkWriteRequest
 import com.popwam.pop.data.api.ProfileDto
 import com.popwam.pop.data.api.ProfileTemplateDto
@@ -289,9 +288,7 @@ fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainView
     var selectedTemplateId by remember(profile.virtualCard?.themeId) { mutableStateOf(profile.virtualCard?.themeId.orEmpty()) }
     val selectedTemplate = state.templates.firstOrNull { it.id == selectedTemplateId } ?: card?.template
     val draft = profile.toDraft(selectedTemplateId)
-    val hceSupported=context.packageManager.hasSystemFeature("android.hardware.nfc.hce")
     val publicUrl="${BuildConfig.PUBLIC_BASE_URL.trimEnd('/')}/${if(!profile.slug.isNullOrBlank()) "p/${profile.slug}" else "p/id/${profile.id}"}"
-    var hceActive by remember(card?.id){mutableStateOf(card?.id!=null&&HceConfig.enabled(context)&&HceConfig.activeHceVirtualCardId(context)==card.id)}
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { WizardHeader(stringResource(R.string.vc_card_details), 0, back) }
         item { Column(Modifier.padding(horizontal = 20.dp)) { Text(card?.name ?: profile.displayName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold); card?.id?.let { FigmaLtrText(it, MaterialTheme.typography.bodySmall) } } }
@@ -303,7 +300,6 @@ fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainView
             }
         }
         item { Button(publish,Modifier.padding(horizontal=20.dp).fillMaxWidth()){Icon(Icons.Default.Visibility,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.publish_title))} }
-        item { Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Button(onClick={if(card!=null){hceActive=!hceActive;HceConfig.save(context,hceActive,if(hceActive)publicUrl else null,if(hceActive)card.id else null)}},enabled=hceSupported&&card!=null,modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFFD4AF37),contentColor=Color.Black)){Icon(Icons.Default.Contactless,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.set_device_card))};Text(if(hceSupported)stringResource(R.string.hce_experimental) else stringResource(R.string.nfc_unavailable),style=MaterialTheme.typography.bodySmall,color=Color(0xFF6E6E6E))} }
         item { Text(stringResource(R.string.vc_change_template), Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

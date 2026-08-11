@@ -4,7 +4,7 @@
     <string name="pop_slogan">عالمك. POP واحد.</string>
     <string name="app_version">الإصدار 0.0.12</string>
     <string name="nav_virtual_cards">كروتي</string><string name="nav_products">منتجاتي</string><string name="nav_menu">القائمة</string>
-    <string name="activate_product">تفعيل منتج</string><string name="set_device_card">استخدامه عبر الهاتف</string><string name="hce_experimental">ميزة تجريبية على أجهزة Android الداعمة لـ NFC</string>
+    <string name="activate_product">تفعيل منتج</string>
     <string name="about_app">حول POP</string><string name="logout_all">تسجيل الخروج من جميع الأجهزة</string><string name="nearby_users">مستخدمو POP القريبون</string><string name="activity_identity">مشاركة هويتي عند عرض ملفات POP</string>
     <string name="hce_service_description">بطاقة POPWAM الافتراضية عبر NFC</string><string name="hce_aid_description">رابط POPWAM العام</string>
     <string name="sign_in">تسجيل الدخول</string><string name="phone_number">رقم الهاتف</string><string name="phone_hint">رقم الهاتف</string><string name="send_code">إرسال رمز التحقق</string><string name="verification_code">رمز التحقق</string><string name="verify_continue">تحقق وتابع</string><string name="phone_help">اختر أي دولة. يُحوّل الرقم إلى صيغة E.164 ويظل هوية حساب POP الأساسية.</string><string name="google_optional">Google حساب متصل اختياري بعد الدخول بالهاتف فقط.</string><string name="logout">تسجيل الخروج</string>
@@ -16,7 +16,7 @@
     <string name="personal">شخصي</string><string name="organization">مؤسسة</string><string name="arabic_name">الاسم بالعربية</string><string name="english_name">الاسم بالإنجليزية</string><string name="arabic_bio">النبذة أو الوصف بالعربية</string><string name="english_bio">النبذة أو الوصف بالإنجليزية</string><string name="phone">الهاتف</string><string name="email">البريد الإلكتروني</string><string name="website">الموقع</string><string name="whatsapp">واتساب</string><string name="theme">النمط</string><string name="links_files">الروابط والملفات</string><string name="new_profile">ملف جديد</string><string name="edit_profile">تعديل الملف</string><string name="profile_saved">تم حفظ الملف</string><string name="image_logo">الصورة الشخصية أو الشعار</string><string name="cover_image">صورة الغلاف</string><string name="choose_upload">اختيار ورفع</string><string name="vcard_current">وجهة حفظ جهة الاتصال تستخدم دائماً أحدث بيانات الملف.</string>
     <string name="write_nfc">كتابة NFC</string><string name="read_verify_nfc">قراءة NFC والتحقق</string><string name="programming_cards">البطاقات غير المبرمجة</string><string name="approach_tag">قرّب وسم NFC الآن</string><string name="nfc_unavailable">NFC غير متاح على هذا الجهاز.</string><string name="nfc_disabled">فعّل NFC من إعدادات Android.</string><string name="write_success">تمت كتابة رابط NFC والتحقق منه.</string><string name="verify_success">يحتوي الوسم على رابط POPWAM الصحيح تماماً.</string><string name="wrong_url">رابط الوسم لا يطابق البطاقة المحددة.</string><string name="unsupported_tag">هذا الوسم لا يدعم كتابة NDEF المتوافقة.</string><string name="tag_read_only">وسم NFC للقراءة فقط بالفعل.</string><string name="tag_too_small">سعة وسم NFC غير كافية.</string><string name="lock_read_only">قفل للقراءة فقط</string><string name="lock_warning">القفل للقراءة فقط دائم عادةً ولا يمكن التراجع عنه. سيُتحقق من الرابط مرة أخرى قبل القفل.</string><string name="type_lock">اكتب LOCK للمتابعة</string><string name="lock_confirm">قفل نهائي</string><string name="lock_success">أصبح وسم NFC للقراءة فقط وتم تحديث الخادم.</string><string name="program_staff_only">برمجة NFC متاحة فقط للموظفين والمديرين المصرح لهم.</string>
     <string name="read_uri">الرابط المقروء</string><string name="programmed_at">تاريخ البرمجة</string><string name="locked_at">تاريخ القفل</string><string name="exact_match">مطابقة تامة</string><string name="mismatch">غير مطابق</string><string name="scan_activation_separately">التحقق من QR التفعيل منفصل عن التحقق من رابط NFC.</string>
-    <string name="hce_title">بطاقة HCE افتراضية</string><string name="hce_explanation">تشارك رابط POPWAM العام المحدد فقط بصيغة NFC Forum Type 4 NDEF. ليست بطاقة دفع ولا تحتوي وظائف EMV أو مصرفية.</string><string name="hce_compatibility">يعتمد HCE على الشركة المصنّعة ووحدة NFC والقارئ وسياسة الشاشة والقفل. بعض الهواتف والقارئات غير متوافقة.</string><string name="enable_hce">تفعيل البطاقة الافتراضية</string><string name="disable_hce">تعطيل البطاقة الافتراضية</string><string name="select_hce_card">اختيار الرابط العام النشط</string>
+    <string name="hce_title">بطاقة HCE افتراضية</string><string name="hce_explanation">تشارك رابط POPWAM العام المحدد فقط بصيغة NFC Forum Type 4 NDEF. ليست بطاقة دفع ولا تحتوي وظائف EMV أو مصرفية.</string><string name="hce_compatibility">يعتمد HCE على الشركة المصنّعة ووحدة NFC والقارئ وسياسة الشاشة والقفل. بعض الهواتف والقارئات غير متوافقة.</string><string name="enable_hce">تفعيل البطاقة الافتراضية</string><string name="disable_hce">تعطيل البطاقة الافتراضية</string>
     <string name="language">اللغة</string><string name="device_language">لغة الجهاز</string><string name="arabic">العربية</string><string name="english">English</string><string name="privacy_note">تقتصر التحليلات على إجمالي الفتحات ووقت آخر فتح والإجماليات اليومية الاختيارية. لا يجمع التطبيق الموقع أو المتصفح أو بصمة الجهاز أو تحليلات IP.</string>
     <string name="generic_error">تعذر إكمال الطلب. حاول مرة أخرى.</string><string name="auth_expired">انتهت الجلسة. سجّل الدخول مجدداً.</string><string name="limit_reached">وصلت إلى حد خطتك.</string><string name="not_configured">هذه الميزة غير مضبوطة.</string><string name="confirm">تأكيد</string><string name="close">إغلاق</string><string name="card_claimed">تمت إضافة البطاقة إلى حسابك.</string><string name="upload_complete">اكتمل رفع الملف.</string><string name="destination_saved">تم حفظ الوجهة.</string>
     <string name="add_link">إضافة رابط</string><string name="link_title">عنوان الرابط</string><string name="link_url">رابط الوجهة أو قيمتها</string><string name="link_type">نوع الوجهة</string><string name="icon">الأيقونة</string><string name="search_icons">بحث في الأيقونات</string><string name="category_all">الكل</string><string name="category_contact">اتصال</string><string name="category_social">اجتماعي</string><string name="category_business">أعمال</string><string name="category_documents">مستندات</string><string name="category_location">موقع</string><string name="category_communication">تواصل</string><string name="category_shopping">تسوق</string><string name="category_media">وسائط</string><string name="category_custom">مخصص</string>
@@ -332,6 +332,29 @@
     <string name="share_scratch_code">رمز خدش مكوّن من 6 أرقام</string>
     <string name="share_activate_securely">تحقق وفعّل</string>
     <string name="share_scan_another">مسح منتج آخر</string>
+    <string name="share_profile_private">هذا الملف خاص. اجعله عامًا أو غير مدرج قبل مشاركته.</string>
+    <string name="share_unlisted_notice">هذا الملف غير مدرج. يمكن لأي شخص يملك الرابط فتحه، لكن لا ينبغي لمحركات البحث فهرسته.</string>
+    <string name="share_privacy_note">تتم مشاركة الرابط العام للملف النشط فقط. لا تُضمّن رموز دخول POP أو بيانات الحساب أو أدلة التحقق مطلقًا.</string>
+    <string name="share_write_nfc">كتابة وسم NFC</string>
+    <string name="share_phone_tap">لمس الهاتف (HCE)</string>
+    <string name="share_hce_ready">جاهز ما دامت هذه الشاشة مفتوحة والهاتف غير مقفل. يختلف التوافق حسب القارئ.</string>
+    <string name="share_hce_observability">يمكن اكتشاف اللمس، لكن لا يستطيع Android ضمان فتح الرابط على الجهاز الآخر.</string>
+    <string name="share_download_qr">حفظ QR</string>
+    <string name="share_opened">فُتحت مشاركة Android.</string>
+    <string name="share_qr_saved">تم حفظ QR في Pictures/POP.</string>
+    <string name="share_qr_shared">فُتحت مشاركة QR.</string>
+    <string name="share_qr_failed">تعذر إكمال إجراء QR.</string>
+    <string name="share_nfc_public_only">سيحتوي الوسم على رابط NDEF عام واحد فقط. لن تُكتب بيانات الحساب أو المصادقة.</string>
+    <string name="share_enable_nfc">فتح إعدادات NFC</string>
+    <string name="share_start_nfc_write">بدء الكتابة</string>
+    <string name="share_nfc_waiting">قرّب الهاتف من وسم NFC متوافق واحد.</string>
+    <string name="share_nfc_writing">جارٍ كتابة الوسم ثم قراءته للتحقق…</string>
+    <string name="share_nfc_locking">جارٍ التحقق من الرابط وقفل الوسم…</string>
+    <string name="share_nfc_write_success">تمت كتابة رابط الملف العام والتحقق منه.</string>
+    <string name="share_nfc_locked">أصبح الوسم الآن للقراءة فقط بشكل دائم.</string>
+    <string name="share_nfc_lock_warning">جعل الوسم للقراءة فقط يكون دائمًا عادةً ولا يمكن التراجع عنه. قرّب الوسم نفسه بعد التحقق فقط إذا كنت موافقًا.</string>
+    <string name="share_nfc_lock_unsupported">لا يمكن قفل هذا الوسم للقراءة فقط بأمان.</string>
+    <string name="share_nfc_verify_failed">تعذرت قراءة الوسم مجددًا مع رابط الملف الصحيح تمامًا.</string>
     <string name="settings_center_title">الإعدادات</string>
     <string name="settings_center_help">تحكّم في مظهر POP وطريقة تواصله وحماية حسابك.</string>
     <string name="settings_appearance">المظهر</string>
@@ -657,4 +680,120 @@
     <string name="profile_readiness_module_incomplete">أكمل قسم الملف المطلوب.</string>
     <string name="profile_readiness_archived">لا يمكن نشر ملف مؤرشف.</string>
     <string name="profile_readiness_generic">راجع متطلب النشر هذا.</string>
+    <string name="profile_field_required">هذا الحقل مطلوب.</string>
+    <string name="profile_field_too_long">هذه القيمة طويلة جدًا.</string>
+    <string name="profile_field_phone_invalid">أدخل رقم هاتف صالحًا.</string>
+    <string name="profile_field_email_invalid">أدخل بريدًا إلكترونيًا صالحًا.</string>
+    <string name="profile_field_url_invalid">أدخل عنوان ويب صالحًا.</string>
+    <string name="profile_field_slug_invalid">استخدم 3 أحرف لاتينية صغيرة أو أرقام أو شرطات على الأقل.</string>
+    <string name="profile_field_number_invalid">أدخل رقمًا صحيحًا صالحًا.</string>
+    <string name="profile_field_time_invalid">استخدم توقيت 24 ساعة بصيغة HH:MM.</string>
+    <string name="profile_field_too_many_items">احذف عنصرًا أو أكثر قبل الحفظ.</string>
+    <string name="profile_field_unsupported">لا يمكن تعديل نوع هذا الحقل في إصدار التطبيق الحالي.</string>
+    <string name="profile_type_details">تفاصيل الملف</string>
+    <string name="profile_required">مطلوب</string>
+    <string name="profile_value_empty">لا توجد قيمة</string>
+    <string name="profile_add_value">إضافة قيمة</string>
+    <string name="profile_list_one_per_line">أدخل عنصرًا واحدًا في كل سطر</string>
+    <string name="profile_institution">المؤسسة التعليمية</string>
+    <string name="profile_qualification">المؤهل</string>
+    <string name="profile_study_field">مجال الدراسة</string>
+    <string name="profile_start_year">سنة البدء</string>
+    <string name="profile_end_year">سنة الانتهاء</string>
+    <string name="profile_organization">المؤسسة</string>
+    <string name="profile_role">الدور</string>
+    <string name="profile_summary">الملخص</string>
+    <string name="profile_current_role">أعمل هنا حاليًا</string>
+    <string name="profile_closed">مغلق</string>
+    <string name="profile_opens_at">يفتح الساعة (HH:MM)</string>
+    <string name="profile_closes_at">يغلق الساعة (HH:MM)</string>
+    <string name="profile_monday">الاثنين</string><string name="profile_tuesday">الثلاثاء</string><string name="profile_wednesday">الأربعاء</string><string name="profile_thursday">الخميس</string><string name="profile_friday">الجمعة</string><string name="profile_saturday">السبت</string><string name="profile_sunday">الأحد</string>
+    <string name="move_up">نقل لأعلى</string><string name="move_down">نقل لأسفل</string>
+    <string name="profile_verification_not_started">لم يبدأ التحقق</string>
+    <string name="profile_verification_required">التحقق مطلوب</string>
+    <string name="profile_verification_in_progress">التحقق قيد التنفيذ</string>
+    <string name="profile_verification_pending">التحقق قيد المراجعة</string>
+    <string name="profile_verification_rejected">تم رفض التحقق</string>
+    <string name="profile_verification_needs_update">يحتاج التحقق إلى تحديث</string>
+    <string name="profile_verification_expired">انتهت صلاحية التحقق</string>
+    <string name="profile_verification_identity">الهوية</string><string name="profile_verification_business">النشاط التجاري</string><string name="profile_verification_professional">المؤهل المهني</string><string name="profile_verification_medical">المؤهل الطبي</string><string name="profile_verification_contact">بيانات الاتصال</string><string name="profile_verification_domain">النطاق</string>
+    <string name="profile_first_name">الاسم الأول</string>
+    <string name="profile_last_name">اسم العائلة</string>
+    <string name="profile_profession">المهنة</string>
+    <string name="profile_custom_profession">التخصص أو المهنة المخصصة</string>
+    <string name="profile_company">الشركة</string>
+    <string name="profile_industry_ar">المجال (بالعربية)</string>
+    <string name="profile_industry_en">المجال (بالإنجليزية)</string>
+    <string name="profile_field_selection_invalid">اختر قيمة مدعومة</string>
+    <string name="profile_profession_personal">شخصي</string>
+    <string name="profile_profession_business_owner">صاحب نشاط</string>
+    <string name="profile_profession_company">شركة</string>
+    <string name="profile_profession_developer">مطوّر</string>
+    <string name="profile_profession_designer">مصمم</string>
+    <string name="profile_profession_creator">منشئ محتوى</string>
+    <string name="profile_profession_marketer">مسوّق</string>
+    <string name="profile_profession_real_estate">عقارات</string>
+    <string name="profile_profession_doctor">طبيب</string>
+    <string name="profile_profession_lawyer">محامٍ</string>
+    <string name="profile_profession_musician">موسيقي</string>
+    <string name="profile_profession_photographer">مصور</string>
+    <string name="profile_profession_freelancer">مستقل</string>
+    <string name="settings_login_security">تسجيل الدخول والأمان</string>
+    <string name="settings_saved_devices">الأجهزة المحفوظة</string>
+    <string name="settings_language_region">اللغة والمنطقة</string>
+    <string name="settings_support_group">الدعم والمعلومات</string>
+    <string name="settings_help_center">مركز المساعدة</string>
+    <string name="settings_manage_profiles">إدارة الملفات</string>
+    <string name="settings_logout_confirm_title">تسجيل الخروج من POP؟</string>
+    <string name="settings_logout_confirm_body">سيتم مسح الجلسة المحلية وبيانات الحساب الحساسة المخزنة مؤقتًا. ستبقى ملفاتك وتفضيلاتك محفوظة.</string>
+    <string name="settings_language_help">اختر من اللغات المتاحة حاليًا في تثبيت POP. تتحدث الواجهة فورًا.</string>
+    <string name="settings_region">منطقة الجهاز</string>
+    <string name="settings_region_help">المنطقة للمعلومات فقط ولا تغيّر هوية هاتفك الموثّقة.</string>
+    <string name="settings_open_notification_settings">فتح إعدادات الإشعارات</string>
+    <string name="settings_profile_privacy_separate">حالات عام وغير مدرج وخاص تخص كل ملف، وليست إعدادًا للحساب الخاص.</string>
+    <string name="settings_manage_profile_visibility">إدارة ظهور الملفات</string>
+    <string name="settings_passcode_biometrics">رمز القفل والمقاييس الحيوية</string>
+    <string name="settings_biometric_status">حالة أمان الجهاز</string>
+    <string name="settings_device_security_help">يعتمد POP على بيانات اعتماد أندرويد والمقاييس الحيوية المسجلة. لا يخزن بصمتك أو بيانات وجهك أو رمز قفل الجهاز.</string>
+    <string name="settings_manage_passkeys">إدارة مفاتيح المرور</string>
+    <string name="settings_enroll_biometrics">إعداد أمان الجهاز</string>
+    <string name="settings_open_device_security">فتح أمان الجهاز</string>
+    <string name="settings_biometric_ready">متاح ومسجّل</string>
+    <string name="settings_biometric_not_enrolled">مدعوم وغير مسجّل</string>
+    <string name="settings_biometric_temporary">غير متاح مؤقتًا</string>
+    <string name="settings_manage_device_sessions">إدارة الجلسات (%1$d)</string>
+    <string name="settings_account_name">اسم الحساب</string>
+    <string name="settings_account_email">البريد الخاص بالحساب</string>
+    <string name="settings_account_language">لغة الحساب</string>
+    <string name="settings_account_status">حالة الحساب</string>
+    <string name="settings_feedback_roadmap">الملاحظات وخارطة الطريق</string>
+    <string name="settings_help_no_direct_support">لا يوجد عنوان دعم منفصل مُعد في المنتج الحالي. تستخدم الملاحظات خارطة طريق POP الحالية بعد تسجيل الدخول.</string>
+    <string name="settings_version_name">إصدار التطبيق</string>
+    <string name="settings_build_number">رقم البناء</string>
+    <string name="settings_company_attribution">POP من POPWAM. المنتج والمنصة من POPWAM.</string>
+    <string name="settings_legal_help">تفتح هذه الروابط صفحات الشروط القانونية الحالية للإنتاج بأمان في المتصفح.</string>
+    <string name="profile_profession_restaurant">مطعم</string>
+    <string name="profile_profession_shop">متجر</string>
+    <string name="profile_documents">المستندات</string>
+    <string name="profile_documents_help">ارفع فقط مستندات الملف العام التي تريد ربطها بهذا الملف. تُدار أدلة التحقق والثقة بصورة منفصلة.</string>
+    <string name="profile_document_title_ar">عنوان المستند (بالعربية)</string>
+    <string name="profile_document_title_en">عنوان المستند (بالإنجليزية)</string>
+    <string name="profile_document_upload">اختيار مستند ورفعه</string>
+    <string name="profile_document_upload_unavailable">رفع المستندات غير متاح لهذا الملف.</string>
+    <string name="profile_document_manage_unavailable">استبدال المستندات وحذفها غير مدعومين على الهاتف بعد. تظهر المستندات الحالية للقراءة فقط.</string>
+    <string name="profile_document_too_large">يجب ألا يزيد حجم المستند عن 10 ميغابايت.</string>
+    <string name="profile_document_type_invalid">اختر ملف PDF أو نصًا أو vCard أو JPEG أو PNG أو WebP بحيث يتطابق الامتداد مع نوع الملف.</string>
+    <string name="profile_document_empty">المستند المحدد فارغ أو تعذرت قراءته.</string>
+    <string name="profile_document_upload_failed">تعذر تجهيز المستند للرفع.</string>
+    <string name="profile_document_metadata">%1$s · %2$s</string>
+    <string name="profile_module_identity">الهوية العامة</string>
+    <string name="profile_module_social_links">روابط التواصل</string>
+    <string name="profile_module_portfolio">معرض الأعمال</string>
+    <string name="profile_module_catalog">الكتالوج</string>
+    <string name="profile_module_personal_details">التفاصيل الشخصية</string>
+    <string name="profile_module_professional_details">التفاصيل المهنية</string>
+    <string name="profile_module_business_details">تفاصيل النشاط</string>
+    <string name="profile_module_restaurant_details">تفاصيل المطعم</string>
+    <string name="profile_module_medical_details">التفاصيل الطبية</string>
+    <string name="profile_additional_details">تفاصيل إضافية</string>
 </resources>

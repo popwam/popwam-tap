@@ -56,7 +56,7 @@ interface PopwamApi {
     @POST("api/mobile/virtual-cards/{id}/google-wallet") suspend fun googleWallet(@Path("id") id:String):GoogleWalletLinkResponse
     @Multipart @POST("api/profiles/{id}/media") suspend fun uploadMedia(@Path("id") id:String,@Part("purpose") purpose:RequestBody,@Part("expectedDraftRevision") expectedDraftRevision:RequestBody?=null,@Part file:MultipartBody.Part):ProfileMediaUploadResponse
     @DELETE("api/profiles/{profileId}/media/{mediaId}") suspend fun removeEditorMedia(@Path("profileId") profileId:String,@Path("mediaId") mediaId:String,@Query("expectedDraftRevision") expectedDraftRevision:Int):ApiResult
-    @Multipart @POST("api/mobile/profiles/{id}/files") suspend fun uploadFile(@Path("id") id:String,@Part("titleAr") titleAr:RequestBody,@Part("titleEn") titleEn:RequestBody,@Part file:MultipartBody.Part):ApiResult
+    @Multipart @POST("api/mobile/profiles/{id}/files") suspend fun uploadFile(@Path("id") id:String,@Part("titleAr") titleAr:RequestBody,@Part("titleEn") titleEn:RequestBody,@Part file:MultipartBody.Part):ProfileFileUploadResponse
     @GET("api/mobile/profiles/{id}/destinations") suspend fun destinations(@Path("id") id:String):Map<String,Any>
     @POST("api/mobile/profiles/{id}/destinations") suspend fun createDestination(@Path("id") id:String,@Body body:DestinationWriteRequest):ApiResult
     @DELETE("api/mobile/destinations/{id}") suspend fun deleteDestination(@Path("id") id:String):ApiResult

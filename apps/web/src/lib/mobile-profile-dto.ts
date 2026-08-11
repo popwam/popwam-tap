@@ -1,0 +1,87 @@
+import { Prisma } from "@popwam/db";
+
+export const mobileProfileInclude = {
+  destinations: { orderBy: { sortOrder: "asc" } },
+  uploads: { orderBy: { sortOrder: "asc" } },
+  virtualCard: { include: { template: true } },
+} satisfies Prisma.ProfileInclude;
+
+type MobileProfileData = Prisma.ProfileGetPayload<{ include: typeof mobileProfileInclude }>;
+
+/** Explicit authenticated-owner compatibility DTO. Internal ownership,
+ * storage keys, draft internals, and publication internals never cross it. */
+export function mobileProfileOwnerDto(profile: MobileProfileData) {
+  return {
+    id: profile.id,
+    slug: profile.slug,
+    type: profile.type,
+    primaryLanguage: profile.primaryLanguage,
+    displayName: profile.displayName,
+    displayNameAr: profile.displayNameAr,
+    displayNameEn: profile.displayNameEn,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    jobTitleAr: profile.jobTitleAr,
+    jobTitleEn: profile.jobTitleEn,
+    company: profile.company,
+    bioAr: profile.bioAr,
+    bioEn: profile.bioEn,
+    organizationNameAr: profile.organizationNameAr,
+    organizationNameEn: profile.organizationNameEn,
+    industryAr: profile.industryAr,
+    industryEn: profile.industryEn,
+    descriptionAr: profile.descriptionAr,
+    descriptionEn: profile.descriptionEn,
+    avatarUrl: profile.avatarUrl,
+    logoUrl: profile.logoUrl,
+    coverUrl: profile.coverUrl,
+    phone: profile.phone,
+    alternatePhone: profile.alternatePhone,
+    whatsappBusiness: profile.whatsappBusiness,
+    email: profile.email,
+    website: profile.website,
+    locationText: profile.locationText,
+    addressAr: profile.addressAr,
+    addressEn: profile.addressEn,
+    theme: profile.theme,
+    destinations: profile.destinations.map((item) => ({
+      id: item.id,
+      profileId: item.profileId,
+      title: item.title,
+      titleAr: item.titleAr,
+      titleEn: item.titleEn,
+      type: item.type,
+      url: item.url,
+      iconKey: item.iconKey,
+      isActive: item.isActive,
+    })),
+    uploads: profile.uploads.map((item) => ({
+      id: item.id,
+      originalFilename: item.originalFilename,
+      displayTitleAr: item.displayTitleAr,
+      displayTitleEn: item.displayTitleEn,
+      publicUrl: item.publicUrl,
+      mimeType: item.mimeType,
+      sizeBytes: item.sizeBytes.toString(),
+      isVisible: item.isVisible,
+    })),
+    virtualCard: profile.virtualCard ? {
+      id: profile.virtualCard.id,
+      name: profile.virtualCard.name,
+      type: profile.virtualCard.type,
+      themeId: profile.virtualCard.themeId,
+      isDefault: profile.virtualCard.isDefault,
+      status: profile.virtualCard.status,
+      template: profile.virtualCard.template ? {
+        id: profile.virtualCard.template.id,
+        nameAr: profile.virtualCard.template.nameAr,
+        nameEn: profile.virtualCard.template.nameEn,
+        slug: profile.virtualCard.template.slug,
+        category: profile.virtualCard.template.category,
+        minimumPlan: profile.virtualCard.template.minimumPlan,
+        previewImageUrl: profile.virtualCard.template.previewImageUrl,
+        configuration: profile.virtualCard.template.configuration,
+      } : null,
+    } : null,
+  };
+}

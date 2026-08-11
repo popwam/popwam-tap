@@ -24,13 +24,6 @@
                 <data android:scheme="https" android:host="pop.popwam.com" android:pathPrefix="/activate"/>
                 <data android:scheme="https" android:host="pop.popwam.com" android:pathPrefix="/login"/>
                 <data android:scheme="https" android:host="pop.popwam.com" android:pathPrefix="/dashboard"/>
-                <data android:scheme="https" android:host="pop.popwam.com"/>
-            </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="go.popwam.com"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>

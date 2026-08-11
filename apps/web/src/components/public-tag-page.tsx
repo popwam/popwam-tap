@@ -6,10 +6,10 @@ import { isSafeDestinationUrl } from "@/lib/url";
 import { decideTagResolution } from "@/lib/tag-resolution";
 import { PublicProfile } from "@/components/public-profile";
 import { PublicStatus } from "@/components/public-status";
-import { getPublicProfileProjectionById, moduleUsesCanonicalPublicState, publicProfileInclude } from "@/lib/profile-projection";
+import { getPublicProfileProjectionById, moduleUsesCanonicalPublicState } from "@/lib/profile-projection";
+import { publishedShareDestination } from "@/lib/share-center";
 
-const profileInclude=publicProfileInclude satisfies Prisma.ProfileInclude;
-const tagInclude={activeDestination:{include:{profile:{include:profileInclude}}}} satisfies Prisma.TagInclude;
+const tagInclude={activeDestination:{include:{profile:{select:{id:true}}}}} satisfies Prisma.TagInclude;
 const cardSelect={id:true,serialNumber:true,publicSlug:true,cardType:true,assignmentStatus:true,cardStatus:true,ownerId:true,activeDestination:{select:{id:true,isActive:true,type:true,url:true,profileId:true}}} satisfies Prisma.CardSelect;
 
 function recordCardOpen(cardId:string){
@@ -30,16 +30,14 @@ export async function PublicTagPage({code,lookup="shortCode"}:{code:string;looku
     if(decision.kind==="unconfigured")return <PublicStatus type="fallback"/>;
     recordCardOpen(card.id);
     if(decision.kind==="redirect"){
-      if(!isSafeDestinationUrl(decision.url))return <PublicStatus type="fallback"/>;
       if(card.activeDestination?.profileId){
         const projection=await getPublicProfileProjectionById(card.activeDestination.profileId);
         if(!projection?.publiclyReadable)return <PublicStatus type="unavailable"/>;
         const isContact=card.activeDestination.type==="VCF";
-        const published=isContact
-          ? moduleUsesCanonicalPublicState(projection.profile,"CONTACT",true)&&projection.profile.showSaveContact
-          : projection.profile.destinations.some(item=>item.id===card.activeDestination?.id);
-        if(!published)return <PublicStatus type="unavailable"/>;
+        if(isContact){if(!moduleUsesCanonicalPublicState(projection.profile,"CONTACT",true)||!projection.profile.showSaveContact)return <PublicStatus type="unavailable"/>;}
+        else {const published=publishedShareDestination(projection,card.activeDestination.id);if(!published)return <PublicStatus type="unavailable"/>;redirect(published.url);}
       }
+      if(!isSafeDestinationUrl(decision.url))return <PublicStatus type="fallback"/>;
       redirect(decision.url);
     }
     const projection=decision.profileId?await getPublicProfileProjectionById(decision.profileId):null;if(!projection?.publiclyReadable)return <PublicStatus type="unavailable"/>;return <PublicProfile profile={projection.profile}/>;
@@ -49,16 +47,14 @@ export async function PublicTagPage({code,lookup="shortCode"}:{code:string;looku
   if(!tag)return <PublicStatus type="notFound"/>;const decision=decideTagResolution(tag);if(decision.kind==="status")return <PublicStatus type={decision.status}/>;if(decision.kind==="unconfigured")return <PublicStatus type="fallback"/>;
   after(async()=>{try{await prisma.tag.update({where:{id:tag.id},data:{scanCount:{increment:1},lastScannedAt:new Date()}});}catch(error){console.error("legacy analytics failed",{operation:"tag.open",tagId:tag.id,error:error instanceof Error?error.name:"unknown"});}});
   if(decision.kind==="redirect"){
-    if(!isSafeDestinationUrl(decision.url))return <PublicStatus type="fallback"/>;
     if(tag.activeDestination?.profileId){
       const projection=await getPublicProfileProjectionById(tag.activeDestination.profileId);
       if(!projection?.publiclyReadable)return <PublicStatus type="unavailable"/>;
       const isContact=tag.activeDestination.type==="VCF";
-      const published=isContact
-        ? moduleUsesCanonicalPublicState(projection.profile,"CONTACT",true)&&projection.profile.showSaveContact
-        : projection.profile.destinations.some(item=>item.id===tag.activeDestination?.id);
-      if(!published)return <PublicStatus type="unavailable"/>;
+      if(isContact){if(!moduleUsesCanonicalPublicState(projection.profile,"CONTACT",true)||!projection.profile.showSaveContact)return <PublicStatus type="unavailable"/>;}
+      else {const published=publishedShareDestination(projection,tag.activeDestination.id);if(!published)return <PublicStatus type="unavailable"/>;redirect(published.url);}
     }
+    if(!isSafeDestinationUrl(decision.url))return <PublicStatus type="fallback"/>;
     redirect(decision.url);
   }
   const profileId=tag.activeDestination?.profile?.id;const projection=profileId?await getPublicProfileProjectionById(profileId):null;if(!projection?.publiclyReadable)return <PublicStatus type="unavailable"/>;return <PublicProfile profile={projection.profile}/>;
