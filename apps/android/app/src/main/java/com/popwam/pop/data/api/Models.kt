@@ -66,6 +66,8 @@ data class QuotaIncreaseRequest(val resource:String,val requestedValue:String,va
 data class QuotaIncreaseResponse(val ok:Boolean=false,val request:QuotaRequestDto?=null,val idempotent:Boolean=false,val error:String?=null)
 data class LegalDocumentDto(val id:String="",val documentType:String="",val version:String="",val title:String="",val path:String="")
 data class LegalRequiredResponse(val ok:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val documents:List<LegalDocumentDto> = emptyList(),val error:String?=null)
+data class PublishedLegalDocumentDto(val documentType:String="",val version:String="",val locale:String="",val title:String="",val content:String="",val effectiveAt:String="")
+data class PublishedLegalDocumentResponse(val ok:Boolean=false,val document:PublishedLegalDocumentDto?=null,val fallbackLocale:Boolean=false,val error:String?=null)
 data class LegalConsentRequest(val accepted:Boolean=true,val locale:String)
 data class ProfileCategoryBootstrapDto(
     val id:String="",

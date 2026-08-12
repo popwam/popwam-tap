@@ -22,7 +22,6 @@ data class SplashTiming(
 
 fun requiredDestination(state: LaunchState, authenticated: Boolean): PopDestination = when {
     authenticated -> PopDestination.Home
-    !state.hasSeenFirstLaunchStage -> PopDestination.FirstLaunchFinalStage
     !state.hasSelectedLanguage -> PopDestination.Language
     !state.hasSelectedBaseTheme -> PopDestination.Theme
     !state.hasCompletedWelcome || state.welcomeVersionSeen < CURRENT_WELCOME_VERSION ->

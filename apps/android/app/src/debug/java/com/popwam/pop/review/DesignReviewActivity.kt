@@ -136,7 +136,7 @@ private fun DesignReviewGallery() {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             items(listOf(0f, .22f, .48f, .75f, 1f)) { value -> Button(onClick = { splashProgress = value }) { Text("${(value * 100).toInt()}%") } }
                         }
-                        PopSplashScreen(splashProgress, showGoAhead = splashProgress >= 1f, onGoAhead = {})
+                        PopSplashScreen(splashProgress, reducedMotion = false)
                     }
                     ReviewScreen.LANGUAGE -> LanguageScreen(listOf("en", "ar"), language, {})
                     ReviewScreen.THEME -> ThemeScreen(mode, palette, false, { mode = it }, {}, {}, { palette = it }, {})

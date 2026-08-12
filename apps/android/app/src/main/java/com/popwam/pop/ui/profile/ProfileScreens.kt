@@ -85,10 +85,10 @@ fun ProfileListScreen(state:ProfilesUiState,onEvent:(ProfileEvent)->Unit){
 }
 
 @Composable
-fun ProfileViewScreen(state:ProfilesUiState,profileId:String,onBack:()->Unit,onEvent:(ProfileEvent)->Unit){
+fun ProfileViewScreen(state:ProfilesUiState,profileId:String,onBack:()->Unit,onEvent:(ProfileEvent)->Unit,topLevel:Boolean=false){
     val content=state.content
     LaunchedEffect(profileId){onEvent(ProfileEvent.SelectProfile(profileId))}
-    Scaffold(containerColor=MaterialTheme.colorScheme.background,topBar={TopAppBar(title={Text(stringResource(R.string.profile_preview))},navigationIcon={IconButton(onBack){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))}},actions={IconButton({onEvent(ProfileEvent.OpenEditor(profileId))}){Icon(Icons.Default.Edit,stringResource(R.string.profile_edit))}})}){padding->
+    Scaffold(containerColor=MaterialTheme.colorScheme.background,topBar={TopAppBar(title={Text(stringResource(if(topLevel)R.string.my_profile else R.string.profile_preview))},navigationIcon={if(!topLevel)IconButton(onBack){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))}},actions={if(topLevel)IconButton({onEvent(ProfileEvent.OpenList)}){Icon(Icons.Default.People,stringResource(R.string.profiles_title))};IconButton({onEvent(ProfileEvent.OpenEditor(profileId))}){Icon(Icons.Default.Edit,stringResource(R.string.profile_edit))}})}){padding->
         when{content==null && (state.loadState==ProfileLoadState.ERROR || !state.refreshing && state.loadState==ProfileLoadState.CONTENT)->ProfileFailure(state.errorCode ?: "PROFILE_CONTENT_UNAVAILABLE",onEvent,Modifier.padding(padding));content==null->ProfileLoading(Modifier.padding(padding));else->LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(bottom=28.dp)){
             item{ProfileHero(content)}
             item{Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){ProfileAction(R.string.profile_share,Icons.Default.Share,Modifier.weight(1f)){onEvent(ProfileEvent.OpenShare(profileId))};ProfileAction(R.string.profile_qr,Icons.Default.QrCode,Modifier.weight(1f)){onEvent(ProfileEvent.OpenQr(profileId))};ProfileAction(R.string.profile_nfc,Icons.Default.Nfc,Modifier.weight(1f)){onEvent(ProfileEvent.OpenNfc(profileId))}}}

@@ -48,13 +48,7 @@ fun LaunchExperience(
         when (destination) {
             PopDestination.Launch -> PopSplashScreen(
                 progress = state.splashProgress,
-                showGoAhead = false,
-                onGoAhead = {},
-            )
-            PopDestination.FirstLaunchFinalStage -> PopSplashScreen(
-                progress = 1f,
-                showGoAhead = true,
-                onGoAhead = viewModel::continueFromFirstLaunchStage,
+                reducedMotion = viewModel.reducedMotion,
             )
             PopDestination.Language -> LanguageScreen(
                 availableLanguageTags = availableLanguages,

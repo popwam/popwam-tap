@@ -9,8 +9,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class LaunchFlowTest {
-    @Test fun cleanLaunchRequiresFinalSplash() =
-        assertEquals(PopDestination.FirstLaunchFinalStage, requiredDestination(LaunchState(), false))
+    @Test fun cleanLaunchContinuesDirectlyToLanguage() =
+        assertEquals(PopDestination.Language, requiredDestination(LaunchState(), false))
 
     @Test fun partialStateResumesAtFirstMissingRequirement() {
         val splash = LaunchState(hasSeenFirstLaunchStage = true)

@@ -41,11 +41,11 @@ class Phase3ScreenshotTest {
     }
 
     @Test fun firstSplashStage() = capture("splash-stage-1", "en", ThemeMode.LIGHT) {
-        PopSplashScreen(progress = 0f, showGoAhead = false, onGoAhead = {}, modifier = Modifier.fillMaxSize())
+        PopSplashScreen(progress = 0f, reducedMotion = false, modifier = Modifier.fillMaxSize())
     }
 
     @Test fun finalFirstLaunchSplashStage() = capture("splash-stage-5", "en", ThemeMode.LIGHT) {
-        PopSplashScreen(progress = 1f, showGoAhead = true, onGoAhead = {}, modifier = Modifier.fillMaxSize())
+        PopSplashScreen(progress = 1f, reducedMotion = true, modifier = Modifier.fillMaxSize())
     }
 
     @Test fun languageEnglish() = capture("language-en", "en", ThemeMode.LIGHT) {

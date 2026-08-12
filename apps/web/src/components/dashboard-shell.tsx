@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { CreditCard, Gauge, Heart, Languages, Layers3, Lightbulb, Link2, LogOut, MessageCircle, MessageSquareText, Nfc, Package, Palette, ScrollText, Settings, Shield, ShoppingBag, UserRound, Users, WalletCards } from "lucide-react";
+import { Bell, CreditCard, Gauge, Heart, Languages, Layers3, Lightbulb, Link2, LogOut, MessageCircle, MessageSquareText, Nfc, Package, Palette, ScrollText, Settings, Shield, ShoppingBag, UserRound, Users, WalletCards } from "lucide-react";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ProfileAvatar } from "@/components/profile-avatar";
 
@@ -23,6 +23,7 @@ export function DashboardShell({ children,user,locale,labels,languageLabel }: { 
     ["/admin/cards",locale==="ar"?"الكروت الفعلية":"Physical cards",Nfc],
     ["/admin/cards/unassigned",locale==="ar"?"كروت غير معيّنة":"Unassigned cards",Nfc],
     ["/admin/users",labels.users,Users],
+    ["/admin/security",locale==="ar"?"الأجهزة والجلسات":"Devices & sessions",Shield],
     ["/admin/customers",labels.customers,Users],
     ["/admin/subscriptions",locale==="ar"?"طلبات الاشتراك":"Subscription requests",Layers3],
     ["/admin/quota-requests",locale==="ar"?"طلبات زيادة الحدود":"Quota requests",Gauge],
@@ -34,6 +35,7 @@ export function DashboardShell({ children,user,locale,labels,languageLabel }: { 
     ["/admin/links",locale==="ar"?"الروابط حسب المستخدم":"Links by user",Link2],
     ["/admin/templates",locale==="ar"?"القوالب":"Templates",Palette],
     ["/admin/plans",labels.plans,Layers3],
+    ["/admin/notifications",locale==="ar"?"مركز الإشعارات":"Notifications center",Bell],
     ["/admin/localization",locale==="ar"?"اللغات والترجمة":"Languages",Languages],
     ["/admin/wallet",locale==="ar"?"إعداد المحفظة":"Wallet setup",WalletCards],
     ["/admin/transfers",locale==="ar"?"عمليات النقل":"Transfers",CreditCard],

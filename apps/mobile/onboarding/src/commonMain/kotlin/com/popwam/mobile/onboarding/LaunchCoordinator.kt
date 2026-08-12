@@ -49,11 +49,6 @@ class LaunchCoordinator(
         )
     }
 
-    suspend fun continueFromFirstLaunchStage() {
-        val updated = store.update { it.copy(hasSeenFirstLaunchStage = true) }
-        mutableState.value = mutableState.value.copy(destination = PopDestination.Language, persisted = updated)
-    }
-
     suspend fun selectLanguage(languageTag: String) {
         val updated = store.update {
             it.copy(hasSelectedLanguage = true, selectedLanguageTag = languageTag)

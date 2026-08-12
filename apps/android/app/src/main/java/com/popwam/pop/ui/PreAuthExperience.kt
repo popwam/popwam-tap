@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,8 +42,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -52,8 +58,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.os.LocaleListCompat
 import com.popwam.pop.R
+import com.popwam.pop.TapApplication
+import com.popwam.pop.data.api.PublishedLegalDocumentDto
 import kotlinx.coroutines.launch
 
 enum class PreAuthLegalKind { TERMS, PRIVACY }
@@ -162,12 +171,22 @@ fun ProductIntroScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NativeLegalScreen(kind: PreAuthLegalKind, version: String? = null, onBack: () -> Unit) {
+fun NativeLegalScreen(kind: PreAuthLegalKind, onBack: () -> Unit) {
     val title = if (kind == PreAuthLegalKind.TERMS) R.string.terms else R.string.privacy
-    val paragraphs = if (kind == PreAuthLegalKind.TERMS) {
-        listOf(R.string.legal_terms_body_one, R.string.legal_terms_body_two)
-    } else {
-        listOf(R.string.legal_privacy_body_one, R.string.legal_privacy_body_two)
+    val context = LocalContext.current
+    val api = remember(context) { (context.applicationContext as TapApplication).container.api }
+    var reload by remember { mutableIntStateOf(0) }
+    var document by remember { mutableStateOf<PublishedLegalDocumentDto?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(kind, currentLocale(), reload) {
+        loading = true
+        failed = false
+        document = runCatching {
+            api.currentLegal(kind.name, currentLocale()).takeIf { it.ok }?.document
+                ?: error("LEGAL_DOCUMENT_UNAVAILABLE")
+        }.onFailure { failed = true }.getOrNull()
+        loading = false
     }
     PopSystemBars(MaterialTheme.colorScheme.background.red < .2f)
     Scaffold(
@@ -192,15 +211,27 @@ fun NativeLegalScreen(kind: PreAuthLegalKind, version: String? = null, onBack: (
                     Text(stringResource(R.string.pop_brand_short), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                 }
             }
-            item {
-                Text(
-                    if (version.isNullOrBlank()) stringResource(R.string.legal_current_public_notice) else stringResource(R.string.legal_version_format, version),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            paragraphs.forEach { paragraph ->
-                item { Text(stringResource(paragraph), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            when {
+                loading -> item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                failed || document == null -> item {
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.generic_error), color = MaterialTheme.colorScheme.error)
+                        Button({ reload++ }, Modifier.padding(top = 12.dp)) { Text(stringResource(R.string.retry)) }
+                    }
+                }
+                else -> {
+                    item {
+                        Text(document!!.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(R.string.legal_version_format, document!!.version),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    document!!.content.split(Regex("\\n\\s*\\n")).filter(String::isNotBlank).forEach { paragraph ->
+                        item { Text(paragraph.trim(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
             }
             item { HorizontalDivider() }
             item { Text(stringResource(R.string.legal_reading_not_consent), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

@@ -155,16 +155,7 @@ fun FigmaMainNavigation(
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            if (currentRoute in topRoutes && currentRoute != "home") TopAppBar(
-                title = { val firstName=state.profiles.firstOrNull()?.firstName?.takeIf(String::isNotBlank);Text(firstName ?: stringResource(R.string.app_name), fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = if(darkBackground) Color.White else Color.Black),
-                actions = {
-                    state.uploadProgress?.let { CircularProgressIndicator(progress={it/100f},Modifier.size(24.dp),strokeWidth=2.dp) }
-                    TextButton({toggleLanguage(context)}) { Text(stringResource(R.string.change_language),fontWeight=FontWeight.Bold,color=if(darkBackground) Color(0xFFD4AF37) else MaterialTheme.colorScheme.primary) }
-                },
-            )
-        },
+        topBar = {},
         bottomBar = {
             if (currentRoute in topRoutes) PopPrimaryNavigationBar(selectedHomeTab(currentRoute)) { route -> nav.navigate(route) { popUpTo("home"); launchSingleTop = true } }
         },
@@ -185,6 +176,11 @@ fun FigmaMainNavigation(
                 }
                 composable("profiles") { ProfileListScreen(profileState,profiles::onEvent) }
                 composable("profiles/create") { ProfileCreationScreen(profileState,nav::popBackStack,profiles::onEvent) }
+                composable("my-profile") {
+                    val activeId = profileState.activeProfileId ?: profileState.profiles.firstOrNull()?.id
+                    if (activeId == null) ProfileListScreen(profileState, profiles::onEvent)
+                    else ProfileViewScreen(profileState, activeId, {}, profiles::onEvent, topLevel = true)
+                }
                 composable("share") { ProductionShareCenterScreen(shareState,share,activeShareProfile,{nav.navigate("share-activate")},{nav.navigate(it)}) }
                 composable("profile/share/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
                     val id=entry.arguments?.getString("id").orEmpty()
@@ -251,8 +247,8 @@ fun FigmaMainNavigation(
                 composable("programming") { LaunchedEffect(Unit) { vm.loadProgramming() }; LegacyProgrammingList(state.programmingCards) { nav.navigate("program/$it") } }
                 composable("program/{id}") { entry -> state.programmingCards.firstOrNull { it.id == entry.arguments?.getString("id") }?.let { LegacyProgramming(it, state, vm) } }
                 composable("hce") { ProductionShareCenterScreen(shareState,share,activeShareProfile,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.HCE) }
-                composable("settings") { SecuritySettingsScreen("root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it=="nearby"||it=="profiles")nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true}) }
-                composable("settings/{section}",arguments=listOf(navArgument("section"){type=NavType.StringType})){entry->SecuritySettingsScreen(entry.arguments?.getString("section") ?: "root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it=="nearby"||it=="profiles")nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true})}
+                composable("settings") { SecuritySettingsScreen("root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it.startsWith("legal/")||it=="nearby"||it=="profiles")nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true}) }
+                composable("settings/{section}",arguments=listOf(navArgument("section"){type=NavType.StringType})){entry->SecuritySettingsScreen(entry.arguments?.getString("section") ?: "root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it.startsWith("legal/")||it=="nearby"||it=="profiles")nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true})}
                 composable("integrations") { SecurePortal(R.string.connected_accounts,"dashboard/integrations",R.string.connected_accounts_help) }
                 composable("passkeys") { SecuritySettingsScreen("passkeys",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true}) }
                 composable("legal/terms"){NativeLegalScreen(PreAuthLegalKind.TERMS,onBack=nav::popBackStack)}
@@ -276,9 +272,9 @@ private fun PopPrimaryNavigationBar(selected: HomePrimaryTab, navigate: (String)
         ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 listOf(
-                    Triple(HomePrimaryTab.HOME, "home", Pair(R.string.home, Icons.Default.Home)),
-                    Triple(HomePrimaryTab.SHARE, "share", Pair(R.string.editor_share, Icons.Default.Share)),
-                    Triple(HomePrimaryTab.MENU, "menu", Pair(R.string.nav_menu, Icons.Default.GridView)),
+                    Triple(HomePrimaryTab.HOME, "home", Pair(R.string.home, PopNavigationIcons.Home)),
+                    Triple(HomePrimaryTab.PROFILE, "my-profile", Pair(R.string.my_profile, PopNavigationIcons.Profile)),
+                    Triple(HomePrimaryTab.MENU, "menu", Pair(R.string.nav_menu, PopNavigationIcons.Menu)),
                 ).forEach { (tab, route, item) ->
                     val selectedColor = if (selected == tab) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     Column(
@@ -286,7 +282,7 @@ private fun PopPrimaryNavigationBar(selected: HomePrimaryTab, navigate: (String)
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Icon(item.second, stringResource(item.first), Modifier.size(if (tab == HomePrimaryTab.SHARE) 26.dp else 24.dp), tint = selectedColor)
+                        Icon(item.second, stringResource(item.first), Modifier.size(24.dp), tint = selectedColor)
                         Text(stringResource(item.first), style = MaterialTheme.typography.labelSmall, color = selectedColor, maxLines = 1)
                         Spacer(Modifier.size(3.dp).background(if (selected == tab) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape))
                     }

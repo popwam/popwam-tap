@@ -57,10 +57,6 @@ class LaunchViewModel(
         savedStateHandle["phase4_profile_setup_handoff"] = destination.step.name
     }
 
-    fun continueFromFirstLaunchStage() = viewModelScope.launch {
-        coordinator.continueFromFirstLaunchStage()
-    }
-
     fun selectLanguage(languageTag: String, applyLanguage: (String) -> Unit) = viewModelScope.launch {
         coordinator.selectLanguage(languageTag)
         applyLanguage(languageTag)

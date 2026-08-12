@@ -23,6 +23,7 @@ interface PopwamApi {
     @POST("api/settings/quota") suspend fun requestQuotaIncrease(@Body body:QuotaIncreaseRequest):QuotaIncreaseResponse
     @POST("api/mobile/push-tokens") suspend fun registerPushToken(@Body body:PushTokenRequest):ApiResult
     @GET("api/legal/required") suspend fun requiredLegal(@Query("locale") locale:String):LegalRequiredResponse
+    @GET("api/legal/current") suspend fun currentLegal(@Query("type") type:String,@Query("locale") locale:String):PublishedLegalDocumentResponse
     @POST("api/legal/required") suspend fun acceptLegal(@Body body:LegalConsentRequest):ApiResult
     @GET("api/profile-bootstrap") suspend fun profileBootstrapStatus(@Query("locale") locale:String):ProfileBootstrapStatusResponse
     @POST("api/profile-bootstrap") suspend fun submitProfileBootstrap(@Body body:ProfileBootstrapRequest):ProfileBootstrapResponse

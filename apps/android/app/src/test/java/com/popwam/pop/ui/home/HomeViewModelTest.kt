@@ -76,7 +76,7 @@ class HomeViewModelTest {
 
     @Test fun `bottom navigation has one deterministic selected tab`() {
         assertEquals(HomePrimaryTab.HOME, selectedHomeTab("home"))
-        assertEquals(HomePrimaryTab.SHARE, selectedHomeTab("share"))
+        assertEquals(HomePrimaryTab.PROFILE, selectedHomeTab("my-profile"))
         assertEquals(HomePrimaryTab.MENU, selectedHomeTab("menu"))
     }
 

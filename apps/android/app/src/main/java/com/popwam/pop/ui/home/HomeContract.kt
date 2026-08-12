@@ -56,10 +56,10 @@ sealed interface HomeEffect {
     data object SessionExpired : HomeEffect
 }
 
-enum class HomePrimaryTab { HOME, SHARE, MENU }
+enum class HomePrimaryTab { HOME, PROFILE, MENU }
 
 fun selectedHomeTab(route: String?): HomePrimaryTab = when (route) {
-    "share" -> HomePrimaryTab.SHARE
+    "my-profile" -> HomePrimaryTab.PROFILE
     "menu" -> HomePrimaryTab.MENU
     else -> HomePrimaryTab.HOME
 }

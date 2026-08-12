@@ -6,15 +6,21 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
+import androidx.appcompat.content.res.AppCompatResources
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.popwam.pop.nfc.PermanentUrlPolicy
+import com.popwam.pop.R
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -49,6 +55,49 @@ object ShareQrRenderer {
         }
         return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.RGB_565)
     }
+
+    /** Branded export frame. The encoded QR remains an untouched high-contrast square. */
+    fun renderPresentation(context: Context, payload: CanonicalSharePayload, width: Int = 1080): Bitmap {
+        require(width in 720..2048)
+        val height = (width * 1.24f).toInt()
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        canvas.drawColor(Color.WHITE)
+        paint.color = Color.rgb(109, 61, 215)
+        canvas.drawRect(0f, 0f, width.toFloat(), width * .18f, paint)
+        paint.color = Color.rgb(212, 175, 55)
+        canvas.drawRect(0f, width * .18f, width.toFloat(), width * .195f, paint)
+
+        val logoSize = (width * .12f).toInt()
+        val logoLeft = (width - logoSize) / 2
+        val logoTop = (width * .045f).toInt()
+        paint.color = Color.WHITE
+        canvas.drawCircle(width / 2f, logoTop + logoSize / 2f, logoSize * .56f, paint)
+        AppCompatResources.getDrawable(context, R.drawable.pop_logo)?.let { logo ->
+            logo.setBounds(logoLeft, logoTop, logoLeft + logoSize, logoTop + logoSize)
+            logo.draw(canvas)
+        }
+
+        val qrSize = (width * .76f).toInt()
+        val qr = render(payload.canonicalUrl, qrSize)
+        val qrLeft = (width - qrSize) / 2f
+        val qrTop = width * .27f
+        paint.color = Color.WHITE
+        canvas.drawRoundRect(qrLeft - 24f, qrTop - 24f, qrLeft + qrSize + 24f, qrTop + qrSize + 24f, 28f, 28f, paint)
+        canvas.drawBitmap(qr, qrLeft, qrTop, null)
+
+        paint.textAlign = Paint.Align.CENTER
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.color = Color.rgb(27, 24, 36)
+        paint.textSize = width * .046f
+        canvas.drawText(payload.profileName.take(42), width / 2f, qrTop + qrSize + width * .10f, paint)
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.color = Color.rgb(82, 77, 94)
+        paint.textSize = width * .026f
+        canvas.drawText(payload.canonicalUrl.take(80), width / 2f, qrTop + qrSize + width * .155f, paint)
+        return output
+    }
 }
 
 sealed interface QrExportResult {
@@ -71,6 +120,18 @@ object SharePlatform {
             putExtra(Intent.EXTRA_TEXT, SharePayloadPolicy.nativeMessage(payload, arabic))
         }
         context.startActivity(Intent.createChooser(intent, chooserTitle))
+    }
+
+    fun shareWhatsApp(context: Context, payload: CanonicalSharePayload, arabic: Boolean) {
+        val message = SharePayloadPolicy.nativeMessage(payload, arabic)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            setPackage("com.whatsapp")
+            putExtra(Intent.EXTRA_TEXT, message)
+        }
+        runCatching { context.startActivity(intent) }.getOrElse {
+            context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/?text=${android.net.Uri.encode(message)}")))
+        }
     }
 
     suspend fun shareQr(context: Context, payload: CanonicalSharePayload, bitmap: Bitmap, chooserTitle: String): QrExportResult = withContext(Dispatchers.IO) {

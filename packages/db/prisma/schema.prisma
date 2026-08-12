@@ -578,6 +578,28 @@ enum FriendNotificationStatus {
   FAILED
 }
 
+enum AdminNotificationStatus {
+  DRAFT
+  PROCESSING
+  SENT
+  PARTIAL
+  SUPPRESSED
+  FAILED
+}
+
+enum AdminNotificationAudience {
+  USER
+  SELECTED
+  SEGMENT
+  TEST
+}
+
+enum AdminNotificationDeliveryStatus {
+  SENT
+  SUPPRESSED
+  FAILED
+}
+
 enum NearbyPresenceSource {
   WEB
   ANDROID
@@ -856,6 +878,8 @@ model User {
   mobileAuthChallenges     MobileAuthChallenge[]
   mobileEnrollmentSessions MobileEnrollmentSession[]
   mobileDeviceCredentials  MobileDeviceCredential[]
+  notificationCampaignsCreated AdminNotificationCampaign[] @relation("AdminNotificationCreator")
+  adminNotificationDeliveries AdminNotificationDelivery[] @relation("AdminNotificationRecipient")
 }
 
 model Plan {
@@ -2946,6 +2970,47 @@ model NotificationPreference {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminNotificationCampaign {
+  id                String                    @id @default(cuid())
+  createdById       String
+  status            AdminNotificationStatus   @default(DRAFT)
+  audienceType      AdminNotificationAudience
+  audience          Json
+  title             Json
+  body              Json
+  defaultLocale     String                    @default("en")
+  category          String                    @default("GENERAL")
+  deepLink          String?
+  imageUrl          String?
+  recipientCount    Int                       @default(0)
+  successCount      Int                       @default(0)
+  suppressedCount   Int                       @default(0)
+  failureCount      Int                       @default(0)
+  createdAt         DateTime                  @default(now())
+  sentAt            DateTime?
+  createdBy         User                      @relation("AdminNotificationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  deliveries        AdminNotificationDelivery[]
+
+  @@index([status, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model AdminNotificationDelivery {
+  id              String                          @id @default(cuid())
+  campaignId      String
+  recipientUserId String
+  status          AdminNotificationDeliveryStatus
+  attemptedTokens Int                             @default(0)
+  successfulTokens Int                            @default(0)
+  failureCode     String?
+  createdAt       DateTime                        @default(now())
+  campaign        AdminNotificationCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  recipient       User                            @relation("AdminNotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, recipientUserId])
+  @@index([recipientUserId, createdAt])
 }
 
 model FriendNotificationEvent {

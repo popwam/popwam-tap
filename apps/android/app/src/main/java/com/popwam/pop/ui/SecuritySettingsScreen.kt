@@ -276,8 +276,8 @@ fun SecuritySettingsScreen(
                 }
                 "legal"->{
                     item{Text(stringResource(R.string.settings_legal_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                    item{Button({openWeb(context,"terms")},Modifier.fillMaxWidth().heightIn(min=48.dp)){Icon(Icons.Default.Gavel,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.terms))}}
-                    item{OutlinedButton({openWeb(context,"privacy")},Modifier.fillMaxWidth().heightIn(min=48.dp)){Icon(Icons.Default.PrivacyTip,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.privacy))}}
+                    item{Button({navigate("legal/terms")},Modifier.fillMaxWidth().heightIn(min=48.dp)){Icon(Icons.Default.Gavel,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.terms))}}
+                    item{OutlinedButton({navigate("legal/privacy")},Modifier.fillMaxWidth().heightIn(min=48.dp)){Icon(Icons.Default.PrivacyTip,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.privacy))}}
                 }
             }
         }

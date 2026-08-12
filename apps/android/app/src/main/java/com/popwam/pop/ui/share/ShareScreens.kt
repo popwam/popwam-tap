@@ -113,16 +113,19 @@ fun ShareCenterScreen(
                 Text(stringResource(R.string.share_how), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ShareAction(R.string.share_whatsapp, Icons.Default.Forum, Modifier.weight(1f), state.shareable) {
+                        state.payload?.let { runCatching { SharePlatform.shareWhatsApp(context, it, arabic); viewModel.nativeShareOpened() }.onFailure { viewModel.qrFailed() } }
+                    }
                     ShareAction(R.string.share_copy, Icons.Default.ContentCopy, Modifier.weight(1f), state.shareable) {
                         state.payload?.let { runCatching { SharePlatform.copy(context, it); viewModel.linkCopied() }.onFailure { viewModel.qrFailed() } }
                     }
                     ShareAction(R.string.share_native, Icons.Default.Share, Modifier.weight(1f), state.shareable) {
                         state.payload?.let { runCatching { SharePlatform.shareLink(context, it, nativeShareTitle, arabic); viewModel.nativeShareOpened() }.onFailure { viewModel.qrFailed() } }
                     }
-                    ShareAction(R.string.share_show_qr, Icons.Default.QrCode2, Modifier.weight(1f), state.shareable, viewModel::showQr)
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ShareAction(R.string.share_show_qr, Icons.Default.QrCode2, Modifier.weight(1f), state.shareable, viewModel::showQr)
                     ShareAction(R.string.share_write_nfc, Icons.Default.Nfc, Modifier.weight(1f), state.shareable && state.nfc.availability != NfcAvailability.UNAVAILABLE) { nfcPanel = true }
                     HceAction(state, Modifier.weight(1f)) { hcePanel = true }
                 }
@@ -207,16 +210,17 @@ fun ShareReviewScreen(state: ShareUiState, panel: ShareInitialPanel = ShareIniti
 
 @Composable
 private fun QrReviewPanel(payload: CanonicalSharePayload) {
+    val context = LocalContext.current
     var bitmap by remember(payload.canonicalUrl) { mutableStateOf<Bitmap?>(null) }
     LaunchedEffect(payload.canonicalUrl) {
-        bitmap = withContext(Dispatchers.Default) { runCatching { ShareQrRenderer.render(ShareQrPayloadPolicy.encodedText(payload), 512) }.getOrNull() }
+        bitmap = withContext(Dispatchers.Default) { runCatching { ShareQrRenderer.renderPresentation(context, payload, 720) }.getOrNull() }
     }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(payload.profileName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             bitmap?.let { value ->
                 Surface(color = androidx.compose.ui.graphics.Color.White, shape = RoundedCornerShape(18.dp)) {
-                    Image(value.asImageBitmap(), stringResource(R.string.share_qr_description), Modifier.fillMaxWidth().aspectRatio(1f).padding(8.dp))
+                    Image(value.asImageBitmap(), stringResource(R.string.share_qr_description), Modifier.fillMaxWidth().aspectRatio(1f / 1.24f).padding(8.dp))
                 }
             } ?: CircularProgressIndicator()
             FigmaLtrText(payload.canonicalUrl, MaterialTheme.typography.bodySmall)
@@ -376,18 +380,18 @@ private fun QrSheet(payload: CanonicalSharePayload, dismiss: () -> Unit, viewMod
     val qrShareTitle = stringResource(R.string.share_qr)
     var bitmapState by remember(payload.canonicalUrl) { mutableStateOf<Result<Bitmap>?>(null) }
     LaunchedEffect(payload.canonicalUrl) {
-        bitmapState = withContext(Dispatchers.Default) { runCatching { ShareQrRenderer.render(ShareQrPayloadPolicy.encodedText(payload)) } }
+        bitmapState = withContext(Dispatchers.Default) { runCatching { ShareQrRenderer.renderPresentation(context, payload) } }
     }
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheetState) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(payload.profileName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.share_qr_ready), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             when {
-                bitmapState == null -> Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                bitmapState == null -> Box(Modifier.fillMaxWidth().aspectRatio(1f / 1.24f), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 bitmapState?.isFailure == true -> ErrorNotice("QR_GENERATION_FAILED")
                 else -> bitmapState?.getOrNull()?.let { bitmap ->
                     Surface(color = androidx.compose.ui.graphics.Color.White, shape = RoundedCornerShape(20.dp)) {
-                        Image(bitmap.asImageBitmap(), stringResource(R.string.share_qr_description), Modifier.fillMaxWidth().aspectRatio(1f).padding(8.dp))
+                        Image(bitmap.asImageBitmap(), stringResource(R.string.share_qr_description), Modifier.fillMaxWidth().aspectRatio(1f / 1.24f).padding(8.dp))
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button({ scope.launch { when (SharePlatform.saveQr(context, payload, bitmap)) { QrExportResult.Success -> viewModel.qrSaved(); else -> viewModel.qrFailed() } } }, Modifier.weight(1f)) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.share_download_qr)) }
