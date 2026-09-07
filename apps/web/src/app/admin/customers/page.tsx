@@ -1,4 +1,6 @@
-import { prisma } from "@popwam/db";
-import { Badge } from "@/components/badge";
-import { PageHeading } from "@/components/page-heading";
-export default async function CustomersPage(){const users=await prisma.user.findMany({where:{OR:[{subscriptions:{some:{}}},{customer:{orders:{some:{}}}}]},include:{subscriptions:{include:{plan:true},orderBy:{createdAt:"desc"},take:1},customer:{include:{_count:{select:{orders:true}}}}},orderBy:{createdAt:"desc"}});return <><PageHeading eyebrow="Customers" title="Customers / العملاء" description="Users appear here after requesting a plan or placing a store order. Normal customer orders are never created from this page."/><div className="card overflow-x-auto"><table className="w-full min-w-[780px] text-sm"><thead><tr>{["Name","Account","Latest plan","Subscription","Store orders"].map(label=><th className="p-3 text-start" key={label}>{label}</th>)}</tr></thead><tbody>{users.map(user=>{const subscription=user.subscriptions[0];return <tr className="border-t border-white/10" key={user.id}><td className="p-3">{user.name||"—"}</td><td className="p-3" dir="ltr">{user.email}</td><td className="p-3">{subscription?.plan.nameEn||subscription?.plan.name||"—"}</td><td className="p-3">{subscription?<Badge value={subscription.status}/>:"—"}</td><td className="p-3">{user.customer?._count.orders||0}</td></tr>})}</tbody></table>{!users.length&&<p className="p-6 text-slate-500">No plan or store customers yet.</p>}</div></>}
+import { redirect } from "next/navigation";
+
+export default function CustomersPage() {
+  redirect("/admin/users?customer=1");
+}
+

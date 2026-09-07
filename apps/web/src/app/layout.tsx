@@ -8,6 +8,7 @@ import "./globals.css";
 
 const abeezee = localFont({ src: "../../../android/app/src/main/res/font/abeezee.ttf", display: "swap", variable: "--font-latin" });
 const arabic = localFont({ src: "../../../android/app/src/main/res/font/cairo.ttf", display: "swap", variable: "--font-arabic" });
+const montserrat = localFont({ src: "../../../android/app/src/main/res/font/montserrat.ttf", display: "swap", variable: "--font-admin-latin" });
 
 export async function generateMetadata(): Promise<Metadata> {
   const branding = await getBrandingSettings();
@@ -15,4 +16,4 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const viewport: Viewport = { themeColor: [{ media: "(prefers-color-scheme: light)", color: "#f5f7fb" }, { media: "(prefers-color-scheme: dark)", color: "#07090f" }], colorScheme: "light dark" };
 const appearanceBootstrap = `try{var t=localStorage.getItem("popwam_ui_theme")||"SYSTEM",f=localStorage.getItem("popwam_ui_font")||"DEFAULT";document.documentElement.dataset.uiTheme=t.toLowerCase();document.documentElement.dataset.uiFont=f.toLowerCase()}catch(e){}`;
-export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { const { locale, dir, dictionary } = await getI18n(); return <html lang={locale} dir={dir} suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }}/></head><body className={`${abeezee.variable} ${arabic.variable}`}><PwaClient installLabel={dictionary.pwa.install}/><FirebaseAnalyticsBootstrap/>{children}</body></html>; }
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { const { locale, dir, dictionary } = await getI18n(); return <html lang={locale} dir={dir} suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: appearanceBootstrap }}/></head><body className={`${abeezee.variable} ${arabic.variable} ${montserrat.variable}`}><PwaClient installLabel={dictionary.pwa.install}/><FirebaseAnalyticsBootstrap/>{children}</body></html>; }
