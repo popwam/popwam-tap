@@ -20,6 +20,7 @@ data class ActiveShareProfile(
     val name: String? = null,
     val access: ShareProfileAccess = ShareProfileAccess.UNKNOWN,
     val lifecycle: String? = null,
+    val type: String? = null,
 )
 
 /** The only payload allowed through the profile share, QR, NFC and HCE paths. */
@@ -83,4 +84,3 @@ data class ShareUiState(
 sealed interface ShareEffect {
     data object SessionExpired : ShareEffect
 }
-

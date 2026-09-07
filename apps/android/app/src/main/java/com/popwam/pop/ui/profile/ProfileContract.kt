@@ -278,6 +278,7 @@ sealed interface ProfileEvent {
     data object OpenCreate:ProfileEvent
     data class SelectProfile(val id:String):ProfileEvent
     data class OpenProfile(val id:String):ProfileEvent
+    data class OpenPublicPreview(val id:String):ProfileEvent
     data class OpenEditor(val id:String):ProfileEvent
     data class OpenSection(val id:String,val section:ProfileEditorSection):ProfileEvent
     data class SetDirty(val dirty:Boolean):ProfileEvent
@@ -299,6 +300,7 @@ sealed interface ProfileDestination {
     data object List:ProfileDestination
     data object Create:ProfileDestination
     data class View(val id:String):ProfileDestination
+    data class PublicPreview(val id:String):ProfileDestination
     data class Editor(val id:String):ProfileDestination
     data class Section(val id:String,val section:ProfileEditorSection):ProfileDestination
     data class Share(val id:String):ProfileDestination

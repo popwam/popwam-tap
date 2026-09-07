@@ -14,7 +14,7 @@ data class SplashTiming(
 
     companion object {
         /** One timeline, with the Figma stages retained only as visual keyframes. */
-        val Standard = SplashTiming(totalMillis = 840)
+        val Standard = SplashTiming(totalMillis = 2_000)
         /** Reduced Motion deliberately skips intermediate movement. */
         val ReducedMotion = SplashTiming(totalMillis = 0)
     }

@@ -81,6 +81,7 @@ interface PopwamApi {
     @GET("api/friends") suspend fun friends(@Query("locale") locale:String,@Query("cursor") cursor:String?=null):FriendsListResponse
     @GET("api/friends/requests") suspend fun friendRequests(@Query("locale") locale:String,@Query("cursor") cursor:String?=null):FriendRequestsResponse
     @GET("api/friends/search") suspend fun searchFriends(@Query("locale") locale:String,@Query("q") query:String,@Query("cursor") cursor:String?=null):FriendSearchResponse
+    @GET("api/mobile/discovery") suspend fun discovery(@Query("locale") locale:String,@Query("q") query:String?=null):DiscoveryResponse
     @POST("api/friends/requests") suspend fun createFriendRequest(@Body body:FriendRequestCreateRequest):FriendMutationResponse
     @POST("api/friends/requests/{id}/accept") suspend fun acceptFriendRequest(@Path("id") id:String,@Body body:LocaleRequest):FriendMutationResponse
     @POST("api/friends/requests/{id}/reject") suspend fun rejectFriendRequest(@Path("id") id:String,@Body body:LocaleRequest):FriendMutationResponse

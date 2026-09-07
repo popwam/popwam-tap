@@ -29,7 +29,8 @@ class RefreshAuthenticator(
 ) : Authenticator {
     override fun authenticate(route: Route?, response: Response): Request? {
         if (responseCount(response) >= 2) return null
-        val token = runBlocking { sessions.refresh() } ?: return null
+        val rejectedToken=response.request.header("Authorization")?.removePrefix("Bearer ")
+        val token = runBlocking { sessions.refresh(rejectedToken) } ?: return null
         return response.request.newBuilder()
             .header("Authorization", "Bearer $token")
             .build()

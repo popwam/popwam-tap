@@ -2,6 +2,7 @@ package com.popwam.pop.ui.profile
 
 import com.popwam.pop.data.auth.PopAnalytics
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -45,11 +46,13 @@ class ProfilesViewModelTest {
     @Test fun `publish success updates lifecycle without another reload`()=runTest(dispatcher){val repo=FakeProfilesRepository(publishResult=ProfileMutationResult(1,ProfileCompletion(true),"PUBLISHED"));val vm=ProfilesViewModel(repo,analytics,null,{});runCurrent();vm.onEvent(ProfileEvent.PublishProfile("publish"));runCurrent();assertEquals(ProfileSaveState.SUCCESS,vm.state.value.saveState);assertEquals("PUBLISHED",vm.state.value.content?.summary?.lifecycle);assertTrue(vm.state.value.content!!.summary.completion.publishReady)}
 
     @Test fun `visible profile actions emit typed navigation`()=runTest(dispatcher){val vm=ProfilesViewModel(FakeProfilesRepository(),analytics,null,{});runCurrent();val effect=async(UnconfinedTestDispatcher(testScheduler),start=CoroutineStart.UNDISPATCHED){vm.effects.first()};vm.onEvent(ProfileEvent.OpenShare("profile-1"));assertEquals(ProfileEffect.Navigate(ProfileDestination.Share("profile-1")),effect.await())}
+
+    @Test fun `latest rapid profile selection wins instead of being dropped`()=runTest(dispatcher){val gate=CompletableDeferred<Unit>();val repo=FakeProfilesRepository(profile2Gate=gate);val vm=ProfilesViewModel(repo,analytics,"profile-1",{});runCurrent();vm.onEvent(ProfileEvent.SelectProfile("profile-2"));runCurrent();vm.onEvent(ProfileEvent.SelectProfile("profile-1"));runCurrent();gate.complete(Unit);runCurrent();assertEquals("profile-1",vm.state.value.activeProfileId);assertEquals("profile-1",vm.state.value.content?.summary?.id)}
 }
 
-private class FakeProfilesRepository(private val saveError:Exception?=null,private val loadError:Exception?=null,private val publishResult:ProfileMutationResult?=null):ProfilesRepository{
+private class FakeProfilesRepository(private val saveError:Exception?=null,private val loadError:Exception?=null,private val publishResult:ProfileMutationResult?=null,private val profile2Gate:CompletableDeferred<Unit>?=null):ProfilesRepository{
     var lastLoaded:String?=null;var saved:ProfileEditorMutation?=null;var createdName:String?=null;var archived:Pair<String,String?>?=null;var visibilityRevision:Int?=null
-    override suspend fun load(activeProfileId:String?):ProfilesSnapshot{loadError?.let{throw it};lastLoaded=activeProfileId;val selected=activeProfileId?:"profile-1";val one=summary();val two=summary("profile-2",false);val created=summary("profile-new",false);val profiles=if(selected=="profile-new")listOf(one,two,created)else listOf(one,two);val selectedSummary=profiles.first{it.id==selected};return ProfilesSnapshot(profiles,selected,content().copy(summary=selectedSummary),ProfileQuota(2,5,3,true,setOf(ProfileBackendKind.PERSONAL,ProfileBackendKind.BUSINESS)),false)}
+    override suspend fun load(activeProfileId:String?):ProfilesSnapshot{loadError?.let{throw it};if(activeProfileId=="profile-2")profile2Gate?.await();lastLoaded=activeProfileId;val selected=activeProfileId?:"profile-1";val one=summary();val two=summary("profile-2",false);val created=summary("profile-new",false);val profiles=if(selected=="profile-new")listOf(one,two,created)else listOf(one,two);val selectedSummary=profiles.first{it.id==selected};return ProfilesSnapshot(profiles,selected,content().copy(summary=selectedSummary),ProfileQuota(2,5,3,true,setOf(ProfileBackendKind.PERSONAL,ProfileBackendKind.BUSINESS)),false)}
     override suspend fun categories(kind:ProfileBackendKind)=listOf(ProfileCategoryOption("personal","Personal",kind,"template-1"))
     override suspend fun mutate(profileId:String,revision:Int,mutation:ProfileEditorMutation):ProfileMutationResult{saveError?.let{throw it};saved=mutation;return ProfileMutationResult(revision+1,ProfileCompletion(false,listOf("VISIBILITY_REQUIRED")))}
     override suspend fun updateVisibility(profileId:String,revision:Int,access:String,slug:String?):ProfileMutationResult{saveError?.let{throw it};visibilityRevision=revision;return ProfileMutationResult(revision+1,ProfileCompletion(access!="PRIVATE",if(access=="PRIVATE")listOf("VISIBILITY_REQUIRED")else emptyList()))}

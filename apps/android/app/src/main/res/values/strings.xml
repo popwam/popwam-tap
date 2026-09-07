@@ -286,10 +286,10 @@
     <string name="share_how">How do you want to share it?</string>
     <string name="share_profile">Current profile</string>
     <string name="share_target">Share target</string>
-    <string name="share_show_qr">Show QR</string>
+    <string name="share_show_qr">QR</string>
     <string name="share_qr_ready">QR ready. An open is only confirmed after the public link is requested.</string>
     <string name="share_qr_description">QR code for the selected public share target</string>
-    <string name="share_native">Share with device</string>
+    <string name="share_native">Share</string>
     <string name="share_whatsapp">WhatsApp</string>
     <string name="share_copy">Copy link</string>
     <string name="share_link">POP public share link</string>
@@ -336,8 +336,8 @@
     <string name="share_profile_private">This profile is private. Make it Public or Unlisted before sharing.</string>
     <string name="share_unlisted_notice">This profile is Unlisted. Anyone with its link can open it, but search engines should not index it.</string>
     <string name="share_privacy_note">Only the active profile’s public URL is shared. POP access tokens, account data, and verification evidence are never included.</string>
-    <string name="share_write_nfc">Write NFC tag</string>
-    <string name="share_phone_tap">Phone tap (HCE)</string>
+    <string name="share_write_nfc">Program card</string>
+    <string name="share_phone_tap">Share by tap</string>
     <string name="share_hce_ready">Ready while this unlocked screen is active. Reader compatibility varies.</string>
     <string name="share_hce_observability">A tap can be detected, but Android cannot guarantee that the other device opened the link.</string>
     <string name="share_download_qr">Save QR</string>
@@ -874,4 +874,22 @@
     <string name="profile_module_restaurant_details">Restaurant details</string>
     <string name="profile_module_medical_details">Medical details</string>
     <string name="profile_additional_details">Additional details</string>
+    <string name="profile_unverified">Unverified</string>
+    <string name="profile_completion_percent">Your POP is %1$d%% complete</string>
+    <string name="profile_basic_information_description">Name, bio, and basic details</string>
+    <string name="profile_contact_links_description">Contact information and social links</string>
+    <string name="profile_media_description">Photos, videos, and documents</string>
+    <string name="profile_appearance_description">Customize your profile appearance</string>
+    <string name="profile_type_details_description">Work, services, and expertise</string>
+    <string name="profile_verification_description">Verify your identity or business</string>
+    <string name="share_hce_guidance">Bring the phone close to an NFC-capable phone</string>
+    <string name="home_search_person">Person</string>
+    <string name="home_search_business">Business</string>
+    <string name="home_search_service">Service</string>
+    <string name="home_search_empty">No public results found</string>
+    <string name="home_search_unavailable">Search is temporarily unavailable</string>
+    <string name="profile_touch">Touch</string>
+    <string name="profile_preview_close">Close preview</string>
+    <string name="profile_preview_action">Preview</string>
+    <string name="profile_touch_countdown">Bring the phone close · %1$d s</string>
 </resources>

@@ -16,6 +16,7 @@ import com.popwam.pop.data.api.ProfileSelectorItemDto
 import com.popwam.pop.data.api.PublishingReadinessDto
 import com.popwam.pop.data.auth.PopAnalytics
 import com.popwam.pop.data.repository.PopwamRepository
+import com.popwam.pop.data.repository.LocalFirstRepository
 import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.async
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.supervisorScope
 import retrofit2.HttpException
 
@@ -37,6 +39,7 @@ data class ProfilesSnapshot(
 
 interface ProfilesRepository {
     suspend fun load(activeProfileId:String?):ProfilesSnapshot
+    suspend fun refresh(activeProfileId:String?):ProfilesSnapshot=load(activeProfileId)
     suspend fun categories(kind:ProfileBackendKind):List<ProfileCategoryOption>
     suspend fun mutate(profileId:String,revision:Int,mutation:ProfileEditorMutation):ProfileMutationResult
     suspend fun updateVisibility(profileId:String,revision:Int,access:String,slug:String?):ProfileMutationResult
@@ -50,32 +53,30 @@ interface ProfilesRepository {
 
 class AndroidProfilesRepository(
     private val repository:PopwamRepository,
+    private val localFirst:LocalFirstRepository,
     private val localeProvider:()->String,
 ):ProfilesRepository {
-    override suspend fun load(activeProfileId:String?):ProfilesSnapshot=supervisorScope {
-        val selectorRequest=async { repository.profileSelector(activeProfileId) }
-        val legacyRequest=async { optionalProfileData { repository.profiles() } }
-        val selector=selectorRequest.await()
+    override suspend fun load(activeProfileId:String?):ProfilesSnapshot=loadInternal(activeProfileId,false)
+    override suspend fun refresh(activeProfileId:String?):ProfilesSnapshot=loadInternal(activeProfileId,true)
+    private suspend fun loadInternal(activeProfileId:String?,force:Boolean):ProfilesSnapshot {
+        val cached=localFirst.core(activeProfileId,localeProvider(),force)
+        val selector=cached.selector ?: throw ProfileDataException("PROFILE_LIST_UNAVAILABLE")
         if(!selector.ok) throw ProfileDataException(selector.error ?: "PROFILE_LIST_UNAVAILABLE")
         val selected=selector.selectedProfileId ?: selector.profiles.firstOrNull()?.id
-        val editors=selector.profiles.map { item ->
-            item.id to async { optionalProfileData { repository.profileEditor(item.id,localeProvider()) } }
-        }.associate { (id,request)->id to request.await() }
-        val publishing=selected?.let { optionalProfileData { repository.publishingStatus(it,localeProvider()) } }
-        val legacy=legacyRequest.await()?.profiles.orEmpty().associateBy { it.id }
+        val legacy=cached.profiles?.profiles.orEmpty().associateBy { it.id }
         val profiles=selector.profiles.map { item ->
-            val editor=editors[item.id]
+            val editor=cached.editors[item.id]
             val old=legacy[item.id]
             item.toOwnedProfile(editor,old?.avatarUrl ?: old?.logoUrl)
         }
         val active=profiles.firstOrNull { it.id==selected }
-        val editor=selected?.let(editors::get)
-        ProfilesSnapshot(
+        val editor=selected?.let(cached.editors::get)
+        return ProfilesSnapshot(
             profiles=profiles,
             activeProfileId=active?.id,
-            content=if(active!=null && editor?.ok==true) editor.toContent(active,publishing?.preview?.slug.orEmpty()) else null,
+            content=if(active!=null && editor?.ok==true) editor.toContent(active,legacy[selected]?.slug.orEmpty()) else null,
             quota=selector.quota.toProfileQuota(),
-            partial=editors.values.any { it?.ok!=true } || legacy.isEmpty() || (selected!=null && publishing?.ok!=true),
+            partial=legacy.isEmpty() || (selected!=null && editor?.ok!=true),
         )
     }
 
@@ -91,6 +92,7 @@ class AndroidProfilesRepository(
     override suspend fun mutate(profileId:String,revision:Int,mutation:ProfileEditorMutation):ProfileMutationResult {
         val result=repository.mutateProfileEditor(profileId,revision,mutation.toJson())
         if(!result.ok) throw ProfileDataException(result.error ?: "PROFILE_SAVE_FAILED")
+        localFirst.invalidateProfile(profileId)
         return result.toMutationResult(revision)
     }
 
@@ -101,11 +103,13 @@ class AndroidProfilesRepository(
             else repository.updatePublishingVisibilityAndSlug(profileId,revision,access,ProfilePolicy.normalizedSlug(slug))
             ProfileRuntimeDiagnostics.parsed(ProfileRuntimeDiagnostics.Operation.VISIBILITY,true,result.error,profileId)
             if(!result.ok) throw ProfileDataException(result.error ?: "PROFILE_VISIBILITY_FAILED")
+            localFirst.invalidateProfile(profileId)
             val mapped=ProfileMutationResult(
                 draftRevision=result.draftRevision ?: revision+1,
                 completion=result.readiness.toCompletionOrNull(),
                 lifecycle=result.lifecycle ?: result.readiness?.lifecycle,
             )
+            if(mapped.successful)localFirst.invalidateProfile(profileId)
             ProfileRuntimeDiagnostics.success(ProfileRuntimeDiagnostics.Operation.VISIBILITY,profileId,mapped.draftRevision)
             return mapped
         } catch(error:HttpException) {
@@ -148,6 +152,7 @@ class AndroidProfilesRepository(
             val result=repository.createAdditionalProfile(AdditionalProfileCreateRequest(name,name,kind.name,categorySlug,templateId,if(localeProvider().startsWith("ar")) "ar" else "en",creationKey))
             ProfileRuntimeDiagnostics.parsed(ProfileRuntimeDiagnostics.Operation.CREATE,true,result.error,result.profileId)
             if(!result.ok || result.profileId.isNullOrBlank()) throw ProfileDataException(result.error ?: "PROFILE_CREATE_FAILED")
+            localFirst.core(result.profileId,localeProvider(),force=true)
             ProfileRuntimeDiagnostics.success(ProfileRuntimeDiagnostics.Operation.CREATE,result.profileId)
             return result.profileId
         } catch(error:HttpException) {
@@ -162,24 +167,29 @@ class AndroidProfilesRepository(
     override suspend fun archive(profileId:String,replacementId:String?):String? {
         val result=repository.archiveProfile(profileId,replacementId)
         if(!result.ok) throw ProfileDataException(result.error ?: "PROFILE_ARCHIVE_FAILED")
+        localFirst.invalidateProfile(profileId)
+        localFirst.core(result.activeProfileId ?: replacementId,localeProvider(),force=true)
         return result.activeProfileId
     }
 
     override suspend fun upload(profileId:String,revision:Int,media:ProfileMediaUpload):ProfileMutationResult {
         val result=repository.uploadMedia(profileId,media.purpose,media.fileName,media.mimeType,media.bytes,revision)
         if(!result.ok) throw ProfileDataException(result.error ?: "PROFILE_MEDIA_UPLOAD_FAILED")
+        localFirst.invalidateProfile(profileId)
         return ProfileMutationResult(result.draftRevision ?: revision+1)
     }
 
     override suspend fun uploadDocument(profileId:String,revision:Int,document:ProfileDocumentUpload):ProfileMutationResult {
         val result=repository.uploadFile(profileId,document.titleAr,document.titleEn,document.fileName,document.mimeType,document.bytes)
         if(!result.ok || result.file==null)throw ProfileDataException(result.error ?: "PROFILE_DOCUMENT_UPLOAD_FAILED")
+        localFirst.invalidateProfile(profileId)
         return ProfileMutationResult(revision)
     }
 
     override suspend fun removeMedia(profileId:String,revision:Int,mediaId:String):ProfileMutationResult {
         val result=repository.removeEditorMedia(profileId,mediaId,revision)
         if(!result.ok) throw ProfileDataException(result.error ?: "PROFILE_MEDIA_REMOVE_FAILED")
+        localFirst.invalidateProfile(profileId)
         return result.toMutationResult(revision)
     }
 }
@@ -277,15 +287,18 @@ class ProfilesViewModel(
     val state=_state.asStateFlow()
     private val _effects=MutableSharedFlow<ProfileEffect>(extraBufferCapacity=8)
     val effects=_effects.asSharedFlow()
+    private var loadJob:Job?=null
+    private var requestedProfileId:String?=initialProfileId
 
     init { load(initial=true,selected=initialProfileId) }
 
     fun onEvent(event:ProfileEvent){when(event){
-        ProfileEvent.Refresh,ProfileEvent.Retry->load(initial=_state.value.profiles.isEmpty(),selected=_state.value.activeProfileId)
+        ProfileEvent.Refresh,ProfileEvent.Retry->load(initial=_state.value.profiles.isEmpty(),selected=_state.value.activeProfileId,force=true)
         ProfileEvent.OpenList->navigate(ProfileDestination.List)
         ProfileEvent.OpenCreate->navigate(ProfileDestination.Create)
         is ProfileEvent.SelectProfile->select(event.id,navigateToProfile=false)
         is ProfileEvent.OpenProfile->select(event.id,navigateToProfile=true)
+        is ProfileEvent.OpenPublicPreview->navigate(ProfileDestination.PublicPreview(event.id))
         is ProfileEvent.OpenEditor->navigate(ProfileDestination.Editor(event.id))
         is ProfileEvent.OpenSection->navigate(ProfileDestination.Section(event.id,event.section))
         is ProfileEvent.SetDirty->_state.value=_state.value.copy(editorDirty=event.dirty,saveState=ProfileSaveState.IDLE,errorCode=null,debugErrorCode=null)
@@ -307,20 +320,22 @@ class ProfilesViewModel(
 
     private fun select(id:String,navigateToProfile:Boolean){
         if(navigateToProfile) navigate(ProfileDestination.View(id))
-        if(id!=_state.value.activeProfileId || _state.value.content?.summary?.id!=id){
+        if(id!=requestedProfileId || _state.value.content?.summary?.id!=id){
+            requestedProfileId=id
             analytics.track("profile_switched",mapOf("source" to "profiles"))
             load(initial=_state.value.profiles.isEmpty(),selected=id,persist=true)
         }
     }
 
-    private fun load(initial:Boolean,selected:String?,persist:Boolean=false){
-        if(_state.value.refreshing)return
-        viewModelScope.launch {
+    private fun load(initial:Boolean,selected:String?,persist:Boolean=false,force:Boolean=false){
+        loadJob?.cancel()
+        loadJob=viewModelScope.launch {
             val previous=_state.value
             _state.value=previous.copy(loadState=if(initial)ProfileLoadState.INITIAL_LOADING else previous.loadState,refreshing=!initial,errorCode=null,debugErrorCode=null)
             try{
-                val snapshot=repository.load(selected)
+                val snapshot=if(force)repository.refresh(selected) else repository.load(selected)
                 _state.value=previous.copy(loadState=if(snapshot.profiles.isEmpty())ProfileLoadState.EMPTY else ProfileLoadState.CONTENT,profiles=snapshot.profiles,activeProfileId=snapshot.activeProfileId,content=snapshot.content,quota=snapshot.quota,refreshing=false,partial=snapshot.partial,offline=false,saveState=ProfileSaveState.IDLE,errorCode=null,debugErrorCode=null)
+                requestedProfileId=snapshot.activeProfileId
                 snapshot.activeProfileId?.let { if(persist || it!=initialProfileId) onActiveProfileChanged(it) }
             }catch(error:HttpException){if(error.code()==401)_effects.emit(ProfileEffect.SessionExpired)else fail(previous,error.apiCode())}
             catch(error:IOException){_state.value=previous.copy(refreshing=false,offline=true,partial=previous.profiles.isNotEmpty(),loadState=if(previous.profiles.isEmpty())ProfileLoadState.ERROR else previous.loadState,errorCode="PROFILE_OFFLINE")}

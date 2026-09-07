@@ -2,6 +2,8 @@
 package com.popwam.pop.ui.profile
 
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
@@ -25,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -51,6 +54,10 @@ import com.popwam.pop.ui.components.PopFormLayout
 import com.popwam.pop.ui.components.PopFormSheet
 import com.popwam.pop.ui.components.PopFormTextField
 import com.popwam.pop.ui.components.PopLtrPrefix
+import com.popwam.pop.ui.components.PopActiveProfileHeader
+import com.popwam.pop.ui.components.PopBrandedLoading
+import com.popwam.pop.ui.components.PopApprovedAsset
+import com.popwam.pop.ui.components.PopApprovedAvatar
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -85,30 +92,132 @@ fun ProfileListScreen(state:ProfilesUiState,onEvent:(ProfileEvent)->Unit){
 }
 
 @Composable
-fun ProfileViewScreen(state:ProfilesUiState,profileId:String,onBack:()->Unit,onEvent:(ProfileEvent)->Unit,topLevel:Boolean=false){
+fun ProfileViewScreen(state:ProfilesUiState,profileId:String,onBack:()->Unit,onEvent:(ProfileEvent)->Unit,topLevel:Boolean=false,onNotifications:()->Unit={}){
     val content=state.content
+    var profilePicker by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(profileId){onEvent(ProfileEvent.SelectProfile(profileId))}
-    Scaffold(containerColor=MaterialTheme.colorScheme.background,topBar={TopAppBar(title={Text(stringResource(if(topLevel)R.string.my_profile else R.string.profile_preview))},navigationIcon={if(!topLevel)IconButton(onBack){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))}},actions={if(topLevel)IconButton({onEvent(ProfileEvent.OpenList)}){Icon(Icons.Default.People,stringResource(R.string.profiles_title))};IconButton({onEvent(ProfileEvent.OpenEditor(profileId))}){Icon(Icons.Default.Edit,stringResource(R.string.profile_edit))}})}){padding->
-        when{content==null && (state.loadState==ProfileLoadState.ERROR || !state.refreshing && state.loadState==ProfileLoadState.CONTENT)->ProfileFailure(state.errorCode ?: "PROFILE_CONTENT_UNAVAILABLE",onEvent,Modifier.padding(padding));content==null->ProfileLoading(Modifier.padding(padding));else->LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(bottom=28.dp)){
+    Scaffold(containerColor=MaterialTheme.colorScheme.background,topBar={if(!topLevel)TopAppBar(title={Text(stringResource(R.string.profile_preview))},navigationIcon={IconButton(onBack){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))}})}){padding->
+        when{content==null && (state.loadState==ProfileLoadState.ERROR || !state.refreshing && state.loadState==ProfileLoadState.CONTENT)->ProfileFailure(state.errorCode ?: "PROFILE_CONTENT_UNAVAILABLE",onEvent,Modifier.padding(padding));content==null->ProfileLoading(Modifier.padding(padding));else->LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=14.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+            if(topLevel)item{PopActiveProfileHeader(content.summary.name,content.summary.subtitle,content.summary.avatarUrl,{profilePicker=true},onNotifications)}
             item{ProfileHero(content)}
-            item{Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){ProfileAction(R.string.profile_share,Icons.Default.Share,Modifier.weight(1f)){onEvent(ProfileEvent.OpenShare(profileId))};ProfileAction(R.string.profile_qr,Icons.Default.QrCode,Modifier.weight(1f)){onEvent(ProfileEvent.OpenQr(profileId))};ProfileAction(R.string.profile_nfc,Icons.Default.Nfc,Modifier.weight(1f)){onEvent(ProfileEvent.OpenNfc(profileId))}}}
-            content.localizedAbout()?.let{item{ProfileSection(stringResource(R.string.profile_about)){Text(it,style=MaterialTheme.typography.bodyLarge)}}}
-            if(content.hasContact())item{ProfileSection(stringResource(R.string.profile_contact)){ContactRows(content)}}
-            if(content.links.isNotEmpty())item{ProfileSection(stringResource(R.string.profile_links)){content.links.sortedBy{it.sortOrder}.forEach{ProfileLinkRow(it)}}}
-            if(content.services.isNotEmpty())item{ProfileSection(stringResource(R.string.profile_services)){content.services.forEach{Text(it.name.ifBlank{it.nameEn.ifBlank{it.nameAr}},style=MaterialTheme.typography.titleSmall);it.localizedDescription()?.let{d->Text(d,color=MaterialTheme.colorScheme.onSurfaceVariant)};Spacer(Modifier.height(10.dp))}}}
-            if(content.locations.isNotEmpty())item{ProfileSection(stringResource(R.string.profile_locations)){content.locations.forEach{Text(it.name,style=MaterialTheme.typography.titleSmall);Text(it.addressEn.ifBlank{it.addressAr},color=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(10.dp))}}}
-            if(content.media.isNotEmpty())item{ProfileSection(stringResource(R.string.profile_media)){Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){content.media.take(3).forEach{AsyncImage(it.previewUrl,null,Modifier.size(88.dp).clip(RoundedCornerShape(14.dp)))}}}}
-            if(content.structuredEntries.any{entry->ProfilePolicy.editableCapabilities(content).any{it.key==entry.fieldKey}&&ProfileStructuredPolicy.displayValue(entry).isNotBlank()})item{StructuredProfileContent(content)}
+            item{ApprovedProfileActions(content.summary.id,onEvent)}
+            items(approvedProfileSections(content),key={it.section.name}){model->ApprovedProfileSectionRow(model){onEvent(ProfileEvent.OpenSection(content.summary.id,model.section))}}
         }}
     }
+    if(profilePicker)ProfileSwitchSheet(state,{profilePicker=false}){id->profilePicker=false;onEvent(ProfileEvent.SelectProfile(id))}
 }
 
 @Composable private fun ProfileHero(content:ProfileContent){
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally){
-        ProfileAvatar(content.summary.avatarUrl,content.summary.name,96.dp);Spacer(Modifier.height(12.dp));Text(content.summary.name,style=MaterialTheme.typography.headlineSmall)
-        content.summary.subtitle?.takeIf(String::isNotBlank)?.let{Text(it,style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        Spacer(Modifier.height(8.dp));Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){ProfileStatus(content.summary.visibility);if(content.summary.verification==ProfileVerificationState.VERIFIED)Icon(Icons.Default.Verified,stringResource(R.string.profile_verified),tint=MaterialTheme.colorScheme.primary)}
-        if(content.slug.isNotBlank())Text("pop.popwam.com/${content.slug}",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary,modifier=Modifier.padding(top=8.dp))
+    val context=LocalContext.current
+    val publicUrl="https://pop.popwam.com/${content.slug}"
+    Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(8.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.45f)),elevation=CardDefaults.cardElevation(defaultElevation=4.dp)){
+        Column(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                PopApprovedAvatar(content.summary.avatarUrl,content.summary.name,68.dp)
+                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)){
+                    Text(content.summary.name,style=MaterialTheme.typography.titleMedium)
+                    Text(stringResource(if(content.summary.backendKind==ProfileBackendKind.BUSINESS)R.string.profile_type_business else R.string.profile_type_personal),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
+                    content.summary.subtitle?.takeIf(String::isNotBlank)?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                }
+                Text(stringResource(if(content.summary.verification==ProfileVerificationState.VERIFIED)R.string.profile_verified else R.string.profile_unverified),style=MaterialTheme.typography.labelSmall,color=if(content.summary.verification==ProfileVerificationState.VERIFIED)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if(content.slug.isNotBlank()){
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+                    OutlinedButton({(context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("POP",publicUrl))},contentPadding=PaddingValues(horizontal=12.dp,vertical=6.dp)){
+                        PopApprovedAsset(R.drawable.pop_approved_copy,null,Modifier.size(18.dp));Spacer(Modifier.width(6.dp));Text(stringResource(R.string.share_copy))
+                    }
+                }
+            }
+            val percent=approvedProfileCompletion(content)
+            Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+                Text(stringResource(R.string.profile_completion_percent,percent),style=MaterialTheme.typography.bodySmall)
+                LinearProgressIndicator({percent/100f},Modifier.fillMaxWidth().height(4.dp),trackColor=MaterialTheme.colorScheme.surfaceVariant)
+            }
+        }
+    }
+}
+
+private data class ApprovedProfileSection(
+    val section:ProfileEditorSection,
+    val title:Int,
+    val description:Int,
+    val icon:Int,
+    val complete:Boolean,
+)
+
+private fun approvedProfileCompletion(content:ProfileContent):Int {
+    val checks=listOf(
+        content.summary.name.isNotBlank() && (content.bio.isNotBlank() || content.summary.subtitle?.isNotBlank()==true),
+        content.hasContact() || content.links.isNotEmpty(),
+        content.media.isNotEmpty() || content.documents.isNotEmpty(),
+        content.theme.isNotBlank(),
+        content.structuredEntries.isNotEmpty() || content.localizedAbout()?.isNotBlank()==true,
+        content.summary.verification==ProfileVerificationState.VERIFIED,
+    )
+    return checks.count{it}*100/checks.size
+}
+
+private fun approvedProfileSections(content:ProfileContent):List<ApprovedProfileSection> {
+    val hasTypeDetails=ProfilePolicy.editableCapabilities(content).isNotEmpty()
+    return listOf(
+        ApprovedProfileSection(ProfileEditorSection.BASIC_INFORMATION,R.string.profile_basic_information,R.string.profile_basic_information_description,R.drawable.pop_approved_section_basic,content.summary.name.isNotBlank()),
+        ApprovedProfileSection(ProfileEditorSection.CONTACT_LINKS,R.string.profile_contact_links,R.string.profile_contact_links_description,R.drawable.pop_approved_section_links,content.hasContact()||content.links.isNotEmpty()),
+        ApprovedProfileSection(ProfileEditorSection.MEDIA,R.string.profile_media,R.string.profile_media_description,R.drawable.pop_approved_section_media,content.media.isNotEmpty()||content.documents.isNotEmpty()),
+        ApprovedProfileSection(ProfileEditorSection.APPEARANCE,R.string.profile_appearance,R.string.profile_appearance_description,R.drawable.pop_approved_section_appearance,content.theme.isNotBlank()),
+        ApprovedProfileSection(if(hasTypeDetails)ProfileEditorSection.TYPE_DETAILS else ProfileEditorSection.ABOUT,if(hasTypeDetails)R.string.profile_type_details else R.string.profile_about,R.string.profile_type_details_description,R.drawable.pop_approved_section_business,content.structuredEntries.isNotEmpty()||content.localizedAbout()?.isNotBlank()==true),
+        ApprovedProfileSection(ProfileEditorSection.VERIFICATION,R.string.profile_verification,R.string.profile_verification_description,R.drawable.pop_approved_section_verification,content.summary.verification==ProfileVerificationState.VERIFIED),
+    )
+}
+
+@Composable private fun ApprovedProfileActions(profileId:String,onEvent:(ProfileEvent)->Unit){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        ApprovedProfileAction(R.string.profile_touch,R.drawable.pop_approved_share_tap,Modifier.weight(1f)){onEvent(ProfileEvent.OpenNfc(profileId))}
+        ApprovedProfileAction(R.string.profile_preview_action,R.drawable.pop_approved_action_preview,Modifier.weight(1f)){onEvent(ProfileEvent.OpenPublicPreview(profileId))}
+        ApprovedProfileAction(R.string.profile_share,R.drawable.pop_approved_action_share,Modifier.weight(1f)){onEvent(ProfileEvent.OpenShare(profileId))}
+        ApprovedProfileAction(R.string.profile_qr,R.drawable.pop_approved_action_qr,Modifier.weight(1f)){onEvent(ProfileEvent.OpenQr(profileId))}
+    }
+}
+
+@Composable private fun ApprovedProfileAction(label:Int,drawable:Int,modifier:Modifier,onClick:()->Unit){
+    Surface(modifier.heightIn(min=76.dp).clickable(onClick=onClick),shape=RoundedCornerShape(8.dp),color=MaterialTheme.colorScheme.surface,shadowElevation=2.dp,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.35f))){
+        Column(Modifier.fillMaxWidth().padding(horizontal=5.dp,vertical=11.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(7.dp)){
+            PopApprovedAsset(drawable,null,Modifier.size(24.dp))
+            Text(stringResource(label),style=MaterialTheme.typography.labelSmall,maxLines=2)
+        }
+    }
+}
+
+@Composable private fun ApprovedProfileSectionRow(model:ApprovedProfileSection,onClick:()->Unit){
+    val direction=LocalLayoutDirection.current
+    Surface(Modifier.fillMaxWidth().clickable(onClick=onClick),shape=RoundedCornerShape(8.dp),color=MaterialTheme.colorScheme.surface,shadowElevation=3.dp,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.28f))){
+        Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+            PopApprovedAsset(model.icon,null,Modifier.size(42.dp))
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)){
+                Text(stringResource(model.title),style=MaterialTheme.typography.titleSmall)
+                Text(stringResource(model.description),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
+            }
+            Text(if(model.complete)"100%" else "0%",style=MaterialTheme.typography.labelMedium,color=if(model.complete)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+            PopApprovedAsset(R.drawable.pop_approved_chevron,null,Modifier.size(29.dp).graphicsLayer(scaleX=if(direction==LayoutDirection.Ltr)-1f else 1f),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable private fun ProfileSwitchSheet(state:ProfilesUiState,dismiss:()->Unit,select:(String)->Unit){
+    ModalBottomSheet(onDismissRequest=dismiss){
+        LazyColumn(contentPadding=PaddingValues(horizontal=20.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            item{Text(stringResource(R.string.profiles_title),style=MaterialTheme.typography.titleLarge)}
+            items(state.profiles,key={it.id}){profile->
+                val active=profile.id==state.activeProfileId
+                Surface(Modifier.fillMaxWidth().clickable{select(profile.id)},shape=RoundedCornerShape(14.dp),color=if(active)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,border=BorderStroke(1.dp,if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha=.4f))){
+                    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                        PopApprovedAvatar(profile.avatarUrl,profile.name,48.dp)
+                        Column(Modifier.weight(1f)){Text(profile.name,style=MaterialTheme.typography.titleSmall);profile.subtitle?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
+                        if(active)Text(stringResource(R.string.profile_active),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+            item{Spacer(Modifier.navigationBarsPadding())}
+        }
     }
 }
 
@@ -436,7 +545,7 @@ private fun Context.readProfileBytes(uri:Uri,maximum:Long):ByteArray?=contentRes
 }
 private fun profileFileSizeLabel(bytes:Long)=when{bytes>=1024L*1024L->"%.1f MB".format(bytes/(1024.0*1024.0));bytes>=1024L->"%.1f KB".format(bytes/1024.0);else->"$bytes B"}
 
-@Composable private fun ProfileLoading(modifier:Modifier=Modifier){Box(modifier.fillMaxSize(),contentAlignment=Alignment.Center){CircularProgressIndicator()}}
+@Composable private fun ProfileLoading(modifier:Modifier=Modifier){PopBrandedLoading(modifier)}
 @Composable private fun ProfileFailure(code:String?,onEvent:(ProfileEvent)->Unit,modifier:Modifier=Modifier){Column(modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Icon(Icons.Default.CloudOff,null,Modifier.size(52.dp),tint=MaterialTheme.colorScheme.error);Text(stringResource(R.string.profile_error_title),style=MaterialTheme.typography.titleLarge);Text(profileErrorMessage(code ?: "PROFILE_SERVER_UNAVAILABLE"),color=MaterialTheme.colorScheme.onSurfaceVariant);if(BuildConfig.DEBUG&&!code.isNullOrBlank())Text(code,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Button({onEvent(ProfileEvent.Retry)},Modifier.padding(top=16.dp)){Text(stringResource(R.string.retry))}}}
 @Composable private fun ProfileEmpty(onEvent:(ProfileEvent)->Unit,modifier:Modifier=Modifier){Column(modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Icon(Icons.Default.PersonAdd,null,Modifier.size(56.dp));Text(stringResource(R.string.profile_empty_title),style=MaterialTheme.typography.titleLarge);Text(stringResource(R.string.profile_empty_body),color=MaterialTheme.colorScheme.onSurfaceVariant);Button({onEvent(ProfileEvent.OpenCreate)},Modifier.padding(top=16.dp)){Text(stringResource(R.string.profile_add))}}}
 @Composable private fun ProfileAvatar(url:String?,name:String,size:androidx.compose.ui.unit.Dp){Surface(Modifier.size(size).clearAndSetSemantics{},shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer){if(url.isNullOrBlank())Box(contentAlignment=Alignment.Center){Text(name.take(1).uppercase(),style=MaterialTheme.typography.headlineSmall,color=MaterialTheme.colorScheme.onPrimaryContainer)}else AsyncImage(url,null,Modifier.fillMaxSize().clip(CircleShape))}}

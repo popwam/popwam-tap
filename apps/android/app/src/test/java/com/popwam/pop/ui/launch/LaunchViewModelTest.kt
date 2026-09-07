@@ -8,17 +8,16 @@ import org.junit.Test
 class LaunchViewModelTest {
     private val source = File("src/main/java/com/popwam/pop/ui/launch/LaunchViewModel.kt").readText()
 
-    @Test fun `cold splash has one continuous timeline and reduced motion`() {
-        assertTrue(source.contains("SplashTiming.ReducedMotion"))
-        assertTrue(source.contains("SplashTiming.Standard"))
-        assertTrue(source.contains("advanceSplashTimeline"))
-        assertTrue(source.contains("KEY_SPLASH_STARTED_AT"))
-        assertTrue(source.contains("coordinator.showSplashProgress"))
+    @Test fun `cold splash has no animation duration gate`() {
+        assertTrue(source.contains("systemSplashExit.await()"))
+        assertFalse(source.contains("SplashTiming.Standard"))
+        assertFalse(source.contains("advanceSplashTimeline"))
+        assertFalse(source.contains("delay("))
     }
 
-    @Test fun `timeline does not restart on recreation and startup does not block`() {
-        assertTrue(source.contains("savedStateHandle.get<Long>(KEY_SPLASH_STARTED_AT)"))
-        assertTrue(source.contains("System.currentTimeMillis() - startedAt"))
+    @Test fun `timeline starts after system splash and startup does not block`() {
+        assertTrue(source.contains("fun onSystemSplashExited()"))
+        assertFalse(source.contains("System.currentTimeMillis() - startedAt"))
         assertFalse(source.contains("runBlocking"))
     }
 

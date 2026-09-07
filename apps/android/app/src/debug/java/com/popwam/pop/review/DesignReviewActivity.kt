@@ -56,7 +56,7 @@ import com.popwam.mobile.foundation.overlay.OverlayState
 import com.popwam.mobile.foundation.platform.BiometricCapability
 import com.popwam.mobile.onboarding.LanguageScreen
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
-import com.popwam.mobile.onboarding.PopSplashScreen
+import com.popwam.pop.ui.components.PopBrandedLoading
 import com.popwam.mobile.onboarding.ThemeScreen
 import com.popwam.mobile.onboarding.WelcomeScreen
 import com.popwam.pop.ui.theme.popFontFamilies
@@ -64,7 +64,10 @@ import com.popwam.pop.TapApplication
 import com.popwam.pop.ui.currentLocale
 import com.popwam.pop.ui.MenuReviewScreen
 import com.popwam.pop.ui.MenuSettingsReviewScreen
+import com.popwam.pop.ui.MenuProfileContext
+import com.popwam.pop.ui.PopBottomNavigationReviewScreen
 import com.popwam.pop.ui.home.HomeLoadState
+import com.popwam.pop.ui.home.HomePrimaryTab
 import com.popwam.pop.ui.home.HomeProfile
 import com.popwam.pop.ui.home.HomeScreen
 import com.popwam.pop.ui.home.HomeUiState
@@ -78,7 +81,9 @@ import com.google.gson.JsonPrimitive
 class DesignReviewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { DesignReviewGallery() }
+        val language=intent.getStringExtra("language")
+        if(!language.isNullOrBlank())AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language))
+        setContent { DesignReviewGallery(intent.getStringExtra("screen"),language,intent.getBooleanExtra("focused",false)) }
     }
 }
 
@@ -87,7 +92,7 @@ private enum class ReviewScreen(val label: String) {
     ALL_IN_ONE("All in One"), SHARE("Share Your Way"), PERSONAL("Personal & Business"), GET_STARTED("Get Started"),
     PHONE("Phone Number"), COUNTRY("Country"), OTP("OTP"), VERIFIED("Verified"), PASSKEY("Passkey"),
     BIOMETRIC("Biometric"), ACCOUNT_CREATED("Account Created"),
-    HOME_LOADED("Home Loaded"), HOME_LOADING("Home Loading"), HOME_EMPTY("Home Empty"), HOME_ERROR("Home Error"),
+    ROOT_HOME("Root Home + Nav"), HOME_LOADED("Home Loaded"), HOME_LOADING("Home Loading"), HOME_EMPTY("Home Empty"), HOME_ERROR("Home Error"),
     PROFILE_LIST("Profile List"), PROFILE_PERSONAL("Personal Profile"), PROFILE_BUSINESS("Business Profile"),
     PROFILE_PROFESSIONAL("Professional"), PROFILE_RESTAURANT("Restaurant"), PROFILE_CLINIC("Clinic"),
     PROFILE_CREATE("Create Profile"),
@@ -102,11 +107,11 @@ private enum class ReviewScreen(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DesignReviewGallery() {
-    var screen by remember { mutableStateOf(ReviewScreen.SPLASH) }
+private fun DesignReviewGallery(initialScreen:String?=null,initialLanguage:String?=null,focused:Boolean=false) {
+    var screen by remember { mutableStateOf(ReviewScreen.entries.firstOrNull{it.name==initialScreen}?:ReviewScreen.SPLASH) }
     var palette by remember { mutableStateOf(IdentityPalette.PULSE) }
     var mode by remember { mutableStateOf(ThemeMode.LIGHT) }
-    var language by remember { mutableStateOf(currentLocale().substringBefore('-')) }
+    var language by remember { mutableStateOf(initialLanguage?:currentLocale().substringBefore('-')) }
     var splashProgress by remember { mutableFloatStateOf(0f) }
     val app = LocalContext.current.applicationContext as TapApplication
     LaunchedEffect(app) {
@@ -118,6 +123,22 @@ private fun DesignReviewGallery() {
     val countries = listOf(AuthenticationCountry("EG", "+20", "Egypt", "🇪🇬", "00 000 0000 00"))
 
     Phase3OnboardingTheme(mode, palette, isSystemInDarkTheme(), language, popFontFamilies()) {
+        if(focused){
+            when(screen){
+                ReviewScreen.SPLASH->PopBrandedLoading()
+                ReviewScreen.ROOT_HOME->PopBottomNavigationReviewScreen{HomeScreen(homeReviewState(language),{})}
+                ReviewScreen.HOME_LOADING->PopBottomNavigationReviewScreen{HomeScreen(HomeUiState(),{})}
+                ReviewScreen.PROFILE_PERSONAL->PopBottomNavigationReviewScreen(HomePrimaryTab.PROFILE){
+                    ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PERSONAL),"review-primary",{}, {},topLevel=true)
+                }
+                ReviewScreen.SHARE_CENTER->ShareReviewScreen(shareReviewState(language))
+                ReviewScreen.MENU->PopBottomNavigationReviewScreen(HomePrimaryTab.MENU){
+                    MenuReviewScreen(MenuProfileContext(if(language=="ar")"سارة أحمد" else "Sarah Ahmed",if(language=="ar")"مصممة منتجات" else "Product designer",type=if(language=="ar")"شخصي" else "Personal",publicUrl="https://pop.popwam.com/sarah-a1b2c3d4",completionPercent=67))
+                }
+                else->Unit
+            }
+            return@Phase3OnboardingTheme
+        }
         Scaffold(
             topBar = { TopAppBar(title = { Text("POP Design Review") }) },
         ) { inset ->
@@ -136,7 +157,7 @@ private fun DesignReviewGallery() {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             items(listOf(0f, .22f, .48f, .75f, 1f)) { value -> Button(onClick = { splashProgress = value }) { Text("${(value * 100).toInt()}%") } }
                         }
-                        PopSplashScreen(splashProgress, reducedMotion = false)
+                        PopBrandedLoading(reducedMotion = false)
                     }
                     ReviewScreen.LANGUAGE -> LanguageScreen(listOf("en", "ar"), language, {})
                     ReviewScreen.THEME -> ThemeScreen(mode, palette, false, { mode = it }, {}, {}, { palette = it }, {})
@@ -152,16 +173,17 @@ private fun DesignReviewGallery() {
                     ReviewScreen.PASSKEY -> AuthenticationExperience(reviewState(AuthenticationStage.PASSKEY, AuthenticationNextAction.ENROLL_PASSKEY), OverlayState(), countries, "", reviewCallbacks)
                     ReviewScreen.BIOMETRIC -> AuthenticationExperience(reviewState(AuthenticationStage.BIOMETRIC, AuthenticationNextAction.ENROLL_BIOMETRIC).copy(biometricCapability = BiometricCapability.FINGERPRINT), OverlayState(), countries, "", reviewCallbacks)
                     ReviewScreen.ACCOUNT_CREATED -> AuthenticationExperience(reviewState(AuthenticationStage.ACCOUNT_CREATED, AuthenticationNextAction.PROFILE_SETUP, SessionScope.FULL), OverlayState(), countries, "", reviewCallbacks)
+                    ReviewScreen.ROOT_HOME -> PopBottomNavigationReviewScreen { HomeScreen(homeReviewState(language), {}) }
                     ReviewScreen.HOME_LOADED -> HomeScreen(homeReviewState(language), {})
                     ReviewScreen.HOME_LOADING -> HomeScreen(HomeUiState(), {})
                     ReviewScreen.HOME_EMPTY -> HomeScreen(HomeUiState(loadState = HomeLoadState.EMPTY), {})
                     ReviewScreen.HOME_ERROR -> HomeScreen(HomeUiState(loadState = HomeLoadState.ERROR, errorCode = "REVIEW"), {})
                     ReviewScreen.PROFILE_LIST -> ProfileListScreen(profileReviewState(language), {})
-                    ReviewScreen.PROFILE_PERSONAL -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PERSONAL),"review-primary",{}, {})
-                    ReviewScreen.PROFILE_BUSINESS -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.BUSINESS),"review-primary",{}, {})
-                    ReviewScreen.PROFILE_PROFESSIONAL -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PROFESSIONAL),"review-primary",{}, {})
-                    ReviewScreen.PROFILE_RESTAURANT -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.RESTAURANT),"review-primary",{}, {})
-                    ReviewScreen.PROFILE_CLINIC -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.CLINIC),"review-primary",{}, {})
+                    ReviewScreen.PROFILE_PERSONAL -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PERSONAL),"review-primary",{}, {},topLevel=true)
+                    ReviewScreen.PROFILE_BUSINESS -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.BUSINESS),"review-primary",{}, {},topLevel=true)
+                    ReviewScreen.PROFILE_PROFESSIONAL -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PROFESSIONAL),"review-primary",{}, {},topLevel=true)
+                    ReviewScreen.PROFILE_RESTAURANT -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.RESTAURANT),"review-primary",{}, {},topLevel=true)
+                    ReviewScreen.PROFILE_CLINIC -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.CLINIC),"review-primary",{}, {},topLevel=true)
                     ReviewScreen.PROFILE_CREATE -> ProfileCreationScreen(profileReviewState(language).copy(categories=listOf(ProfileCategoryOption("personal","Personal",ProfileBackendKind.PERSONAL,null),ProfileCategoryOption("business","Business",ProfileBackendKind.BUSINESS,null))),{}, {})
                     ReviewScreen.PROFILE_BASIC -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.BASIC_INFORMATION,{}, {})
                     ReviewScreen.PROFILE_ABOUT -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.ABOUT,{}, {})

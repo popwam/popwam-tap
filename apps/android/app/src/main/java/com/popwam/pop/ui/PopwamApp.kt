@@ -70,6 +70,7 @@ import com.popwam.pop.ui.theme.AppearanceStore
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.ThemeMode
 import com.popwam.pop.ui.home.HomeViewModel
+import com.popwam.pop.ui.components.PopOfficialLogo
 import com.popwam.pop.ui.profile.ProfilesViewModel
 import com.popwam.pop.ui.share.ShareViewModel
 import java.io.File
@@ -91,7 +92,6 @@ import com.google.gson.JsonParser
     onPaletteSelected:(IdentityPalette)->Unit,
 ){
     val authState by auth.state.collectAsStateWithLifecycle()
-    LaunchedEffect(phoneCountries) { phoneCountries.refresh() }
     var destination by rememberSaveable { mutableStateOf(UnauthenticatedDestination.PHONE_AUTH.name) }
     var pendingRoute by rememberSaveable { mutableStateOf(initialRoute) }
     var pendingActivation by rememberSaveable { mutableStateOf("") }
@@ -314,7 +314,7 @@ private fun LoginScreen(
             contentPadding=PaddingValues(vertical=24.dp),
             verticalArrangement=Arrangement.spacedBy(18.dp,Alignment.CenterVertically),
         ) {
-            item { Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(82.dp),tint=MaterialTheme.colorScheme.primary);Text("POP",style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Black);Text(stringResource(R.string.pop_slogan),color=MaterialTheme.colorScheme.onSurfaceVariant)} }
+            item { Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){PopOfficialLogo(Modifier.size(82.dp));Text("POP",style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Black);Text(stringResource(R.string.pop_slogan),color=MaterialTheme.colorScheme.onSurfaceVariant)} }
             item {
                 val selected=options.firstOrNull{it.iso2==country}
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically){OutlinedButton({countryPicker=true},Modifier.heightIn(min=54.dp),enabled=options.isNotEmpty(),contentPadding=PaddingValues(horizontal=12.dp)){Text(selected?.flag.orEmpty());Spacer(Modifier.width(5.dp));Text(selected?.callingCode?:"+");Icon(Icons.Default.ExpandMore,null)};Box(Modifier.weight(1f)){LtrField(phone,{phone=it.filter{c->c.isDigit()||c in " -()"};invalidPhone=false},R.string.phone_number,null,KeyboardType.Phone,true,selected?.placeholder)}}
@@ -367,7 +367,7 @@ private fun PhoneOtpScreen(
             verticalArrangement=Arrangement.spacedBy(18.dp,Alignment.CenterVertically),
             horizontalAlignment=Alignment.CenterHorizontally,
         ) {
-            item { Icon(painterResource(R.drawable.pop_logo),null,Modifier.size(78.dp),tint=MaterialTheme.colorScheme.primary) }
+            item { PopOfficialLogo(Modifier.size(78.dp)) }
             item {
                 Text(stringResource(R.string.verify_phone_title),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Black)
             }

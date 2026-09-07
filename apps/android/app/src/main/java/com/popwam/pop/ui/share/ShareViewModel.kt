@@ -15,6 +15,7 @@ import com.popwam.pop.data.api.ShareProductUpdateRequest
 import com.popwam.pop.data.api.ShareTargetDto
 import com.popwam.pop.data.auth.PopAnalytics
 import com.popwam.pop.data.repository.PopwamRepository
+import com.popwam.pop.data.repository.LocalFirstRepository
 import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.nfc.NfcCoordinator
 import com.popwam.pop.nfc.NfcFailure
@@ -39,7 +40,7 @@ data class ShareSnapshot(
 )
 
 interface ShareRepository {
-    suspend fun load(profileId: String): ShareSnapshot
+    suspend fun load(profileId: String, force: Boolean = false): ShareSnapshot
     suspend fun updateProduct(id: String, request: ShareProductUpdateRequest): ShareProductDto
     suspend fun inspectActivation(identifier: String): ScratchActivationInspectResponse
     suspend fun claimActivation(identifier: String, scratch: String, profileId: String, targetId: String): ShareProductDto?
@@ -47,16 +48,19 @@ interface ShareRepository {
 
 class AndroidShareRepository(
     private val repository: PopwamRepository,
+    private val localFirst: LocalFirstRepository,
     private val localeProvider: () -> String,
 ) : ShareRepository {
-    override suspend fun load(profileId: String): ShareSnapshot {
-        val selector = repository.profileSelector(profileId)
+    override suspend fun load(profileId: String, force: Boolean): ShareSnapshot {
+        val selector = localFirst.core(profileId,localeProvider()).selector
+            ?: throw ShareDataException("SHARE_PROFILES_FAILED")
         if (!selector.ok) throw ShareDataException(selector.error ?: "SHARE_PROFILES_FAILED")
         val selected = selector.profiles.firstOrNull { it.id == profileId }
             ?: throw ShareDataException("PROFILE_NOT_FOUND")
-        val targets = repository.shareTargets(profileId, localeProvider())
+        val local = localFirst.share(profileId,localeProvider(),force)
+        val targets = local.targets
         if (!targets.ok) throw ShareDataException(targets.error ?: "SHARE_TARGETS_FAILED")
-        val productsResult = runCatching { repository.shareProducts() }.getOrNull()
+        val productsResult = local.products
         return ShareSnapshot(
             selector = selector,
             serverProfileName = targets.profile.label.ifBlank { selected.label },
@@ -64,8 +68,8 @@ class AndroidShareRepository(
             serverShareable = targets.shareable,
             serverReason = targets.reason,
             targets = targets.targets,
-            products = productsResult?.takeIf { it.ok }?.products.orEmpty(),
-            partial = productsResult?.ok != true,
+            products = productsResult.takeIf { it.ok }?.products.orEmpty(),
+            partial = !productsResult.ok,
         )
     }
 
@@ -122,7 +126,7 @@ class ShareViewModel(
         )
         viewModelScope.launch {
             try {
-                val snapshot = repository.load(profile.id)
+                val snapshot = repository.load(profile.id, force)
                 if (generation != loadGeneration) return@launch
                 val resolved = profile.copy(
                     name = profile.name?.takeIf(String::isNotBlank) ?: snapshot.serverProfileName,

@@ -13,8 +13,8 @@ class FirstLaunchAndroidContractTest {
         val launch=source("src/main/java/com/popwam/pop/ui/launch/LaunchViewModel.kt")
         assertTrue(activity.contains("LaunchCoordinator(app.container.launchState)"))
         assertTrue(activity.contains("LaunchExperience(launchViewModel"))
-        assertTrue(launch.contains("advanceSplashTimeline"))
-        assertTrue(launch.contains("KEY_SPLASH_STARTED_AT"))
+        assertTrue(launch.contains("systemSplashExit.await()"))
+        assertFalse(launch.contains("advanceSplashTimeline"))
         assertFalse(File("src/main/java/com/popwam/pop/ui/RuntimeLaunchViewModel.kt").exists())
     }
 
@@ -70,19 +70,21 @@ class FirstLaunchAndroidContractTest {
         assertTrue(locales.contains("android:name=\"fr\""))
     }
 
-    @Test fun `server localization and session restore run asynchronously beside splash`() {
+    @Test fun `session and local state restore do not trigger localization network`() {
         val application=source("src/main/java/com/popwam/pop/TapApplication.kt")
         val authority=source("src/main/java/com/popwam/pop/data/localization/LocalizationAuthorityStore.kt")
         val launch=source("src/main/java/com/popwam/pop/ui/launch/LaunchViewModel.kt")
         assertTrue(authority.contains("api.localizationBootstrap()"))
         assertTrue(launch.contains("sessions.initialize()"))
-        assertTrue(launch.contains("localization.refresh()"))
+        assertFalse(launch.contains("localization.refresh()"))
+        assertTrue(application.contains("localFirst.core"))
         assertFalse(application.contains("runBlocking"))
     }
 
     @Test fun `typography is centrally script aware`() {
         val theme=source("src/main/java/com/popwam/pop/ui/theme/Theme.kt")
-        assertTrue(theme.contains("if(arabic) Cairo else Montserrat"))
+        assertTrue(theme.contains("PopScriptDirection.RTL"))
+        assertTrue(theme.contains("popFontFamilies()"))
         assertTrue(theme.contains("R.font.cairo"))
         assertTrue(theme.contains("R.font.montserrat"))
     }

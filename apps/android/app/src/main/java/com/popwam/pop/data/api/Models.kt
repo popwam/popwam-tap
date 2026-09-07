@@ -371,6 +371,28 @@ data class FriendsPolicyResponse(val ok:Boolean=false,val policy:FriendsPolicyDt
 data class FriendsListResponse(val ok:Boolean=false,val friends:List<FriendDto> = emptyList(),val nextCursor:String?=null,val error:String?=null)
 data class FriendRequestsResponse(val ok:Boolean=false,val requests:List<FriendRequestDto> = emptyList(),val incomingPendingCount:Int=0,val nextCursor:String?=null,val error:String?=null)
 data class FriendSearchResponse(val ok:Boolean=false,val results:List<FriendSearchResultDto> = emptyList(),val nextCursor:String?=null,val error:String?=null)
+data class DiscoveryProfileDto(
+    val id:String="",
+    val slug:String="",
+    val name:String="",
+    val title:String?=null,
+    val imageUrl:String?=null,
+    val kind:String="PERSON",
+)
+data class DiscoveryServiceDto(
+    val id:String="",
+    val name:String="",
+    val description:String?=null,
+    val profileSlug:String="",
+    val profileName:String="",
+    val profileImageUrl:String?=null,
+)
+data class DiscoveryResponse(
+    val ok:Boolean=false,
+    val profiles:List<DiscoveryProfileDto> = emptyList(),
+    val services:List<DiscoveryServiceDto> = emptyList(),
+    val error:String?=null,
+)
 data class FriendRequestCreateRequest(val targetKey:String,val source:String="SEARCH",val locale:String="en")
 data class FriendPreferencePatchRequest(val favorite:Boolean?=null,val muted:Boolean?=null)
 data class FriendPreferenceDto(val favorite:Boolean=false,val muted:Boolean=false)

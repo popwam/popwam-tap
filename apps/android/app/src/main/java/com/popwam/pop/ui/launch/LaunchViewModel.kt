@@ -15,13 +15,12 @@ import com.popwam.mobile.foundation.navigation.WelcomePage
 import com.popwam.mobile.foundation.overlay.OverlayState
 import com.popwam.mobile.onboarding.LaunchCoordinator
 import com.popwam.mobile.onboarding.LaunchUiState
-import com.popwam.mobile.onboarding.SplashTiming
 import com.popwam.pop.data.auth.SessionRepository
 import com.popwam.pop.data.launch.LegacyLaunchStateMigrator
 import com.popwam.pop.data.localization.LocalizationAuthorityStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -40,10 +39,13 @@ class LaunchViewModel(
     private val foreground = MutableStateFlow(true)
     private var restored = false
     private var queuedDestination: PopDestination? = null
+    private val systemSplashExit = CompletableDeferred<Unit>()
 
     init { beginColdLaunch() }
 
     fun setForeground(value: Boolean) { foreground.value = value }
+
+    fun onSystemSplashExited() { systemSplashExit.complete(Unit) }
 
     fun acceptDeepLink(raw: String?) {
         val parsed = PendingDeepLinkParser.parse(raw) ?: return
@@ -92,7 +94,6 @@ class LaunchViewModel(
 
     private fun beginColdLaunch() {
         viewModelScope.launch {
-            val timing = if (reducedMotion) SplashTiming.ReducedMotion else SplashTiming.Standard
             val startup = async(Dispatchers.IO) {
                 runCatching { sessions.initialize() }
                 val migrated = migrator.migrate(
@@ -102,15 +103,9 @@ class LaunchViewModel(
                 runCatching { afterSessionInitialized() }
                 sessions.authenticated to migrated
             }
-            launch { runCatching { localization.refresh() } }
-
-            // SavedStateHandle survives configuration and normal process recreation.  The
-            // timeline is calculated from its original clock, rather than re-created by a
-            // composable or replayed as a set of static screens.
-            val startedAt = savedStateHandle.get<Long>(KEY_SPLASH_STARTED_AT)
-                ?: System.currentTimeMillis().also { savedStateHandle[KEY_SPLASH_STARTED_AT] = it }
-            advanceSplashTimeline(startedAt, timing)
-
+            // Android owns the system splash. Once it exits, navigate as soon as local
+            // session and launch state are ready; there is no animation-duration gate.
+            systemSplashExit.await()
             val authenticated = startup.await().first
             coordinator.restore()
             restored = true
@@ -126,21 +121,6 @@ class LaunchViewModel(
         }
     }
 
-    private suspend fun advanceSplashTimeline(startedAt: Long, timing: SplashTiming) {
-        if (timing.totalMillis == 0L) {
-            coordinator.showSplashProgress(1f)
-            return
-        }
-        while (true) {
-            val progress = ((System.currentTimeMillis() - startedAt).toFloat() / timing.totalMillis).coerceIn(0f, 1f)
-            coordinator.showSplashProgress(progress)
-            if (progress >= 1f) return
-            // Pausing updates while backgrounded avoids invisible work.  Progress is still
-            // derived from the original clock, so returning never restarts the animation.
-            if (foreground.value) delay(16) else delay(100)
-        }
-    }
-
     private fun saveCurrentWelcomePage() {
         val destination = coordinator.state.value.destination as? PopDestination.Welcome ?: return
         savedStateHandle[KEY_WELCOME_PAGE] = destination.page.name
@@ -151,7 +131,6 @@ class LaunchViewModel(
 
     companion object {
         private const val KEY_WELCOME_PAGE = "phase3_welcome_page"
-        private const val KEY_SPLASH_STARTED_AT = "phase3_splash_started_at"
     }
 }
 

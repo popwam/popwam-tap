@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -30,6 +31,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -41,7 +43,11 @@ import com.popwam.pop.hce.HceConfig
 import com.popwam.pop.nfc.NfcCoordinator
 import com.popwam.pop.ui.FigmaLtrText
 import com.popwam.pop.ui.QrScanner
+import com.popwam.pop.ui.components.PopApprovedAsset
+import com.popwam.pop.ui.components.PopApprovedAvatar
+import com.popwam.pop.ui.components.PopBrandedLoading
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -56,25 +62,25 @@ fun ShareCenterScreen(
     onActivate: () -> Unit,
     navigate: (String) -> Unit,
     initialPanel: ShareInitialPanel = ShareInitialPanel.NONE,
+    onBack: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val arabic = LocalConfiguration.current.locales[0].language == "ar"
     val nativeShareTitle = stringResource(R.string.share_native)
     val lifecycleOwner = LocalLifecycleOwner.current
     var nfcPanel by rememberSaveable { mutableStateOf(false) }
-    var hcePanel by rememberSaveable { mutableStateOf(false) }
-    var productEditor by remember { mutableStateOf<ShareProductDto?>(null) }
+    var hceQuickPanel by rememberSaveable { mutableStateOf(false) }
     var initialPanelConsumed by rememberSaveable(activeProfile?.id, initialPanel) { mutableStateOf(false) }
 
     LaunchedEffect(activeProfile) {
         if (activeProfile == null) viewModel.clearActiveProfile() else viewModel.activateProfile(activeProfile)
     }
-    LaunchedEffect(state.shareable, initialPanel, activeProfile?.id) {
-        if (!initialPanelConsumed && state.shareable) {
+    LaunchedEffect(state.loadState, state.shareable, initialPanel, activeProfile?.id) {
+        if (!initialPanelConsumed && state.loadState==ShareLoadState.READY) {
             when (initialPanel) {
-                ShareInitialPanel.QR -> viewModel.showQr()
+                ShareInitialPanel.QR -> if(state.shareable)viewModel.showQr()
                 ShareInitialPanel.NFC -> nfcPanel = true
-                ShareInitialPanel.HCE -> hcePanel = true
+                ShareInitialPanel.HCE -> { if(state.shareable&&state.hce.availability==HceAvailability.READY)viewModel.setHce(context,true);hceQuickPanel=true }
                 ShareInitialPanel.NONE -> Unit
             }
             initialPanelConsumed = true
@@ -98,65 +104,62 @@ fun ShareCenterScreen(
         ShareLoadState.ERROR -> ShareError(state.errorCode, viewModel::refresh)
         ShareLoadState.READY -> LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item {
-                Text(stringResource(R.string.share_eyebrow), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-                Text(stringResource(R.string.share_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.share_description), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            }
-            item { ActiveProfileCard(state) }
+            item { ApprovedShareTopBar(onBack) }
+            item { ApprovedShareProfileCard(state) { state.payload?.let { payload -> runCatching { SharePlatform.copy(context,payload);viewModel.linkCopied() }.onFailure { viewModel.qrFailed() } } } }
             if (!state.shareable) item { UnshareableCard(state) { activeProfile?.id?.let { navigate("profile/$it/edit/VISIBILITY") } } }
             if (state.availability == ShareAvailability.UNLISTED) item { StatusNotice(R.string.share_unlisted_notice, Icons.Default.VisibilityOff) }
             item {
                 Text(stringResource(R.string.share_how), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ShareAction(R.string.share_whatsapp, Icons.Default.Forum, Modifier.weight(1f), state.shareable) {
+                    ApprovedShareAction(R.string.share_whatsapp, R.drawable.pop_approved_share_whatsapp, Modifier.weight(1f), state.shareable) {
                         state.payload?.let { runCatching { SharePlatform.shareWhatsApp(context, it, arabic); viewModel.nativeShareOpened() }.onFailure { viewModel.qrFailed() } }
                     }
-                    ShareAction(R.string.share_copy, Icons.Default.ContentCopy, Modifier.weight(1f), state.shareable) {
-                        state.payload?.let { runCatching { SharePlatform.copy(context, it); viewModel.linkCopied() }.onFailure { viewModel.qrFailed() } }
-                    }
-                    ShareAction(R.string.share_native, Icons.Default.Share, Modifier.weight(1f), state.shareable) {
+                    ApprovedShareAction(R.string.share_native, R.drawable.pop_approved_action_share, Modifier.weight(1f), state.shareable) {
                         state.payload?.let { runCatching { SharePlatform.shareLink(context, it, nativeShareTitle, arabic); viewModel.nativeShareOpened() }.onFailure { viewModel.qrFailed() } }
                     }
+                    ApprovedShareAction(R.string.share_show_qr, R.drawable.pop_approved_action_qr, Modifier.weight(1f), state.shareable, viewModel::showQr)
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ShareAction(R.string.share_show_qr, Icons.Default.QrCode2, Modifier.weight(1f), state.shareable, viewModel::showQr)
-                    ShareAction(R.string.share_write_nfc, Icons.Default.Nfc, Modifier.weight(1f), state.shareable && state.nfc.availability != NfcAvailability.UNAVAILABLE) { nfcPanel = true }
-                    HceAction(state, Modifier.weight(1f)) { hcePanel = true }
+                    ApprovedShareAction(R.string.share_write_nfc, R.drawable.pop_approved_share_program_card, Modifier.weight(1f), state.shareable && state.nfc.availability != NfcAvailability.UNAVAILABLE) { nfcPanel = true }
+                    ApprovedShareAction(R.string.share_phone_tap, R.drawable.pop_approved_share_tap, Modifier.weight(1f), state.shareable && state.hce.availability !in setOf(HceAvailability.UNAVAILABLE,HceAvailability.UNSUPPORTED)) {
+                        when(state.hce.availability){HceAvailability.READY->viewModel.setHce(context,true);HceAvailability.DISABLED->openNfcSettings(context);else->Unit}
+                    }
+                    Spacer(Modifier.weight(1f))
                 }
             }
+            if(state.hce.activeForProfile||state.hce.requested)item{ApprovedHceGuidance()}
             item { StatusNotice(R.string.share_privacy_note, Icons.Default.PrivacyTip) }
             state.feedback?.let { feedback -> item { ShareFeedback(feedback) { viewModel.consumeFeedback() } } }
             state.errorCode?.let { item { ErrorNotice(it) } }
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.share_products), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.share_products_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Button(onActivate) { Icon(Icons.Default.AddCircle, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.activate_product)) }
-                }
-            }
-            if (state.products.isEmpty()) item { EmptyProducts() }
-            items(state.products, key = { it.id }) { product -> ProductCard(product, { productEditor = product }, { runCatching { SharePlatform.copy(context, CanonicalSharePayload(activeProfile?.id.orEmpty(), product.label, product.permanentUrl)); viewModel.linkCopied() } }) }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextButton({ navigate("products") }) { Text(stringResource(R.string.share_legacy_routes)) }
-                    TextButton({ navigate("virtual-cards") }) { Text(stringResource(R.string.wallet)) }
-                }
-            }
         }
     }
 
     if (state.qrVisible && state.payload != null) QrSheet(state.payload, viewModel::hideQr, viewModel)
     if (nfcPanel) NfcWriteSheet(state, viewModel, { nfcPanel = false; viewModel.cancelNfcOperation() })
-    if (hcePanel) HceSheet(state, viewModel) { hcePanel = false }
-    productEditor?.let { ProductSheet(it, state, viewModel, { navigate("card/${it.id}") }) { productEditor = null } }
+    if(hceQuickPanel)HceCountdownSheet(state){hceQuickPanel=false;viewModel.setHce(context,false);if(initialPanel==ShareInitialPanel.HCE)onBack()}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun HceCountdownSheet(state:ShareUiState,dismiss:()->Unit){
+    var remaining by remember(state.activeProfile?.id){mutableIntStateOf(10)}
+    LaunchedEffect(Unit){while(remaining>0){delay(1_000);remaining--};dismiss()}
+    ModalBottomSheet(onDismissRequest=dismiss){
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(16.dp)){
+            PopApprovedAsset(R.drawable.pop_approved_share_tap,null,Modifier.size(72.dp))
+            when{
+                !state.shareable->Text(stringResource(R.string.share_publish_required),style=MaterialTheme.typography.titleMedium)
+                state.hce.availability==HceAvailability.READY->Text(stringResource(R.string.profile_touch_countdown,remaining),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+                state.hce.availability==HceAvailability.DISABLED->Text(stringResource(R.string.share_nfc_disabled),style=MaterialTheme.typography.titleMedium)
+                else->Text(stringResource(R.string.share_hce_unsupported),style=MaterialTheme.typography.titleMedium)
+            }
+            TextButton(dismiss){Text(stringResource(R.string.close))}
+        }
+    }
 }
 
 /** Stateless entry point used only by the debug design-review gallery. */
@@ -168,29 +171,26 @@ fun ShareReviewScreen(state: ShareUiState, panel: ShareInitialPanel = ShareIniti
         ShareLoadState.ERROR -> ShareError(state.errorCode) {}
         ShareLoadState.READY -> LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item {
-                Text(stringResource(R.string.share_eyebrow), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-                Text(stringResource(R.string.share_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.share_description), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            }
-            item { ActiveProfileCard(state) }
+            item { ApprovedShareTopBar {} }
+            item { ApprovedShareProfileCard(state) {} }
             if (!state.shareable) item { UnshareableCard(state) {} }
             if (state.availability == ShareAvailability.UNLISTED) item { StatusNotice(R.string.share_unlisted_notice, Icons.Default.VisibilityOff) }
             item {
                 Text(stringResource(R.string.share_how), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ShareAction(R.string.share_copy, Icons.Default.ContentCopy, Modifier.weight(1f), state.shareable) {}
-                    ShareAction(R.string.share_native, Icons.Default.Share, Modifier.weight(1f), state.shareable) {}
-                    ShareAction(R.string.share_show_qr, Icons.Default.QrCode2, Modifier.weight(1f), state.shareable) {}
+                    ApprovedShareAction(R.string.share_whatsapp,R.drawable.pop_approved_share_whatsapp,Modifier.weight(1f),state.shareable){}
+                    ApprovedShareAction(R.string.share_native,R.drawable.pop_approved_action_share,Modifier.weight(1f),state.shareable){}
+                    ApprovedShareAction(R.string.share_show_qr,R.drawable.pop_approved_action_qr,Modifier.weight(1f),state.shareable){}
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ShareAction(R.string.share_write_nfc, Icons.Default.Nfc, Modifier.weight(1f), state.shareable) {}
-                    HceAction(state, Modifier.weight(1f)) {}
+                    ApprovedShareAction(R.string.share_write_nfc,R.drawable.pop_approved_share_program_card,Modifier.weight(1f),state.shareable){}
+                    ApprovedShareAction(R.string.share_phone_tap,R.drawable.pop_approved_share_tap,Modifier.weight(1f),state.shareable&&state.hce.availability !in setOf(HceAvailability.UNAVAILABLE,HceAvailability.UNSUPPORTED)){}
+                    Spacer(Modifier.weight(1f))
                 }
             }
             when (panel) {
@@ -202,8 +202,6 @@ fun ShareReviewScreen(state: ShareUiState, panel: ShareInitialPanel = ShareIniti
             item { StatusNotice(R.string.share_privacy_note, Icons.Default.PrivacyTip) }
             state.feedback?.let { feedback -> item { ShareFeedback(feedback) {} } }
             state.errorCode?.let { item { ErrorNotice(it) } }
-            if (state.products.isEmpty()) item { EmptyProducts() }
-            else items(state.products, key = { it.id }) { ProductCard(it, {}, {}) }
         }
     }
 }
@@ -253,6 +251,65 @@ private fun HceReviewPanel(state: ShareUiState) {
         },
         Icons.Default.Contactless,
     )
+}
+
+@Composable
+private fun ApprovedShareTopBar(onBack:()->Unit){
+    val rtl=androidx.compose.ui.platform.LocalLayoutDirection.current==androidx.compose.ui.unit.LayoutDirection.Rtl
+    Row(Modifier.fillMaxWidth().heightIn(min=56.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+        Surface(Modifier.size(42.dp).clickable(onClick=onBack),shape=RoundedCornerShape(21.dp),color=MaterialTheme.colorScheme.surfaceVariant){
+            Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){PopApprovedAsset(R.drawable.pop_approved_chevron,stringResource(R.string.back),Modifier.size(42.dp).graphicsLayer(scaleX=if(rtl)-1f else 1f),tint=MaterialTheme.colorScheme.onSurface)}
+        }
+        Column(Modifier.weight(1f)){
+            Text(stringResource(R.string.share_title),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+            Text(stringResource(R.string.share_description),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
+        }
+    }
+}
+
+@Composable
+private fun ApprovedShareProfileCard(state:ShareUiState,copy:()->Unit){
+    Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(8.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.45f)),elevation=CardDefaults.cardElevation(defaultElevation=4.dp)){
+        Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
+                PopApprovedAvatar(null,state.activeProfile?.name,68.dp)
+                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)){
+                    Text(state.activeProfile?.name.orEmpty(),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                    state.activeProfile?.type?.takeIf(String::isNotBlank)?.let{Text(it,style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)}
+                    Text(availabilityLabel(state.availability),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            state.payload?.let{payload->
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr){
+                    Text(payload.canonicalUrl,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
+                }
+                OutlinedButton(copy,Modifier.fillMaxWidth(),contentPadding=PaddingValues(vertical=9.dp)){
+                    PopApprovedAsset(R.drawable.pop_approved_copy,null,Modifier.size(19.dp));Spacer(Modifier.width(7.dp));Text(stringResource(R.string.share_copy))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApprovedShareAction(label:Int,drawable:Int,modifier:Modifier,enabled:Boolean,onClick:()->Unit){
+    Surface(modifier.heightIn(min=96.dp).semantics{role=Role.Button}.clickable(enabled=enabled,onClick=onClick),shape=RoundedCornerShape(8.dp),color=if(enabled)MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.55f),shadowElevation=2.dp,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.3f))){
+        Column(Modifier.fillMaxSize().padding(horizontal=8.dp,vertical=13.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){
+            PopApprovedAsset(drawable,null,Modifier.size(31.dp),tint=if(enabled)null else MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(9.dp))
+            Text(stringResource(label),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.SemiBold,color=if(enabled)MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,textAlign=TextAlign.Center,maxLines=2)
+        }
+    }
+}
+
+@Composable
+private fun ApprovedHceGuidance(){
+    Surface(Modifier.fillMaxWidth(),shape=RoundedCornerShape(8.dp),color=MaterialTheme.colorScheme.primaryContainer){
+        Row(Modifier.fillMaxWidth().padding(14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
+            PopApprovedAsset(R.drawable.pop_approved_share_tap,null,Modifier.size(28.dp))
+            Text(stringResource(R.string.share_hce_guidance),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+    }
 }
 
 @Composable
@@ -509,7 +566,7 @@ private fun ErrorNotice(code: String) {
     }
 }
 
-@Composable private fun ShareLoading() = Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+@Composable private fun ShareLoading() = PopBrandedLoading()
 @Composable private fun ShareEmpty() = Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) { Text(stringResource(R.string.no_active_profile), style = MaterialTheme.typography.titleMedium) }
 @Composable private fun ShareError(code: String?, retry: () -> Unit) = Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) { ErrorNotice(code ?: "SHARE_UNAVAILABLE"); Button(retry) { Text(stringResource(R.string.retry)) } } }
 

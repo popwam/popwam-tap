@@ -2,6 +2,10 @@ package com.popwam.pop.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +29,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
@@ -55,6 +62,7 @@ import com.popwam.pop.ui.share.ShareProfileAccess
 import com.popwam.pop.ui.share.ShareActivationScreen as ProductionShareActivationScreen
 import com.popwam.pop.ui.share.ShareEffect
 import com.popwam.pop.ui.share.ShareViewModel
+import com.popwam.pop.ui.components.PopApprovedAsset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,10 +99,8 @@ fun FigmaMainNavigation(
             name = owned?.name ?: homeProfile?.name,
             access = ShareProfileAccess.from(owned?.visibility ?: homeProfile?.visibility),
             lifecycle = owned?.lifecycle ?: homeProfile?.lifecycle,
+            type = owned?.categoryKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase),
         )
-    }
-    LaunchedEffect(activeShareProfile) {
-        if (activeShareProfile == null) share.clearActiveProfile() else share.activateProfile(activeShareProfile)
     }
     LaunchedEffect(shareState.hce.requested, shareState.hce.activeForProfile, shareState.hce.availability) {
         HceConfig.refreshPreferredService(context)
@@ -109,6 +115,7 @@ fun FigmaMainNavigation(
                     ProfileDestination.List->nav.navigate("profiles")
                     ProfileDestination.Create->nav.navigate("profiles/create")
                     is ProfileDestination.View->nav.navigate("profile/${destination.id}")
+                    is ProfileDestination.PublicPreview->nav.navigate("profile/public-preview/${destination.id}")
                     is ProfileDestination.Editor->nav.navigate("profile/${destination.id}/edit")
                     is ProfileDestination.Section->nav.navigate("profile/${destination.id}/edit/${destination.section.name}")
                     is ProfileDestination.Share->nav.navigate("profile/share/${destination.id}")
@@ -171,6 +178,7 @@ fun FigmaMainNavigation(
                             HomeDestination.Share -> nav.navigate("share")
                             HomeDestination.Menu -> nav.navigate("menu")
                             is HomeDestination.Profile -> nav.navigate("profile/${destination.id}")
+                            is HomeDestination.PublicProfile -> nav.navigate("public-preview/${Uri.encode(destination.slug)}")
                         }
                     }, onSessionExpired = onLogout)
                 }
@@ -179,25 +187,25 @@ fun FigmaMainNavigation(
                 composable("my-profile") {
                     val activeId = profileState.activeProfileId ?: profileState.profiles.firstOrNull()?.id
                     if (activeId == null) ProfileListScreen(profileState, profiles::onEvent)
-                    else ProfileViewScreen(profileState, activeId, {}, profiles::onEvent, topLevel = true)
+                    else ProfileViewScreen(profileState, activeId, {}, profiles::onEvent, topLevel = true) { nav.navigate("settings/notifications") }
                 }
-                composable("share") { ProductionShareCenterScreen(shareState,share,activeShareProfile,{nav.navigate("share-activate")},{nav.navigate(it)}) }
+                composable("share") { ProductionShareCenterScreen(shareState,share,activeShareProfile,{nav.navigate("share-activate")},{nav.navigate(it)},onBack=nav::popBackStack) }
                 composable("profile/share/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
                     val id=entry.arguments?.getString("id").orEmpty()
                     val owned=profileState.profiles.firstOrNull{it.id==id}
-                    val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle)
+                    val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.categoryKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
                     LaunchedEffect(id){home.selectActiveProfile(id)}
-                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)})
+                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},onBack=nav::popBackStack)
                 }
                 composable("profile/qr/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
-                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle)
+                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.categoryKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
                     LaunchedEffect(id){home.selectActiveProfile(id)}
-                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.QR)
+                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.QR,nav::popBackStack)
                 }
                 composable("profile/nfc/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
-                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle)
+                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.categoryKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
                     LaunchedEffect(id){home.selectActiveProfile(id)}
-                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.NFC)
+                    ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.HCE,nav::popBackStack)
                 }
                 composable("share-activate") { ProductionShareActivationScreen(shareState,share){nav.popBackStack()} }
                 composable("virtual-cards") { VirtualProfiles(state, vm::reload, { nav.navigate("virtual-card/$it") }, { nav.navigate("create-card/start") }) }
@@ -205,8 +213,17 @@ fun FigmaMainNavigation(
                 composable("activity") { ActivityFeed(state, vm::reload) }
                 composable("menu") {
                     val active = profileState.profiles.firstOrNull { it.id == profileState.activeProfileId }
+                    val activeContent = profileState.content?.takeIf { it.summary.id == active?.id }
                     PopMenuScreen(
-                        profile = active?.let { MenuProfileContext(it.name, it.categoryKind.name.lowercase().replaceFirstChar(Char::uppercase), it.avatarUrl) },
+                        profile = active?.let { MenuProfileContext(
+                            name=it.name,
+                            subtitle=it.subtitle,
+                            avatarUrl=it.avatarUrl,
+                            type=it.categoryKind.name.lowercase().replaceFirstChar(Char::uppercase),
+                            verified=it.verification==ProfileVerificationState.VERIFIED,
+                            publicUrl=activeContent?.slug?.takeIf(String::isNotBlank)?.let { slug->"https://pop.popwam.com/$slug" },
+                            completionPercent=if(it.completion.publishReady)100 else 0,
+                        ) },
                         navigate = { nav.navigate(it) },
                         logout = onLogout,
                     )
@@ -229,6 +246,12 @@ fun FigmaMainNavigation(
                 composable("profile/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     ProfileViewScreen(profileState,entry.arguments?.getString("id").orEmpty(),nav::popBackStack,profiles::onEvent)
                 }
+                composable("profile/public-preview/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
+                    val id=entry.arguments?.getString("id").orEmpty()
+                    val slug=profileState.content?.takeIf{it.summary.id==id}?.slug
+                    if(slug.isNullOrBlank())nav.popBackStack() else PublicProfilePreviewDialog("https://pop.popwam.com/$slug",nav::popBackStack)
+                }
+                composable("public-preview/{slug}",arguments=listOf(navArgument("slug"){type=NavType.StringType})){entry->PublicProfilePreviewDialog("https://pop.popwam.com/${entry.arguments?.getString("slug").orEmpty()}",nav::popBackStack)}
                 composable("profile/{id}/edit",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ProfileEditorHubScreen(profileState,entry.arguments?.getString("id").orEmpty(),nav::popBackStack,profiles::onEvent)}
                 composable("profile/{id}/edit/{section}",arguments=listOf(navArgument("id"){type=NavType.StringType},navArgument("section"){type=NavType.StringType})){entry->val section=runCatching{ProfileEditorSection.valueOf(entry.arguments?.getString("section").orEmpty())}.getOrDefault(ProfileEditorSection.BASIC_INFORMATION);ProfileEditorSectionScreen(profileState,entry.arguments?.getString("id").orEmpty(),section,nav::popBackStack,profiles::onEvent)}
                 composable("card/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
@@ -246,7 +269,7 @@ fun FigmaMainNavigation(
                 // NFC services remain contextual for activation, device-card selection and authorized programming; there is no public NFC Tools route.
                 composable("programming") { LaunchedEffect(Unit) { vm.loadProgramming() }; LegacyProgrammingList(state.programmingCards) { nav.navigate("program/$it") } }
                 composable("program/{id}") { entry -> state.programmingCards.firstOrNull { it.id == entry.arguments?.getString("id") }?.let { LegacyProgramming(it, state, vm) } }
-                composable("hce") { ProductionShareCenterScreen(shareState,share,activeShareProfile,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.HCE) }
+                composable("hce") { ProductionShareCenterScreen(shareState,share,activeShareProfile,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.HCE,nav::popBackStack) }
                 composable("settings") { SecuritySettingsScreen("root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it.startsWith("legal/")||it=="nearby"||it=="profiles")nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true}) }
                 composable("settings/{section}",arguments=listOf(navArgument("section"){type=NavType.StringType})){entry->SecuritySettingsScreen(entry.arguments?.getString("section") ?: "root",state,vm,appearanceStore,onThemeModeSelected,onPaletteSelected,{if(it.startsWith("friends")||it.startsWith("legal/")||it=="nearby"||it=="profiles")nav.navigate(it) else nav.navigate("settings/$it")},nav::popBackStack,onLogout,{howItWorks=true})}
                 composable("integrations") { SecurePortal(R.string.connected_accounts,"dashboard/integrations",R.string.connected_accounts_help) }
@@ -260,36 +283,66 @@ fun FigmaMainNavigation(
     HowItWorksSheet(howItWorks,{howItWorks=false}){howItWorks=false;nav.navigate("create-card/start")}
 }
 
+@Composable private fun PublicProfilePreviewDialog(url:String,dismiss:()->Unit){
+    Dialog(onDismissRequest=dismiss,properties=DialogProperties(usePlatformDefaultWidth=false)){
+        Surface(Modifier.fillMaxWidth(.94f).fillMaxHeight(.9f),shape=RoundedCornerShape(22.dp),color=MaterialTheme.colorScheme.surface){
+            Column(Modifier.fillMaxSize()){
+                Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Text(stringResource(R.string.profile_preview),Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);TextButton(dismiss){Text(stringResource(R.string.profile_preview_close))}}
+                var loading by remember(url){mutableStateOf(true)}
+                Box(Modifier.fillMaxSize()){
+                    AndroidView(factory={context->WebView(context).apply{
+                        settings.javaScriptEnabled=false;settings.domStorageEnabled=false;settings.allowFileAccess=false;settings.allowContentAccess=false;settings.mixedContentMode=android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                        webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView,request:WebResourceRequest):Boolean{return request.url.scheme!="https"||request.url.host!="pop.popwam.com"};override fun onPageFinished(view:WebView?,loadedUrl:String?){loading=false}}
+                        loadUrl(url)
+                    }},update={if(it.url!=url)it.loadUrl(url)},modifier=Modifier.fillMaxSize())
+                    if(loading)CircularProgressIndicator(Modifier.align(Alignment.Center))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun PopPrimaryNavigationBar(selected: HomePrimaryTab, navigate: (String) -> Unit) {
-    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 28.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 36.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
         Surface(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 320.dp),
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().widthIn(max = 320.dp).heightIn(min = 62.dp),
+            shape = RoundedCornerShape(26.dp),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 8.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f)),
         ) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                listOf(
-                    Triple(HomePrimaryTab.HOME, "home", Pair(R.string.home, PopNavigationIcons.Home)),
-                    Triple(HomePrimaryTab.PROFILE, "my-profile", Pair(R.string.my_profile, PopNavigationIcons.Profile)),
-                    Triple(HomePrimaryTab.MENU, "menu", Pair(R.string.nav_menu, PopNavigationIcons.Menu)),
-                ).forEach { (tab, route, item) ->
-                    val selectedColor = if (selected == tab) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    Column(
-                        Modifier.widthIn(min = 80.dp).heightIn(min = 56.dp).clickable { navigate(route) },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(item.second, stringResource(item.first), Modifier.size(24.dp), tint = selectedColor)
-                        Text(stringResource(item.first), style = MaterialTheme.typography.labelSmall, color = selectedColor, maxLines = 1)
-                        Spacer(Modifier.size(3.dp).background(if (selected == tab) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape))
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    listOf(
+                        Triple(HomePrimaryTab.HOME, "home", Pair(R.string.home, R.drawable.pop_approved_nav_home)),
+                        Triple(HomePrimaryTab.PROFILE, "my-profile", Pair(R.string.my_profile, R.drawable.pop_logo_official)),
+                        Triple(HomePrimaryTab.MENU, "menu", Pair(R.string.nav_menu, R.drawable.pop_approved_nav_menu)),
+                    ).forEach { (tab, route, item) ->
+                        val selectedColor = if (selected == tab) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        Column(
+                            Modifier.widthIn(min = 84.dp).heightIn(min = 52.dp).clip(RoundedCornerShape(18.dp)).clickable { navigate(route) },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            PopApprovedAsset(
+                                item.second,
+                                stringResource(item.first),
+                                Modifier.size(if (tab == HomePrimaryTab.PROFILE) 47.dp else 32.dp),
+                                if (tab == HomePrimaryTab.PROFILE) null else selectedColor,
+                            )
+                            Spacer(Modifier.size(3.dp).background(if (selected == tab) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape))
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+fun PopBottomNavigationReviewScreen(selected:HomePrimaryTab=HomePrimaryTab.HOME,content:@Composable ()->Unit){
+    Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={PopPrimaryNavigationBar(selected){}}){padding->Box(Modifier.fillMaxSize().padding(padding)){content()}}
 }
 
 @Composable

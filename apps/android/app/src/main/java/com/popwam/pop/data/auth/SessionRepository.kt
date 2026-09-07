@@ -40,13 +40,23 @@ class SessionRepository(private val authApi:AuthApi,private val store:SessionSto
             throw error
         }
     }
-    suspend fun refresh():String? {
+    suspend fun refresh(rejectedAccessToken:String?=null):String? {
         var invalidated = false
         val token = mutex.withLock {
             val before = store.snapshot() ?: return@withLock null
-            val response = runCatching {
+            if(rejectedAccessToken!=null && before.accessToken!=rejectedAccessToken) return@withLock before.accessToken
+            val response = try {
                 authApi.refresh(RefreshRequest(before.refreshToken, deviceName()))
-            }.getOrNull()
+            } catch (error: Throwable) {
+                // Transport failure and server availability are not proof that the
+                // secure local session is invalid. Keep offline access intact.
+                val status = (error as? HttpException)?.code()
+                if (status in setOf(400, 401, 403)) {
+                    store.clear()
+                    invalidated = true
+                }
+                return@withLock null
+            }
             if (response?.ok == true) {
                 store.save(before.copy(accessToken = response.accessToken, refreshToken = response.refreshToken))
                 response.accessToken

@@ -11,18 +11,19 @@ import com.popwam.mobile.foundation.navigation.PopDestination
 import com.popwam.mobile.foundation.overlay.OverlayKey
 import com.popwam.mobile.onboarding.LanguageScreen
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
-import com.popwam.mobile.onboarding.PopSplashScreen
 import com.popwam.mobile.onboarding.ThemeScreen
 import com.popwam.mobile.onboarding.WelcomeScreen
 import com.popwam.pop.data.localization.LocalizationAuthoritySnapshot
 import com.popwam.pop.ui.PopSystemBars
 import com.popwam.pop.ui.applyPopLanguage
+import com.popwam.pop.ui.components.PopBrandedLoading
 
 @Composable
 fun LaunchExperience(
     viewModel: LaunchViewModel,
     localization: LocalizationAuthoritySnapshot,
     fonts: PopFontFamilies,
+    startupAnimationReady: Boolean,
     existingApplication: @Composable () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -46,9 +47,9 @@ fun LaunchExperience(
     Phase3OnboardingTheme(theme, style, isSystemInDarkTheme(), language, fonts) {
         PopSystemBars(theme == ThemeMode.DARK || theme == ThemeMode.SYSTEM && isSystemInDarkTheme())
         when (destination) {
-            PopDestination.Launch -> PopSplashScreen(
-                progress = state.splashProgress,
+            PopDestination.Launch -> PopBrandedLoading(
                 reducedMotion = viewModel.reducedMotion,
+                animationReady = startupAnimationReady,
             )
             PopDestination.Language -> LanguageScreen(
                 availableLanguageTags = availableLanguages,

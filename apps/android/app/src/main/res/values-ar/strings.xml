@@ -286,10 +286,10 @@
     <string name="share_how">كيف تريد مشاركته؟</string>
     <string name="share_profile">الملف الحالي</string>
     <string name="share_target">المحتوى المراد مشاركته</string>
-    <string name="share_show_qr">عرض QR</string>
+    <string name="share_show_qr">QR</string>
     <string name="share_qr_ready">QR جاهز. لا يتم تأكيد الفتح إلا بعد طلب الرابط العام.</string>
     <string name="share_qr_description">رمز QR لمحتوى المشاركة العام المحدد</string>
-    <string name="share_native">المشاركة عبر الجهاز</string>
+    <string name="share_native">المشاركة</string>
     <string name="share_whatsapp">واتساب</string>
     <string name="share_copy">نسخ الرابط</string>
     <string name="share_link">رابط مشاركة POP العام</string>
@@ -336,8 +336,8 @@
     <string name="share_profile_private">هذا الملف خاص. اجعله عامًا أو غير مدرج قبل مشاركته.</string>
     <string name="share_unlisted_notice">هذا الملف غير مدرج. يمكن لأي شخص يملك الرابط فتحه، لكن لا ينبغي لمحركات البحث فهرسته.</string>
     <string name="share_privacy_note">تتم مشاركة الرابط العام للملف النشط فقط. لا تُضمّن رموز دخول POP أو بيانات الحساب أو أدلة التحقق مطلقًا.</string>
-    <string name="share_write_nfc">كتابة وسم NFC</string>
-    <string name="share_phone_tap">لمس الهاتف (HCE)</string>
+    <string name="share_write_nfc">برمجة كارت</string>
+    <string name="share_phone_tap">شارك بلمسة</string>
     <string name="share_hce_ready">جاهز ما دامت هذه الشاشة مفتوحة والهاتف غير مقفل. يختلف التوافق حسب القارئ.</string>
     <string name="share_hce_observability">يمكن اكتشاف اللمس، لكن لا يستطيع Android ضمان فتح الرابط على الجهاز الآخر.</string>
     <string name="share_download_qr">حفظ QR</string>
@@ -797,4 +797,22 @@
     <string name="profile_module_restaurant_details">تفاصيل المطعم</string>
     <string name="profile_module_medical_details">التفاصيل الطبية</string>
     <string name="profile_additional_details">تفاصيل إضافية</string>
+    <string name="profile_unverified">غير موثّق</string>
+    <string name="profile_completion_percent">اكتمل POP الخاص بك بنسبة %1$d%%</string>
+    <string name="profile_basic_information_description">الاسم، النبذة، والتفاصيل الأساسية</string>
+    <string name="profile_contact_links_description">معلومات الاتصال وروابط التواصل الاجتماعي</string>
+    <string name="profile_media_description">الصور والفيديوهات والوثائق</string>
+    <string name="profile_appearance_description">خصّص مظهر ملفك</string>
+    <string name="profile_type_details_description">عملك، خدماتك، وخبرتك</string>
+    <string name="profile_verification_description">تحقق من هويتك أو عملك</string>
+    <string name="share_hce_guidance">قرّب الهاتف من هاتف يدعم NFC</string>
+    <string name="home_search_person">شخص</string>
+    <string name="home_search_business">نشاط تجاري</string>
+    <string name="home_search_service">خدمة</string>
+    <string name="home_search_empty">لا توجد نتائج عامة مطابقة</string>
+    <string name="home_search_unavailable">البحث غير متاح مؤقتًا</string>
+    <string name="profile_touch">لمسة</string>
+    <string name="profile_preview_close">إغلاق المعاينة</string>
+    <string name="profile_preview_action">معاينة</string>
+    <string name="profile_touch_countdown">قرّب الجهاز · %1$d ث</string>
 </resources>

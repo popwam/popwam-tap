@@ -50,6 +50,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import com.popwam.mobile.onboarding.LaunchCoordinator
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -58,10 +60,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appearanceStore: AppearanceStore
     private lateinit var launchViewModel: LaunchViewModel
     private lateinit var authenticationViewModel: AuthenticationFlowViewModel
+    private var systemSplashExited by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val systemSplash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        systemSplash.setOnExitAnimationListener { provider ->
+            provider.remove()
+            systemSplashExited = true
+            if (::launchViewModel.isInitialized) launchViewModel.onSystemSplashExited()
+        }
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE,
@@ -85,10 +93,15 @@ class MainActivity : AppCompatActivity() {
                 sessions = app.container.sessions,
                 localization = app.container.localization,
                 reducedMotion = reducedMotionEnabled(this),
-                afterSessionInitialized = { app.container.pushTokens.uploadPendingIfAuthenticated() },
+                afterSessionInitialized = {
+                    if (app.container.sessions.authenticated) {
+                        app.container.localFirst.core(null,currentLocale())
+                    }
+                },
             ),
         )[LaunchViewModel::class.java]
         launchViewModel.acceptDeepLink(intent?.dataString)
+        if (systemSplashExited) launchViewModel.onSystemSplashExited()
         authenticationViewModel = ViewModelProvider(
             this,
             AuthenticationFlowFactory(app.container.authenticationRemote,app.container.sessionStore,app.container.firebasePhoneAuth),
@@ -99,10 +112,13 @@ class MainActivity : AppCompatActivity() {
             androidx.compose.runtime.LaunchedEffect(launchState.persisted.selectedBaseTheme, launchState.persisted.selectedPopStyle) {
                 appearanceStore.synchronize(launchState.persisted.selectedBaseTheme.name, launchState.persisted.selectedPopStyle.name)
             }
-            LaunchExperience(launchViewModel,localization,popFontFamilies()) {
+            LaunchExperience(launchViewModel,localization,popFontFamilies(),systemSplashExited) {
                 val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
                 val authState by auth.state.collectAsStateWithLifecycle()
                 if(!authState.authenticated) {
+                    androidx.compose.runtime.LaunchedEffect(app.container.phoneCountries) {
+                        app.container.phoneCountries.refresh()
+                    }
                     Phase3OnboardingTheme(
                         launchState.persisted.selectedBaseTheme,
                         launchState.persisted.selectedPopStyle,
@@ -119,9 +135,9 @@ class MainActivity : AppCompatActivity() {
                     }
                 } else {
                     val main: MainViewModel = viewModel(factory = MainFactory(app.container.repository, app.container.sessions.role,app.container.analytics))
-                    val home: HomeViewModel = viewModel(factory = HomeViewModelFactory(AndroidHomeRepository(app.container.repository, ::currentLocale),app.container.analytics,launchState.persisted.activeProfileId,launchViewModel::selectActiveProfile))
-                    val profiles: ProfilesViewModel = viewModel(factory = ProfilesViewModelFactory(AndroidProfilesRepository(app.container.repository, ::currentLocale),app.container.analytics,launchState.persisted.activeProfileId){profileId->launchViewModel.selectActiveProfile(profileId);home.selectActiveProfile(profileId)})
-                    val share: ShareViewModel = viewModel(factory = ShareViewModelFactory(app,AndroidShareRepository(app.container.repository,::currentLocale),app.container.analytics))
+                    val home: HomeViewModel = viewModel(factory = HomeViewModelFactory(AndroidHomeRepository(app.container.localFirst, ::currentLocale),app.container.analytics,launchState.persisted.activeProfileId,launchViewModel::selectActiveProfile))
+                    val profiles: ProfilesViewModel = viewModel(factory = ProfilesViewModelFactory(AndroidProfilesRepository(app.container.repository,app.container.localFirst, ::currentLocale),app.container.analytics,launchState.persisted.activeProfileId){profileId->launchViewModel.selectActiveProfile(profileId);home.selectActiveProfile(profileId)})
+                    val share: ShareViewModel = viewModel(factory = ShareViewModelFactory(app,AndroidShareRepository(app.container.repository,app.container.localFirst,::currentLocale),app.container.analytics))
                     PopwamTheme(launchState.persisted.selectedBaseTheme.name,"DEFAULT",launchState.persisted.selectedPopStyle.name) {
                     PopwamApp(
                         auth, main, home, profiles, share, NfcDeepLinkPolicy.route(intent?.dataString), appearanceStore, app.container.phoneCountries,

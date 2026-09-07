@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,24 +28,22 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BusinessCenter
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,11 +62,13 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.popwam.pop.R
+import com.popwam.pop.ui.components.PopActiveProfileHeader
+import com.popwam.pop.ui.components.PopBrandedLoading
 
 @Composable
 fun HomeRoute(
@@ -113,14 +115,20 @@ private fun LoadedHome(state: HomeUiState, onEvent: (HomeEvent) -> Unit, modifie
         ) {
             item { HomeHeader(state.activeProfile, { profilePicker = true }, { onEvent(HomeEvent.Notifications) }) }
             if (state.isPartial || state.errorCode != null) item { PartialHomeBanner { onEvent(HomeEvent.Retry) } }
-            item { HomeSearch { onEvent(HomeEvent.Search) } }
-            item { HomeSectionTitle(stringResource(R.string.home_suggested)) }
-            item { DiscoveryBoundary(stringResource(R.string.home_suggestions_unavailable), onClick = { onEvent(HomeEvent.Search) }) }
+            item { HomeSearch(state.searchQuery, state.searchLoading) { onEvent(HomeEvent.SearchChanged(it)) } }
+            if(state.searchQuery.trim().length>=2){
+                if(state.searchError!=null)item{Text(stringResource(R.string.home_search_unavailable),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+                if(state.searchAttempted&&state.searchProfiles.isEmpty()&&state.searchServices.isEmpty())item{Text(stringResource(R.string.home_search_empty),Modifier.fillMaxWidth().padding(vertical=16.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                items(state.searchProfiles,key={"profile-${it.id}"}){result->DiscoveryResultCard(result.name,result.title,result.imageUrl,stringResource(if(result.kind=="BUSINESS")R.string.home_search_business else R.string.home_search_person)){onEvent(HomeEvent.OpenPublicProfile(result.slug))}}
+                items(state.searchServices,key={"service-${it.id}"}){result->DiscoveryResultCard(result.name,result.profileName,result.profileImageUrl,stringResource(R.string.home_search_service)){onEvent(HomeEvent.OpenPublicProfile(result.profileSlug))}}
+            }
             state.activeProfile?.let { profile ->
                 item { ProfileCompletionCard(profile, state.completionPercent, state.profileReady) { onEvent(HomeEvent.OpenProfile(profile.id)) } }
             }
+            item { HomeSectionTitle(stringResource(R.string.home_suggested)) }
+            item { Spacer(Modifier.height(4.dp)) }
             item { HomeSectionTitle(stringResource(R.string.home_distinguished_services)) }
-            item { DiscoveryBoundary(stringResource(R.string.home_services_unavailable), icon = Icons.Default.BusinessCenter) }
+            items(state.services,key={"discover-${it.id}"}){service->DiscoveryResultCard(service.name,service.profileName,service.profileImageUrl,stringResource(R.string.home_search_service)){onEvent(HomeEvent.OpenPublicProfile(service.profileSlug))}}
             if (state.activeProductCount > 0 || state.totalOpenCount > 0) {
                 item { HomeActivitySummary(state.activeProductCount, state.totalOpenCount) }
             }
@@ -139,40 +147,24 @@ private fun LoadedHome(state: HomeUiState, onEvent: (HomeEvent) -> Unit, modifie
 
 @Composable
 private fun HomeHeader(profile: HomeProfile?, openProfiles: () -> Unit, notifications: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
-        ProfileAvatar(profile?.avatarUrl, profile?.name, Modifier.size(44.dp))
-        Column(
-            Modifier.weight(1f).clickable(role = Role.Button, onClick = openProfiles).padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(profile?.name ?: stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                profile?.subtitle ?: stringResource(R.string.active_profile),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        IconButton(notifications, Modifier.size(48.dp)) {
-            Icon(Icons.Default.NotificationsNone, stringResource(R.string.notifications), tint = MaterialTheme.colorScheme.onSurface)
-        }
-    }
+    PopActiveProfileHeader(
+        name = profile?.name ?: stringResource(R.string.app_name),
+        subtitle = profile?.subtitle ?: stringResource(R.string.active_profile),
+        avatarUrl = profile?.avatarUrl,
+        onSwitchProfile = openProfiles,
+        onNotifications = notifications,
+    )
 }
 
 @Composable
-private fun HomeSearch(onClick: () -> Unit) {
-    val description = stringResource(R.string.home_search_hint)
-    Surface(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { role = Role.Button; contentDescription = description }.clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-    ) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(description, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun HomeSearch(value:String,loading:Boolean,onValueChange:(String)->Unit) {
+    OutlinedTextField(value,onValueChange,Modifier.fillMaxWidth(),singleLine=true,placeholder={Text(stringResource(R.string.home_search_hint))},leadingIcon={if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(Icons.Default.Search,null)},keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(),shape=RoundedCornerShape(14.dp))
+}
+
+@Composable private fun DiscoveryResultCard(name:String,subtitle:String?,imageUrl:String?,kind:String,onClick:()->Unit){
+    Surface(Modifier.fillMaxWidth().clickable(role=Role.Button,onClick=onClick),shape=RoundedCornerShape(16.dp),color=MaterialTheme.colorScheme.surface,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.6f))){
+        Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+            ProfileAvatar(imageUrl,name,Modifier.size(48.dp));Column(Modifier.weight(1f)){Text(name,style=MaterialTheme.typography.titleSmall);subtitle?.takeIf(String::isNotBlank)?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}};Text(kind,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary);Icon(Icons.AutoMirrored.Filled.ArrowForward,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -308,18 +300,7 @@ private fun PartialHomeBanner(retry: () -> Unit) {
 
 @Composable
 private fun HomeLoading(modifier: Modifier) {
-    Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(30.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) { LoadingBlock(44, 44); Spacer(Modifier.width(14.dp)); LoadingBlock(170, 20); Spacer(Modifier.weight(1f)); CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 3.dp) }
-        LoadingBlock(null, 48)
-        LoadingBlock(130, 22)
-        LoadingBlock(null, 120)
-        LoadingBlock(null, 150)
-    }
-}
-
-@Composable
-private fun LoadingBlock(width: Int?, height: Int) {
-    Spacer(Modifier.then(if (width == null) Modifier.fillMaxWidth() else Modifier.width(width.dp)).height(height.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp)))
+    PopBrandedLoading(modifier.background(MaterialTheme.colorScheme.background))
 }
 
 @Composable

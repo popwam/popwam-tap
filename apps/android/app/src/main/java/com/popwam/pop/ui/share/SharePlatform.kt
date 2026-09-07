@@ -74,7 +74,7 @@ object ShareQrRenderer {
         val logoTop = (width * .045f).toInt()
         paint.color = Color.WHITE
         canvas.drawCircle(width / 2f, logoTop + logoSize / 2f, logoSize * .56f, paint)
-        AppCompatResources.getDrawable(context, R.drawable.pop_logo)?.let { logo ->
+        AppCompatResources.getDrawable(context, R.drawable.pop_logo_official)?.let { logo ->
             logo.setBounds(logoLeft, logoTop, logoLeft + logoSize, logoTop + logoSize)
             logo.draw(canvas)
         }

@@ -147,4 +147,22 @@
     <string name="profile_readiness_module_incomplete">Complétez la section obligatoire.</string>
     <string name="profile_readiness_archived">Un profil archivé ne peut pas être publié.</string>
     <string name="profile_readiness_generic">Vérifiez cette exigence de publication.</string>
+    <string name="profile_unverified">Non vérifié</string>
+    <string name="profile_completion_percent">Votre POP est complété à %1$d%%</string>
+    <string name="profile_basic_information_description">Nom, bio et informations essentielles</string>
+    <string name="profile_contact_links_description">Coordonnées et liens sociaux</string>
+    <string name="profile_media_description">Photos, vidéos et documents</string>
+    <string name="profile_appearance_description">Personnalisez l’apparence du profil</string>
+    <string name="profile_type_details_description">Activité, services et expertise</string>
+    <string name="profile_verification_description">Vérifiez votre identité ou votre activité</string>
+    <string name="share_hce_guidance">Approchez le téléphone d’un téléphone compatible NFC</string>
+    <string name="home_search_person">Personne</string>
+    <string name="home_search_business">Entreprise</string>
+    <string name="home_search_service">Service</string>
+    <string name="home_search_empty">Aucun résultat public</string>
+    <string name="home_search_unavailable">La recherche est temporairement indisponible</string>
+    <string name="profile_touch">Toucher</string>
+    <string name="profile_preview_close">Fermer l’aperçu</string>
+    <string name="profile_preview_action">Aperçu</string>
+    <string name="profile_touch_countdown">Approchez l’appareil · %1$d s</string>
 </resources>

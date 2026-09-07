@@ -1,5 +1,8 @@
 package com.popwam.pop.ui.home
 
+import com.popwam.pop.data.api.DiscoveryProfileDto
+import com.popwam.pop.data.api.DiscoveryServiceDto
+
 enum class HomeLoadState { INITIAL_LOADING, CONTENT, EMPTY, ERROR }
 
 data class HomeProfile(
@@ -25,6 +28,13 @@ data class HomeUiState(
     val isOffline: Boolean = false,
     val discoveryAvailable: Boolean = false,
     val servicesAvailable: Boolean = false,
+    val services: List<DiscoveryServiceDto> = emptyList(),
+    val searchQuery: String = "",
+    val searchProfiles: List<DiscoveryProfileDto> = emptyList(),
+    val searchServices: List<DiscoveryServiceDto> = emptyList(),
+    val searchLoading: Boolean = false,
+    val searchAttempted: Boolean = false,
+    val searchError: String? = null,
     val errorCode: String? = null,
 ) {
     val activeProfile get() = profiles.firstOrNull { it.id == activeProfileId } ?: profiles.firstOrNull()
@@ -34,12 +44,14 @@ sealed interface HomeEvent {
     data object Refresh : HomeEvent
     data object Retry : HomeEvent
     data object Search : HomeEvent
+    data class SearchChanged(val query:String) : HomeEvent
     data object Notifications : HomeEvent
     data object AddProfile : HomeEvent
     data object Share : HomeEvent
     data object Menu : HomeEvent
     data class SelectProfile(val id: String) : HomeEvent
     data class OpenProfile(val id: String) : HomeEvent
+    data class OpenPublicProfile(val slug: String) : HomeEvent
 }
 
 sealed interface HomeDestination {
@@ -49,6 +61,7 @@ sealed interface HomeDestination {
     data object Share : HomeDestination
     data object Menu : HomeDestination
     data class Profile(val id: String) : HomeDestination
+    data class PublicProfile(val slug: String) : HomeDestination
 }
 
 sealed interface HomeEffect {

@@ -10,7 +10,7 @@
     </style>
 
     <style name="Theme.POP.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenAnimatedIcon">@drawable/pop_splash_mark</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/pop_logo_official</item>
         <item name="windowSplashScreenBackground">@color/pop_splash_background</item>
         <item name="postSplashScreenTheme">@style/Theme.POP</item>
     </style>

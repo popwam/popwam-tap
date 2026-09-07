@@ -1,6 +1,8 @@
 package com.popwam.pop.ui.home
 
 import com.popwam.pop.data.auth.PopAnalytics
+import com.popwam.pop.data.api.DiscoveryProfileDto
+import com.popwam.pop.data.api.DiscoveryResponse
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -13,6 +15,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -97,6 +100,15 @@ class HomeViewModelTest {
         val effect = async(UnconfinedTestDispatcher(testScheduler), start = CoroutineStart.UNDISPATCHED) { viewModel.effects.first() }
         runCurrent()
         assertEquals(HomeEffect.SessionExpired, effect.await())
+    }
+
+    @Test fun `search is debounced and only the final query is requested`()=runTest(dispatcher){
+        val queries=mutableListOf<String>()
+        val repo=object:HomeRepository{
+            override suspend fun load(selectedProfileId:String?)=snapshot()
+            override suspend fun search(query:String):DiscoveryResponse{queries+=query;return DiscoveryResponse(ok=true,profiles=listOf(DiscoveryProfileDto(id="p",slug="public",name="Public")))}
+        }
+        val vm=HomeViewModel(repo,analytics);runCurrent();vm.onEvent(HomeEvent.SearchChanged("pu"));advanceTimeBy(200);vm.onEvent(HomeEvent.SearchChanged("publ"));advanceTimeBy(351);runCurrent();assertEquals(listOf("publ"),queries);assertEquals("public",vm.state.value.searchProfiles.single().slug)
     }
 
     private fun snapshot() = HomeSnapshot(

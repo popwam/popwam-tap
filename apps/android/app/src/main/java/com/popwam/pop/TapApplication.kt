@@ -7,6 +7,8 @@ import com.popwam.pop.data.api.PopwamApi
 import com.popwam.pop.data.api.ProfileRuntimeDiagnostics
 import com.popwam.pop.data.auth.*
 import com.popwam.pop.data.repository.PopwamRepository
+import com.popwam.pop.data.repository.LocalFirstRepository
+import com.popwam.pop.data.local.LocalFirstStore
 import com.popwam.pop.data.repository.AuthSetupRepository
 import com.popwam.pop.data.localization.LocalizationAuthorityStore
 import com.popwam.pop.data.launch.AndroidLaunchStatePersistence
@@ -86,16 +88,22 @@ class AppContainer(application:Application){
             }
         },
     )
+    val repository=PopwamRepository(api)
+    val localStore=LocalFirstStore(application,gson)
+    val localFirst=LocalFirstRepository(repository,localStore,{sessionStore.snapshot()?.userId},lifecycleScope)
     init { sessions.setLifecycleHooks({
-        // POP OTP persistence has already completed. Supplementary work must not delay setup routing.
+        // A newly authenticated account is not handed to Home until its minimum
+        // offline read model is safely persisted.
+        localFirst.core(null,com.popwam.pop.ui.currentLocale())
+        // Push registration is non-critical and remains event-driven after sign-in.
         lifecycleScope.launch {
             runCatching { pushTokens.uploadPendingIfAuthenticated() }
         }
     },{
         HceConfig.clearForLogout(application)
         pushTokens.revokeBeforeLogout()
+        localFirst.clearCurrentAccount()
     }) }
-    val repository=PopwamRepository(api)
     val authSetup=AuthSetupRepository(api)
     fun persistSelectedLanguage(language:String){lifecycleScope.launch{launchState.update{it.copy(hasSelectedLanguage=true,selectedLanguageTag=language)}}}
 }

@@ -127,7 +127,8 @@ class AuthViewModel(
     private var firebaseExchangeInFlight=false
     private var setupResolutionInFlight=false
 
-    init { if (sessions.authenticated) refreshSetup("en") }
+    // A restored secure session is sufficient for local/offline access. Setup is
+    // resolved after a new authentication or when its UI explicitly needs it.
 
     /** Phase 4 has already committed a full session atomically. This bridge only
      * lets retained post-auth code observe that fact; it owns no enrollment state. */
@@ -534,10 +535,6 @@ class MainViewModel(
     private val _state = MutableStateFlow(MainUiState())
     val state = _state.asStateFlow()
     private var nearbySession:NearbySessionDto?=null
-
-    init {
-        reload()
-    }
 
     fun reload() {
         if (_state.value.loading) return
