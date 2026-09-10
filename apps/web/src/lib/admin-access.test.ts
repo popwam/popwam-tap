@@ -44,7 +44,9 @@ describe("administrator authentication", () => {
     expect(middleware).not.toContain("token.role");
   });
   it("uses the admin login callback on admin logout", () => {
-    expect(source("apps/web/src/components/dashboard-shell.tsx")).toContain('admin?"/admin/login":"/login"');
+    const shell = source("apps/web/src/components/dashboard-shell.tsx");
+    expect(shell).toMatch(/const\s+logoutUrl\s*=\s*admin\s*\?\s*"\/admin\/login"\s*:\s*"\/login"/);
+    expect(shell).toContain("signOut({ callbackUrl: logoutUrl })");
   });
   it("contains complete Arabic and English admin login copy", () => {
     expect(ar.adminAuth.title).toBe("بوابة الإدارة");

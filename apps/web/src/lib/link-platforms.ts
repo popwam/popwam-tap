@@ -1,4 +1,5 @@
 import { isSafeDestinationUrl, normalizeDestination } from "./url";
+import { defaultPhoneCountry } from "./phone";
 
 export type LinkPlatformDefinition = {
   slug: string;
@@ -18,7 +19,7 @@ export function buildPlatformUrl(platform: LinkPlatformDefinition, raw: string) 
   }
   if (["FULL_URL", "USERNAME_OR_URL"].includes(platform.inputType) && isSafeDestinationUrl(input)) return { valid: true as const, url: input };
   if (platform.inputType === "PHONE" || platform.slug === "whatsapp") {
-    const url = normalizeDestination("WHATSAPP_PRIVATE", input);
+    const url = normalizeDestination("WHATSAPP_PRIVATE", input, defaultPhoneCountry());
     return isSafeDestinationUrl(url) ? { valid: true as const, url } : { valid: false as const, error: "VALUE_INVALID" };
   }
   const value = input.replace(/^@/, "");

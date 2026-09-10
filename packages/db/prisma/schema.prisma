@@ -93,6 +93,11 @@ enum ProfileKind {
   BUSINESS
 }
 
+enum ProfileShowcaseItemType {
+  PRODUCT
+  SERVICE
+}
+
 enum ProfileLifecycle {
   DRAFT
   PUBLISHED
@@ -916,6 +921,12 @@ model Plan {
   allowWalletPasses        Boolean    @default(false)
   allowCustomLinks         Boolean    @default(false)
   allowInstallableProfiles Boolean    @default(false)
+  storefrontEnabled        Boolean    @default(false)
+  storefrontProductsEnabled Boolean   @default(false)
+  storefrontServicesEnabled Boolean   @default(false)
+  storefrontMaxItems       Int?
+  storefrontWhatsappOrder  Boolean    @default(false)
+  storefrontEmailOrder     Boolean    @default(false)
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
   subscriptions            UserPlan[]
@@ -1335,6 +1346,12 @@ model ProfileRevisionService {
   nameEn        String?
   descriptionAr String?
   descriptionEn String?
+  itemType      ProfileShowcaseItemType @default(SERVICE)
+  imageUrl      String?
+  price         Decimal?                @db.Decimal(14, 2)
+  currency      String?
+  category      String?
+  featured      Boolean                 @default(false)
   url           String?
   iconKey       String?
   sortOrder     Int
@@ -2065,6 +2082,12 @@ model ProfileService {
   nameEn        String?
   descriptionAr String?
   descriptionEn String?
+  itemType      ProfileShowcaseItemType @default(SERVICE)
+  imageUrl      String?
+  price         Decimal?                @db.Decimal(14, 2)
+  currency      String?
+  category      String?
+  featured      Boolean                 @default(false)
   url           String?
   iconKey       String?
   isVisible     Boolean  @default(true)

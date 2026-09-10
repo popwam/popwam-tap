@@ -1,0 +1,14 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { APPROVED_PROFILE_TEMPLATES } from "./profile-templates";
+import { ADMIN_PREVIEW_STOREFRONT_POLICY, createAdminTemplatePreviewFixture } from "./template-preview-fixture";
+
+const source=(path:string)=>readFileSync(new URL(path,import.meta.url),"utf8");
+
+describe("isolated Admin template review fixtures",()=>{
+  it("builds populated deterministic data for all 17 approved templates",()=>{for(const template of APPROVED_PROFILE_TEMPLATES){const fixture=createAdminTemplatePreviewFixture(template.slug);expect(fixture.displayName.length).toBeGreaterThan(3);expect(fixture.avatarUrl).toMatch(/^\/template-preview\//);expect(fixture.coverUrl).toMatch(/^\/template-preview\//);expect(fixture.destinations.length).toBeGreaterThanOrEqual(3);expect(fixture.fields.length).toBeGreaterThanOrEqual(3);expect(fixture.services.length).toBeGreaterThanOrEqual(4);expect(fixture.media.length).toBeGreaterThanOrEqual(2);expect(fixture.virtualCard?.template?.slug).toBe(template.slug);}});
+  it("provides a mixed populated Storefront and explicit preview-only entitlement context",()=>{const fixture=createAdminTemplatePreviewFixture("store-first");expect(new Set(fixture.services.map(item=>item.itemType))).toEqual(new Set(["PRODUCT","SERVICE"]));expect(fixture.services.some(item=>item.price==null)).toBe(true);expect(fixture.services.some(item=>item.price!=null)).toBe(true);expect(fixture.services.every(item=>item.imageUrl?.startsWith("/template-preview/"))).toBe(true);expect(ADMIN_PREVIEW_STOREFRONT_POLICY).toEqual({enabled:true,products:true,services:true,maxItems:12,whatsapp:true,email:true});});
+  it("has no database or external-data dependency",()=>{const fixtureSource=source("./template-preview-fixture.ts");expect(fixtureSource).not.toMatch(/@popwam\/db|prisma\.|fetch\(/);expect(createAdminTemplatePreviewFixture("store-first").services.every(item=>item.imageUrl?.startsWith("/template-preview/"))).toBe(true);});
+  it("keeps fixture imports and preview overrides out of real public routes",()=>{for(const route of ["../app/p/[slug]/page.tsx","../app/p/id/[profileId]/page.tsx"]){const routeSource=source(route);expect(routeSource).not.toContain("template-preview-fixture");expect(routeSource).not.toContain("adminPreviewContext");}expect(source("../components/admin-template-render-preview.tsx")).toContain("adminPreviewContext");});
+  it("exposes visual-ready only from the resolved real renderer, never the skeleton card",()=>{const renderer=source("../components/public-profile.tsx");expect(renderer.indexOf("await loadProfileTemplateFrame")).toBeLessThan(renderer.indexOf('data-template-review-ready="true"'));expect(source("../components/template-preview-card.tsx")).not.toContain("data-template-review-ready");expect(source("../app/admin/templates/preview/[slug]/page.tsx")).toContain("AdminTemplateRenderPreview");});
+});

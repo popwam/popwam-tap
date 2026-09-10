@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/session";
 import { assertWithinLimitLocked, getUserEntitlements } from "@/lib/plans";
 import { templateAllowed } from "@/lib/virtual-cards";
 import { buildPlatformUrl } from "@/lib/link-platforms";
+import { approvedTemplateBySlug } from "@/lib/profile-templates";
 
 const text = (data: FormData, key: string) => String(data.get(key) || "").trim();
 
@@ -30,6 +31,11 @@ export async function saveLinkPlatform(data: FormData) {
   if (!allowedInputTypes.includes(inputType)) throw new Error("LINK_PLATFORM_INPUT_TYPE_INVALID");
   const urlTemplate = text(data, "urlTemplate") || null;
   if (urlTemplate && !urlTemplate.includes("{value}")) throw new Error("LINK_PLATFORM_TEMPLATE_INVALID");
+  const validationPattern = text(data, "validationPattern") || null;
+  if (validationPattern) {
+    if (validationPattern.length > 200) throw new Error("LINK_PLATFORM_PATTERN_TOO_LONG");
+    try { new RegExp(validationPattern); } catch { throw new Error("LINK_PLATFORM_PATTERN_INVALID"); }
+  }
   const payload = {
     nameAr: text(data, "nameAr"),
     nameEn: text(data, "nameEn"),
@@ -37,7 +43,7 @@ export async function saveLinkPlatform(data: FormData) {
     iconKey: text(data, "iconKey") || "link",
     customIconUrl,
     placeholder: text(data, "placeholder"),
-    validationPattern: text(data, "validationPattern") || null,
+    validationPattern,
     category: text(data, "category") || "SOCIAL",
     inputType,
     urlTemplate,
@@ -107,12 +113,18 @@ export async function selectProfileTemplate(data: FormData) {
   const user = await requireUser();
   const virtualCardId = text(data, "virtualCardId");
   const templateId = text(data, "templateId");
-  const [card, template, entitlements] = await Promise.all([prisma.virtualCard.findFirst({ where: { id: virtualCardId, userId: user.id }, select: { id: true, profileId: true } }), prisma.profileTemplate.findFirst({ where: { id: templateId, isActive: true } }), getUserEntitlements(user.id)]);
+  const [card, template, entitlements] = await Promise.all([prisma.virtualCard.findFirst({ where: { id: virtualCardId, userId: user.id }, select: { id: true, profileId: true, profile: { select: { profileKind: true, slug: true } } } }), prisma.profileTemplate.findFirst({ where: { id: templateId, isActive: true } }), getUserEntitlements(user.id)]);
   if (!card || !template) throw new Error("TEMPLATE_NOT_FOUND");
-  if (!templateAllowed(entitlements.plan.slug, template.minimumPlan)) throw new Error("TEMPLATE_PLAN_REQUIRED");
-  await prisma.virtualCard.update({ where: { id: card.id }, data: { themeId: template.id } });
-  await prisma.auditLog.create({ data: { actorId: user.id, operation: "virtual_card.template.select", targetId: card.id, metadata: { templateId } } });
+  if (!entitlements.effective.allowThemes || !templateAllowed(entitlements.plan.slug, template.minimumPlan)) throw new Error("TEMPLATE_PLAN_REQUIRED");
+  if (approvedTemplateBySlug(template.slug)?.family==="storefront"&&!entitlements.effective.storefrontEnabled) throw new Error("TEMPLATE_STOREFRONT_REQUIRED");
+  if (template.profileKind && template.profileKind !== card.profile.profileKind) throw new Error("PROFILE_TEMPLATE_INCOMPATIBLE");
+  await prisma.$transaction([
+    prisma.profile.update({ where: { id: card.profileId }, data: { templateId: template.id, draftRevision: { increment: 1 } } }),
+    prisma.virtualCard.update({ where: { id: card.id }, data: { themeId: template.id } }),
+    prisma.auditLog.create({ data: { actorId: user.id, operation: "profile.template.selected", targetId: card.profileId, metadata: { templateId, previousPublicRevisionPreserved: true } } }),
+  ]);
   revalidatePath("/dashboard/templates"); revalidatePath(`/p/id/${card.profileId}`);
+  if (card.profile.slug) revalidatePath(`/p/${card.profile.slug}`);
 }
 
 export async function setDefaultVirtualCard(data: FormData) {

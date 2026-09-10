@@ -1,0 +1,19 @@
+# Web/Admin deployment excludes non-runtime local assets.
+apps/android/**
+!apps/android/app/
+!apps/android/app/src/
+!apps/android/app/src/main/
+!apps/android/app/src/main/res/
+!apps/android/app/src/main/res/font/
+!apps/android/app/src/main/res/font/abeezee.ttf
+!apps/android/app/src/main/res/font/cairo.ttf
+!apps/android/app/src/main/res/font/montserrat.ttf
+docs/profile-templates/visual-review/
+.codex-pass4-migration-test/
+
+# Generated/local build state.
+.git/
+.next/
+.turbo/
+node_modules/
+coverage/

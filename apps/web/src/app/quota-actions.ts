@@ -16,5 +16,6 @@ export async function reviewQuotaRequest(data: FormData) {
     adminNote: String(data.get("adminNote") || ""),
   });
   revalidatePath("/admin/quota-requests");
+  revalidatePath("/admin/requests");
   revalidatePath(`/admin/users/${result.request.userId}`);
 }

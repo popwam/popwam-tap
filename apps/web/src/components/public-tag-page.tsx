@@ -40,7 +40,7 @@ export async function PublicTagPage({code,lookup="shortCode"}:{code:string;looku
       if(!isSafeDestinationUrl(decision.url))return <PublicStatus type="fallback"/>;
       redirect(decision.url);
     }
-    const projection=decision.profileId?await getPublicProfileProjectionById(decision.profileId):null;if(!projection?.publiclyReadable)return <PublicStatus type="unavailable"/>;return <PublicProfile profile={projection.profile}/>;
+    const projection=decision.profileId?await getPublicProfileProjectionById(decision.profileId):null;if(!projection?.publiclyReadable)return <PublicStatus type="unavailable"/>;return <PublicProfile profile={projection.profile} ownerId={projection.ownerId}/>;
   }
   let tag=await prisma.tag.findUnique({where:lookup==="token"?{token:code}:{shortCode:code},include:tagInclude});
   if(!tag&&lookup==="shortCode"){const alias=await prisma.tagAlias.findUnique({where:{code},include:{tag:{include:tagInclude}}});tag=alias?.tag||null;}
@@ -57,7 +57,7 @@ export async function PublicTagPage({code,lookup="shortCode"}:{code:string;looku
     if(!isSafeDestinationUrl(decision.url))return <PublicStatus type="fallback"/>;
     redirect(decision.url);
   }
-  const profileId=tag.activeDestination?.profile?.id;const projection=profileId?await getPublicProfileProjectionById(profileId):null;if(!projection?.publiclyReadable)return <PublicStatus type="unavailable"/>;return <PublicProfile profile={projection.profile}/>;
+  const profileId=tag.activeDestination?.profile?.id;const projection=profileId?await getPublicProfileProjectionById(profileId):null;if(!projection?.publiclyReadable)return <PublicStatus type="unavailable"/>;return <PublicProfile profile={projection.profile} ownerId={projection.ownerId}/>;
 }
 
 async function CardActivationInstructions({serialNumber,publicSlug}:{serialNumber:string;cardType:string;cardStatus:string;publicSlug:string}){

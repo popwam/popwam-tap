@@ -1,34 +1,30 @@
-import { prisma } from "@popwam/db";
+import Link from "next/link";
+import { AdminNotificationStatus, Prisma, prisma } from "@popwam/db";
 import { revalidatePath } from "next/cache";
+import { ArrowLeft, ArrowRight, Bell, Eye, Send, Users } from "lucide-react";
 import { AdminNotificationComposer } from "@/components/admin-notification-composer";
-import { Badge } from "@/components/badge";
-import { PageHeading } from "@/components/page-heading";
+import { DashboardPageHeader, EmptyState, FilterBar, StatusBadge } from "@/components/admin-ui";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { createAdminNotificationCampaign, parseAdminNotificationInput, sendSavedAdminNotificationCampaign } from "@/lib/admin-notifications";
+import { getI18n } from "@/lib/i18n";
 import { requireAdmin } from "@/lib/session";
 
-async function saveCampaign(data: FormData) {
-  "use server";
-  const admin = await requireAdmin();
-  const input = parseAdminNotificationInput(data);
-  await createAdminNotificationCampaign(admin.id, input, data.get("operation") === "send");
-  revalidatePath("/admin/notifications");
-}
+const PAGE_SIZE=20;
+async function saveCampaign(data:FormData){"use server";const admin=await requireAdmin();const input=parseAdminNotificationInput(data);await createAdminNotificationCampaign(admin.id,input,data.get("operation")==="send");revalidatePath("/admin/notifications");}
+async function sendDraft(data:FormData){"use server";const admin=await requireAdmin();await sendSavedAdminNotificationCampaign(String(data.get("id")||""),admin.id);revalidatePath("/admin/notifications");}
 
-async function sendDraft(data: FormData) {
-  "use server";
-  const admin = await requireAdmin();
-  await sendSavedAdminNotificationCampaign(String(data.get("id") || ""), admin.id);
-  revalidatePath("/admin/notifications");
-}
-
-export default async function AdminNotificationsPage() {
-  await requireAdmin();
-  const [users, campaigns] = await Promise.all([
-    prisma.user.findMany({ where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, take: 500, select: { id: true, name: true, email: true, locale: true } }),
-    prisma.adminNotificationCampaign.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { createdBy: { select: { name: true, email: true } } } }),
+export default async function AdminNotificationsPage({searchParams}:{searchParams:Promise<{status?:string;category?:string;page?:string}>}){
+  const admin=await requireAdmin(),[{locale},filters]=await Promise.all([getI18n(),searchParams]);const ar=locale==="ar",page=Math.max(1,Number.parseInt(filters.page||"1",10)||1);
+  const where:Prisma.AdminNotificationCampaignWhereInput={...(Object.values(AdminNotificationStatus).includes(filters.status as AdminNotificationStatus)?{status:filters.status as AdminNotificationStatus}:{}),...(filters.category?{category:filters.category}:{})};
+  const [campaigns,total,users,activeCount,enCount,arCount,frCount,publishedCount]=await Promise.all([
+    prisma.adminNotificationCampaign.findMany({where,orderBy:{createdAt:"desc"},skip:(page-1)*PAGE_SIZE,take:PAGE_SIZE,include:{createdBy:{select:{name:true,email:true}}}}),prisma.adminNotificationCampaign.count({where}),
+    prisma.user.findMany({where:{status:"ACTIVE"},orderBy:{createdAt:"desc"},take:200,select:{id:true,name:true,email:true,locale:true}}),prisma.user.count({where:{status:"ACTIVE"}}),prisma.user.count({where:{status:"ACTIVE",OR:[{locale:null},{locale:{startsWith:"en",mode:"insensitive"}}]}}),prisma.user.count({where:{status:"ACTIVE",locale:{startsWith:"ar",mode:"insensitive"}}}),prisma.user.count({where:{status:"ACTIVE",locale:{startsWith:"fr",mode:"insensitive"}}}),prisma.user.count({where:{status:"ACTIVE",profiles:{some:{lifecycle:"PUBLISHED"}}}}),
   ]);
-  return <><PageHeading eyebrow="Communications" title="Notifications center" description="Compose locale-aware FCM messages, target authorized audiences, and inspect honest submission outcomes without exposing device tokens."/>
-    <AdminNotificationComposer action={saveCampaign} users={users}/>
-    <section className="card mt-6 overflow-x-auto"><table className="w-full min-w-[1040px] text-sm"><thead><tr>{["Created","Audience","Category","Copy","Status","Recipients","FCM accepted","Suppressed","Failed","Creator",""].map(value => <th className="p-3 text-start" key={value}>{value}</th>)}</tr></thead><tbody>{campaigns.map(campaign => { const title = campaign.title as { en?: string }; return <tr className="border-t border-white/10" key={campaign.id}><td className="p-3">{campaign.createdAt.toLocaleString()}</td><td className="p-3">{campaign.audienceType}</td><td className="p-3">{campaign.category}</td><td className="max-w-64 truncate p-3">{title.en || "—"}</td><td className="p-3"><Badge value={campaign.status}/></td><td className="p-3">{campaign.recipientCount}</td><td className="p-3 text-emerald-300">{campaign.successCount}</td><td className="p-3 text-amber-300">{campaign.suppressedCount}</td><td className="p-3 text-rose-300">{campaign.failureCount}</td><td className="p-3">{campaign.createdBy.name || campaign.createdBy.email}</td><td className="p-3">{campaign.status === "DRAFT" && <form action={sendDraft}><input type="hidden" name="id" value={campaign.id}/><button className="btn-secondary">Send</button></form>}</td></tr>; })}</tbody></table>{!campaigns.length && <p className="p-6 text-slate-500">No campaigns yet.</p>}</section>
+  const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));const hrefFor=(next:number)=>{const p=new URLSearchParams();if(filters.status)p.set("status",filters.status);if(filters.category)p.set("category",filters.category);p.set("page",String(next));return `/admin/notifications?${p}`};
+  const copy=ar?{eyebrow:"التواصل",title:"مركز الإشعارات",description:"أنشئ حملات محلية، استهدف الجمهور المسموح، واقرأ نتائج FCM بمعناها الحقيقي.",allStatus:"كل الحالات",allCategory:"كل الفئات",apply:"تطبيق",audience:"الجمهور",created:"أُنشئت",creator:"أنشأها",recipients:"مستلمون",accepted:"مستخدمون قَبِل FCM الإرسال لهم",suppressed:"مستبعدون",failed:"فشل",view:"عرض التفاصيل",send:"إرسال",confirm:"إرسال هذه المسودة الآن؟",empty:"لا توجد حملات مطابقة",page:"صفحة"}:{eyebrow:"Communications",title:"Notifications center",description:"Create localized campaigns, target supported audiences, and read FCM outcomes with accurate semantics.",allStatus:"All statuses",allCategory:"All categories",apply:"Apply",audience:"Audience",created:"Created",creator:"Creator",recipients:"recipients",accepted:"users accepted by FCM",suppressed:"suppressed",failed:"failed",view:"View details",send:"Send",confirm:"Send this draft now?",empty:"No campaigns match",page:"Page"};
+  return <><DashboardPageHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} action={<AdminNotificationComposer action={saveCampaign} users={users} locale={locale} estimates={{ALL_ACTIVE:activeCount,LOCALE_EN:enCount,LOCALE_AR:arCount,LOCALE_FR:frCount,PUBLISHED_PROFILE:publishedCount}}/>}/>
+    <form action="/admin/notifications"><FilterBar><select className="input md:max-w-48" name="status" defaultValue={filters.status||""}><option value="">{copy.allStatus}</option>{Object.values(AdminNotificationStatus).map(value=><option key={value}>{value}</option>)}</select><select className="input md:max-w-48" name="category" defaultValue={filters.category||""}><option value="">{copy.allCategory}</option>{["GENERAL","PRODUCTS","SECURITY","MARKETING"].map(value=><option key={value}>{value}</option>)}</select><button className="btn-primary">{copy.apply}</button></FilterBar></form>
+    <div className="grid gap-4">{campaigns.map(campaign=>{const titles=campaign.title as {en?:string;ar?:string;fr?:string};const bodies=campaign.body as {en?:string;ar?:string;fr?:string};const title=(ar?titles.ar:titles.en)||titles.en||titles.ar||titles.fr||"—";const body=(ar?bodies.ar:bodies.en)||bodies.en||bodies.ar||bodies.fr||"";const audience=campaign.audience as {value?:string};return <article className="admin-section-card" key={campaign.id}><div className="grid items-center gap-4 xl:grid-cols-[minmax(16rem,1.5fr)_minmax(9rem,.7fr)_minmax(18rem,1.3fr)_auto]"><div className="flex min-w-0 gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-500/10 text-brand-300"><Bell size={20}/></span><div className="min-w-0"><h2 className="truncate">{title}</h2><p className="mt-1 line-clamp-2 text-xs text-slate-500">{body}</p><div className="mt-2 flex gap-2"><StatusBadge value={campaign.category}/><span className="text-[10px] text-slate-500">{campaign.defaultLocale.toUpperCase()}</span></div></div></div><div><StatusBadge value={campaign.status}/><p className="mt-2 text-[10px] text-slate-500">{copy.audience}: {campaign.audienceType}{audience.value?` · ${audience.value}`:""}</p></div><dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4"><div><dt className="text-slate-500">{copy.recipients}</dt><dd className="font-bold">{campaign.recipientCount}</dd></div><div><dt className="text-emerald-400">FCM</dt><dd className="font-bold">{campaign.successCount}</dd></div><div><dt className="text-amber-300">{copy.suppressed}</dt><dd className="font-bold">{campaign.suppressedCount}</dd></div><div><dt className="text-rose-300">{copy.failed}</dt><dd className="font-bold">{campaign.failureCount}</dd></div></dl><div className="flex gap-2 xl:justify-end"><Link className="btn-secondary" href={`/admin/notifications/${campaign.id}`}><Eye size={15}/>{copy.view}</Link>{campaign.status==="DRAFT"&&<form action={sendDraft}><input type="hidden" name="id" value={campaign.id}/><ConfirmSubmit className="btn-primary" message={copy.confirm}><Send size={15}/><span className="sr-only">{copy.send}</span></ConfirmSubmit></form>}</div></div><footer className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-white/10 pt-3 text-[10px] text-slate-500"><span>{copy.created}: {campaign.createdAt.toLocaleString(locale)}</span><span>{copy.creator}: {campaign.createdBy.name||campaign.createdBy.email}</span>{campaign.sentAt&&<span>FCM attempted: {campaign.sentAt.toLocaleString(locale)}</span>}<span title={copy.accepted}>{campaign.successCount} {copy.accepted}</span></footer></article>})}</div>
+    {!campaigns.length&&<div className="admin-table-shell"><EmptyState title={copy.empty}/></div>}<footer className="mt-4 flex items-center justify-between text-xs text-slate-500"><span>{total} · {copy.page} {page}/{pages}</span><div className="flex gap-2">{page>1&&<Link className="btn-secondary" href={hrefFor(page-1)}><ArrowLeft className="directional-icon" size={15}/></Link>}{page<pages&&<Link className="btn-secondary" href={hrefFor(page+1)}><ArrowRight className="directional-icon" size={15}/></Link>}</div></footer>
   </>;
 }

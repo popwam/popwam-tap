@@ -27,7 +27,7 @@ describe("Phase J Nearby server privacy contract", () => {
 
   it("stores one short-lived coarse presence per user and only a token hash", () => {
     expect(schema).toContain("model NearbyPresence");
-    expect(schema).toContain("userId                String               @unique");
+    expect(schema).toMatch(/userId\s+String\s+@unique/);
     expect(schema).toContain("coarseCell");
     expect(schema).toContain("sessionHash");
     expect(schema).not.toContain("model UserLocation");

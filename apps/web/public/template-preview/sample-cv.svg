@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600" role="img" aria-labelledby="title description">
+  <title id="title">Safe template preview CV</title>
+  <desc id="description">A fictional curriculum vitae used only by the Admin template preview fixture.</desc>
+  <rect width="1200" height="1600" fill="#f8fafc"/>
+  <rect x="96" y="96" width="1008" height="1408" rx="32" fill="#ffffff" stroke="#dbe4ee" stroke-width="8"/>
+  <circle cx="244" cy="276" r="84" fill="#4338ca"/>
+  <path d="M205 298c25-59 56-59 79 0" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="244" cy="245" r="29" fill="#fff"/>
+  <text x="370" y="250" fill="#111827" font-family="Arial, sans-serif" font-size="70" font-weight="700">Maya Hassan</text>
+  <text x="372" y="315" fill="#64748b" font-family="Arial, sans-serif" font-size="35">Product Designer · Preview CV</text>
+  <g fill="#dbe4ee">
+    <rect x="150" y="450" width="900" height="24" rx="12"/>
+    <rect x="150" y="510" width="760" height="24" rx="12"/>
+    <rect x="150" y="570" width="840" height="24" rx="12"/>
+    <rect x="150" y="700" width="420" height="28" rx="14"/>
+    <rect x="150" y="770" width="900" height="20" rx="10"/>
+    <rect x="150" y="820" width="820" height="20" rx="10"/>
+    <rect x="150" y="950" width="420" height="28" rx="14"/>
+    <rect x="150" y="1020" width="900" height="20" rx="10"/>
+    <rect x="150" y="1070" width="720" height="20" rx="10"/>
+    <rect x="150" y="1200" width="420" height="28" rx="14"/>
+    <rect x="150" y="1270" width="850" height="20" rx="10"/>
+  </g>
+</svg>

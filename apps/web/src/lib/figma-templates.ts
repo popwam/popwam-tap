@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@popwam/db";
+import { APPROVED_PROFILE_TEMPLATES } from "./profile-templates";
 
 export const FIGMA_TEMPLATES = [
   {
@@ -108,18 +109,49 @@ export const FIGMA_TEMPLATES = [
 ] as const;
 
 export async function ensureFigmaTemplates() {
-  await Promise.all(FIGMA_TEMPLATES.map(template => prisma.profileTemplate.upsert({
+  const templates = [...FIGMA_TEMPLATES.map(template => ({ ...template, profileKind: null })), ...APPROVED_PROFILE_TEMPLATES.map(template => ({
+    slug: template.slug,
+    nameAr: template.nameAr,
+    nameEn: template.nameEn,
+    category: template.family,
+    profileKind: template.profileKind,
+    minimumPlan: template.minimumPlan,
+    previewImageUrl: null,
+    sortOrder: 100 + template.source,
+    configuration: template.configuration,
+  }))];
+  await Promise.all(templates.map(template => prisma.profileTemplate.upsert({
     where: { slug: template.slug },
     update: {
       nameAr: template.nameAr, nameEn: template.nameEn, category: template.category,
       minimumPlan: template.minimumPlan, previewImageUrl: template.previewImageUrl,
       configuration: template.configuration as unknown as Prisma.InputJsonValue,
       isActive: true, sortOrder: template.sortOrder,
+      profileKind: template.profileKind,
     },
     create: {
       ...template,
       configuration: template.configuration as unknown as Prisma.InputJsonValue,
       isActive: true,
+    },
+  })));
+}
+
+export async function ensureApprovedProfileTemplates() {
+  await Promise.all(APPROVED_PROFILE_TEMPLATES.map(template => prisma.profileTemplate.upsert({
+    where: { slug: template.slug },
+    update: {
+      nameAr: template.nameAr, nameEn: template.nameEn, category: template.family,
+      profileKind: template.profileKind, minimumPlan: template.minimumPlan,
+      configuration: template.configuration as unknown as Prisma.InputJsonValue,
+      sortOrder: 100 + template.source,
+    },
+    create: {
+      slug: template.slug, nameAr: template.nameAr, nameEn: template.nameEn,
+      category: template.family, profileKind: template.profileKind,
+      minimumPlan: template.minimumPlan, previewImageUrl: null,
+      configuration: template.configuration as unknown as Prisma.InputJsonValue,
+      isActive: true, sortOrder: 100 + template.source,
     },
   })));
 }

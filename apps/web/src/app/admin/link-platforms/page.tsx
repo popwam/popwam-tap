@@ -1,22 +1,66 @@
-import { prisma } from "@popwam/db";
-import { saveLinkPlatform, toggleLinkPlatform } from "@/app/catalog-actions";
-import { Badge } from "@/components/badge";
-import { PageHeading } from "@/components/page-heading";
+import { Prisma, prisma } from "@popwam/db";
+import { DashboardPageHeader, EmptyState, FilterBar, SearchField } from "@/components/admin-ui";
+import { AddLinkPlatformButton, LinkPlatformAdminCatalog } from "@/components/link-platform-admin-catalog";
+import { getI18n } from "@/lib/i18n";
+import { requireAdmin } from "@/lib/session";
 
-function PlatformFields({ platform }: { platform?: Awaited<ReturnType<typeof prisma.linkPlatform.findFirst>> }) {
-  return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    {platform && <input type="hidden" name="id" value={platform.id}/>}<input className="input" name="nameEn" defaultValue={platform?.nameEn} placeholder="English name" required/><input className="input" name="nameAr" defaultValue={platform?.nameAr} placeholder="الاسم العربي" required/><input className="input" name="slug" defaultValue={platform?.slug} placeholder="slug" pattern="[a-z0-9-]+" required/><input className="input" name="category" defaultValue={platform?.category || "SOCIAL"} placeholder="Category"/>
-    <select className="input" name="inputType" defaultValue={platform?.inputType || "FULL_URL"}>{[["USERNAME","Username"],["PHONE","Phone number"],["EMAIL","Email"],["FULL_URL","Full URL"],["USERNAME_OR_URL","Username or URL"],["CHANNEL_ID","Channel ID"],["CUSTOM_TEXT","Custom text"]].map(([value,label])=><option value={value} key={value}>{label}</option>)}</select>
-    <input className="input" name="placeholder" defaultValue={platform?.placeholder} placeholder="User input placeholder" required/><input className="input xl:col-span-2" name="urlTemplate" defaultValue={platform?.urlTemplate || ""} placeholder="https://example.com/{value}" dir="ltr"/>
-    <input className="input" name="iconKey" defaultValue={platform?.iconKey || "link"} placeholder="Default icon key"/><input className="input" name="sortOrder" type="number" min="0" defaultValue={platform?.sortOrder || 0}/><input className="input xl:col-span-2" name="validationPattern" defaultValue={platform?.validationPattern || ""} placeholder="Optional validation regex" dir="ltr"/>
-    <input className="input xl:col-span-2" name="androidAppUrl" defaultValue={platform?.androidAppUrl || ""} placeholder="Android app opening link" dir="ltr"/><input className="input xl:col-span-2" name="iosAppUrl" defaultValue={platform?.iosAppUrl || ""} placeholder="iOS app opening link" dir="ltr"/><input className="input xl:col-span-2" name="webFallback" defaultValue={platform?.webFallback || ""} placeholder="Web fallback URL" dir="ltr"/>
-    <textarea className="input min-h-24 xl:col-span-2" name="helpEn" defaultValue={platform?.helpEn || ""} placeholder="English help: open your profile, copy its link, return here, and paste it."/><textarea className="input min-h-24 xl:col-span-2" name="helpAr" defaultValue={platform?.helpAr || ""} placeholder="تعليمات المساعدة بالعربية"/>
-    <input className="input xl:col-span-2" name="customIconUrl" defaultValue={platform?.customIconUrl || ""} placeholder="Existing custom icon URL" dir="ltr"/><label className="input flex items-center gap-2 xl:col-span-2">Upload icon<input type="file" name="iconFile" accept="image/jpeg,image/png,image/webp"/></label>
-    <label className="flex items-center gap-2"><input type="checkbox" name="isActive" defaultChecked={platform?.isActive ?? true}/>Active</label><label className="flex items-center gap-2"><input type="checkbox" name="allowCustomLabel" defaultChecked={platform?.allowCustomLabel}/>Allow custom label</label><label className="flex items-center gap-2"><input type="checkbox" name="allowCustomIcon" defaultChecked={platform?.allowCustomIcon}/>Allow uploaded custom icon</label>
-  </div>;
-}
+export const metadata = { title: "Admin link platforms" };
 
-export default async function LinkPlatformsPage() {
-  const platforms = await prisma.linkPlatform.findMany({ orderBy: [{ sortOrder: "asc" }, { nameEn: "asc" }] });
-  return <><PageHeading eyebrow="Catalog" title="Link platforms / منصات الروابط" description="Configure username builders, safe app-opening helpers, manual paste instructions, validation, and fallback behavior without collecting social passwords or pretending to copy from another app."/><details className="card mb-6 p-5"><summary className="cursor-pointer font-bold">Add platform</summary><form action={saveLinkPlatform} className="mt-4"><PlatformFields/><button className="btn-primary mt-4">Save platform</button></form></details><div className="space-y-3">{platforms.map(platform => <details className="card p-5" key={platform.id}><summary className="flex cursor-pointer list-none items-center justify-between gap-3"><span><strong>{platform.nameEn} / {platform.nameAr}</strong><span className="ms-3 font-mono text-xs text-slate-500">{platform.slug} · {platform.inputType}</span></span><Badge value={platform.isActive ? "ACTIVE" : "DISABLED"}/></summary><form action={saveLinkPlatform} className="mt-4 border-t border-white/10 pt-4"><PlatformFields platform={platform}/><button className="btn-secondary mt-4">Save changes</button></form><form action={toggleLinkPlatform} className="mt-3"><input type="hidden" name="id" value={platform.id}/><button className="btn-secondary">{platform.isActive ? "Deactivate" : "Activate"}</button></form></details>)}</div></>;
+export default async function LinkPlatformsPage({ searchParams }: { searchParams: Promise<{ q?: string; state?: string; inputType?: string; category?: string; sort?: string }> }) {
+  await requireAdmin();
+  const [{ locale }, filters, categories] = await Promise.all([
+    getI18n(),
+    searchParams,
+    prisma.linkPlatform.findMany({ distinct: ["category"], orderBy: { category: "asc" }, select: { category: true } }),
+  ]);
+  const ar = locale === "ar";
+  const q = filters.q?.trim().slice(0, 100) || "";
+  const state = filters.state === "active" || filters.state === "disabled" ? filters.state : "";
+  const sort = ["order", "name", "usage"].includes(filters.sort || "") ? filters.sort! : "order";
+  const where: Prisma.LinkPlatformWhereInput = {
+    ...(state ? { isActive: state === "active" } : {}),
+    ...(filters.inputType ? { inputType: filters.inputType } : {}),
+    ...(filters.category ? { category: filters.category } : {}),
+    ...(q ? { OR: [{ nameEn: { contains: q, mode: "insensitive" } }, { nameAr: { contains: q, mode: "insensitive" } }, { slug: { contains: q, mode: "insensitive" } }] } : {}),
+  };
+  const platforms = await prisma.linkPlatform.findMany({
+    where,
+    orderBy: sort === "name" ? [{ nameEn: "asc" }] : [{ sortOrder: "asc" }, { nameEn: "asc" }],
+  });
+  const usage = platforms.length ? await prisma.destination.groupBy({
+    by: ["linkPlatformId"],
+    where: { linkPlatformId: { in: platforms.map(platform => platform.id) } },
+    _count: { _all: true },
+  }) : [];
+  const usageById = new Map(usage.map(item => [item.linkPlatformId, item._count._all]));
+  const items = platforms.map(platform => ({
+    id: platform.id, nameAr: platform.nameAr, nameEn: platform.nameEn, slug: platform.slug,
+    iconKey: platform.iconKey, customIconUrl: platform.customIconUrl, placeholder: platform.placeholder,
+    validationPattern: platform.validationPattern, category: platform.category, inputType: platform.inputType,
+    urlTemplate: platform.urlTemplate, androidAppUrl: platform.androidAppUrl, iosAppUrl: platform.iosAppUrl,
+    webFallback: platform.webFallback, helpAr: platform.helpAr, helpEn: platform.helpEn,
+    isActive: platform.isActive, sortOrder: platform.sortOrder, allowCustomLabel: platform.allowCustomLabel,
+    allowCustomIcon: platform.allowCustomIcon, usageCount: usageById.get(platform.id) || 0,
+  })).sort((a, b) => sort === "usage" ? b.usageCount - a.usageCount || a.sortOrder - b.sortOrder : 0);
+  const copy = ar ? {
+    eyebrow: "إدارة الروابط", title: "منصات الروابط", description: "كتالوج POP للمنصات العامة، وبناء الروابط، والتحقق، وفتح التطبيقات بأمان.",
+    search: "ابحث بالاسم أو المعرّف", allStates: "كل الحالات", activeOnly: "المفعّلة", disabledOnly: "المعطّلة", allInputs: "كل أنواع الإدخال", allCategories: "كل الفئات", order: "الترتيب", byName: "الاسم", byUsage: "الأكثر استخدامًا", apply: "تطبيق",
+    add: "إضافة منصة", edit: "تعديل", close: "إغلاق", save: "حفظ المنصة", disable: "تعطيل", enable: "تفعيل", used: "مرات الاستخدام", builder: "بناء الرابط", validation: "التحقق", appLinks: "روابط التطبيقات", fallback: "الرابط البديل", noBuilder: "إدخال مباشر", noValidation: "تحقق أساسي", none: "لا يوجد", identity: "هوية المنصة", behavior: "الإدخال وبناء الرابط", guidance: "إرشادات المستخدم", options: "الإتاحة والتخصيص", icon: "أيقونة المنصة", upload: "رفع أيقونة", active: "منصة مفعّلة", customLabel: "السماح باسم مخصص", customIcon: "السماح بأيقونة مخصصة", disableConfirm: "تعطيل المنصة من الاختيارات الجديدة", empty: "لا توجد منصات مطابقة", emptyHelp: "جرّب تعديل البحث أو الفلاتر.",
+  } : {
+    eyebrow: "Link administration", title: "Link platforms", description: "POP's catalog for public platforms, link builders, validation, and safe app opening.",
+    search: "Search name or slug", allStates: "All states", activeOnly: "Active", disabledOnly: "Disabled", allInputs: "All input modes", allCategories: "All categories", order: "Sort order", byName: "Name", byUsage: "Most used", apply: "Apply",
+    add: "Add platform", edit: "Edit", close: "Close", save: "Save platform", disable: "Disable", enable: "Enable", used: "Uses", builder: "Link builder", validation: "Validation", appLinks: "App links", fallback: "Fallback", noBuilder: "Direct input", noValidation: "Basic checks", none: "None", identity: "Platform identity", behavior: "Input and link behavior", guidance: "User guidance", options: "Availability and customization", icon: "Platform icon", upload: "Upload icon", active: "Platform active", customLabel: "Allow custom label", customIcon: "Allow custom icon", disableConfirm: "Disable this platform for new selections", empty: "No platforms match", emptyHelp: "Try adjusting the search or filters.",
+  };
+  return <>
+    <DashboardPageHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} action={<AddLinkPlatformButton copy={copy}/>}/>
+    <form action="/admin/link-platforms"><FilterBar>
+      <SearchField defaultValue={q} placeholder={copy.search}/>
+      <select className="input md:max-w-40" name="state" defaultValue={state}><option value="">{copy.allStates}</option><option value="active">{copy.activeOnly}</option><option value="disabled">{copy.disabledOnly}</option></select>
+      <select className="input md:max-w-48" name="inputType" defaultValue={filters.inputType || ""}><option value="">{copy.allInputs}</option>{["USERNAME", "PHONE", "EMAIL", "FULL_URL", "USERNAME_OR_URL", "CHANNEL_ID", "CUSTOM_TEXT"].map(value => <option key={value}>{value}</option>)}</select>
+      <select className="input md:max-w-40" name="category" defaultValue={filters.category || ""}><option value="">{copy.allCategories}</option>{categories.map(item => <option key={item.category}>{item.category}</option>)}</select>
+      <select className="input md:max-w-40" name="sort" defaultValue={sort}><option value="order">{copy.order}</option><option value="name">{copy.byName}</option><option value="usage">{copy.byUsage}</option></select>
+      <button className="btn-primary">{copy.apply}</button>
+    </FilterBar></form>
+    {items.length ? <LinkPlatformAdminCatalog platforms={items} copy={copy}/> : <div className="admin-table-shell"><EmptyState title={copy.empty} description={copy.emptyHelp}/></div>}
+  </>;
 }
