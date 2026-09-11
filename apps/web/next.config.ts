@@ -25,6 +25,11 @@ const nextConfig: NextConfig = {
         ],
       },
       { source: "/:path*", headers: securityHeaders },
+      { source: "/mobile-preview/:path*", headers: [
+        { key: "Cache-Control", value: "private, no-store, max-age=0" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'" },
+      ] },
       { source: "/dashboard/nearby", headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), browsing-topics=()" }] },
       { source: "/dashboard/:path*", headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }] },
       { source: "/admin/:path*", headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }] },

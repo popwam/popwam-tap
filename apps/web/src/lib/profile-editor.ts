@@ -7,6 +7,7 @@ import {
   ProfessionType,
   prisma,
 } from "@popwam/db";
+import { templateSelectionError, showcaseWriteError, showcasePrice, showcaseCurrency, showcaseImage } from "./mobile-showcase-policy";
 import { randomUUID } from "node:crypto";
 import { assertWithinLimitLocked, getUserEntitlements } from "./plans";
 import { buildOwnerPreviewProjection } from "./profile-preview";
@@ -63,7 +64,7 @@ export type ProfileEditorAction =
   | { type: "LINK_UPSERT"; id?: unknown; title?: unknown; titleAr?: unknown; titleEn?: unknown; destinationType?: unknown; url?: unknown; countryIso2?: unknown; visibility?: unknown }
   | { type: "LINK_DELETE"; id?: unknown }
   | { type: "LINK_REORDER"; ids?: unknown }
-  | { type: "SERVICE_UPSERT"; id?: unknown; nameAr?: unknown; nameEn?: unknown; descriptionAr?: unknown; descriptionEn?: unknown; url?: unknown; visibility?: unknown }
+  | { type: "SERVICE_UPSERT"; itemType?: unknown; imageUrl?: unknown; price?: unknown; currency?: unknown; category?: unknown; featured?: unknown; id?: unknown; nameAr?: unknown; nameEn?: unknown; descriptionAr?: unknown; descriptionEn?: unknown; url?: unknown; visibility?: unknown }
   | { type: "SERVICE_DELETE"; id?: unknown }
   | { type: "SERVICE_REORDER"; ids?: unknown }
   | { type: "BRANCH_UPSERT"; id?: unknown; nameAr?: unknown; nameEn?: unknown; addressAr?: unknown; addressEn?: unknown; phone?: unknown; countryIso2?: unknown; mapUrl?: unknown; visibility?: unknown }
@@ -186,6 +187,7 @@ function same(value: unknown) {
 
 export function changedEditorSections(profile: DraftProfileData, published: PublishedRevisionData | null) {
   if (!published) return profile.modules.map((module) => module.moduleDefinition.key);
+  if (published.sourceDraftRevision === profile.draftRevision) return [];
   const changed = new Set<string>();
   if (same([
     profile.displayName, profile.displayLabel, profile.displayNameAr, profile.displayNameEn,
@@ -218,8 +220,8 @@ export function changedEditorSections(profile: DraftProfileData, published: Publ
     .map((item) => [item.id, item.title, item.titleAr, item.titleEn, item.type, item.url, item.isVisible, item.sortOrder]);
   const publicLinks = published.destinations.map((item) => [item.sourceId, item.title, item.titleAr, item.titleEn, item.type, item.url, true, item.sortOrder]);
   if (same(draftLinks) !== same(publicLinks)) { changed.add("LINKS"); changed.add("SOCIAL"); }
-  if (same(profile.services.map((item) => [item.id, item.nameAr, item.nameEn, item.descriptionAr, item.descriptionEn, item.url, item.isVisible, item.sortOrder]))
-    !== same(published.services.map((item) => [item.sourceId, item.nameAr, item.nameEn, item.descriptionAr, item.descriptionEn, item.url, true, item.sortOrder]))) changed.add("SERVICES");
+  if (same(profile.services.map((item) => [item.id, item.nameAr, item.nameEn, item.descriptionAr, item.descriptionEn, item.url, item.isVisible, item.sortOrder, item.itemType, item.imageUrl, item.price?.toString() ?? null, item.currency, item.category, item.featured]))
+    !== same(published.services.map((item) => [item.sourceId, item.nameAr, item.nameEn, item.descriptionAr, item.descriptionEn, item.url, true, item.sortOrder, item.itemType, item.imageUrl, item.price?.toString() ?? null, item.currency, item.category, item.featured]))) changed.add("SERVICES");
   if (same(profile.branches.map((item) => [item.id, item.nameAr, item.nameEn, item.addressAr, item.addressEn, item.phone, item.mapUrl, item.isVisible, item.sortOrder]))
     !== same(published.branches.map((item) => [item.sourceId, item.nameAr, item.nameEn, item.addressAr, item.addressEn, item.phone, item.mapUrl, true, item.sortOrder]))) changed.add("BRANCHES");
   if (same(profile.mediaAssets.map((item) => [item.id, item.purpose, item.visibility, item.sortOrder]))
@@ -314,6 +316,7 @@ export async function getProfileEditor(userId: string, profileId: string, locale
   const profile = await getOwnedDraft(userId, profileId);
   if (!profile) throw new Error("PROFILE_NOT_FOUND");
   const published = await loadPublishedRevision(profileId);
+  const { effective } = await getUserEntitlements(profile.userId);
   const required = new Set([
     "IDENTITY",
     ...(profile.template?.moduleRules.filter((rule) => rule.required).map((rule) => rule.moduleDefinition.key) || []),
@@ -329,6 +332,7 @@ export async function getProfileEditor(userId: string, profileId: string, locale
     .filter((definition) => templateAllowsModule(profile, definition.key))
     .map((definition) => ({ key: definition.key, name: localized(locale, definition.nameAr, definition.nameEn, definition.key) }));
   const changedSections = changedEditorSections(profile, published);
+  if (published && profile.template?.slug !== published.templateSlug) changedSections.push("APPEARANCE");
   const readiness = evaluateProfileReadiness(profile);
   const kind = canonicalProfileKind(profile);
   const categoryKey = profile.category?.slug || null;
@@ -353,6 +357,15 @@ export async function getProfileEditor(userId: string, profileId: string, locale
       draftChanged: published ? changedSections.length > 0 : true,
       changedSections,
       primaryLanguage: profile.primaryLanguage,
+    },
+    imageUploadMaxBytes: Number(process.env.MAX_IMAGE_UPLOAD_MB || "5") * 1024 * 1024,
+    storefront: {
+      storefrontEnabled: effective.storefrontEnabled, storefrontProductsEnabled: effective.storefrontProductsEnabled,
+      storefrontServicesEnabled: effective.storefrontServicesEnabled, storefrontMaxItems: effective.storefrontMaxItems,
+      storefrontWhatsappOrder: effective.storefrontWhatsappOrder, storefrontEmailOrder: effective.storefrontEmailOrder,
+      publicWhatsappReady: Boolean(profile.showWhatsappBusiness && normalizeProfilePhone(profile.whatsappBusiness || "", null) || profile.showWhatsappPrivate && normalizeProfilePhone(profile.whatsappPrivate || "", null)),
+      publicEmailReady: Boolean(profile.showEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email || "")),
+      contactModulePublic: profile.modules.some(item => item.moduleDefinition.key === "CONTACT" && item.enabled && item.visibility === "PUBLIC"),
     },
     permissions: { canEdit: true, canSetPrimary: false },
     readiness,
@@ -469,6 +482,8 @@ async function loadLockedProfile(tx: Tx, userId: string, profileId: string, expe
   const authorized = await tx.profile.findFirst({
     where: managedProfileWhere(userId, profileId),
     include: {
+      services: true,
+      mediaAssets: true,
       organization: { select: { memberships: { where: { userId }, select: { role: true } } } },
       template: { include: { moduleRules: { include: { moduleDefinition: true } } } },
       modules: { include: { moduleDefinition: true }, orderBy: { sortOrder: "asc" } },
@@ -509,9 +524,9 @@ async function reorderExact(tx: Tx, model: "destination" | "profileService" | "p
 export async function mutateProfileEditor(userId: string, profileId: string, expectedRevision: number, action: ProfileEditorAction) {
   if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new Error("DRAFT_REVISION_REQUIRED");
   if (!action || typeof action !== "object" || !("type" in action)) throw new Error("ACTION_INVALID");
-  const { effective } = await getUserEntitlements(userId);
   return prisma.$transaction(async (tx) => {
     const profile = await loadLockedProfile(tx, userId, profileId, expectedRevision);
+    const { effective, plan } = await getUserEntitlements(profile.userId);
     const requiredKeys = new Set([
       "IDENTITY",
       ...(profile.template?.moduleRules.filter((rule) => rule.required).map((rule) => rule.moduleDefinition.key) || []),
@@ -544,6 +559,9 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
           },
         });
         if (!template) throw new Error("PROFILE_TEMPLATE_INCOMPATIBLE");
+        const templateError = templateSelectionError(template, canonicalProfileKind(profile), plan.slug, effective);
+        if (templateError) throw new Error(templateError);
+        await tx.virtualCard.updateMany({ where: { profileId }, data: { themeId: template.id } });
         await tx.profile.update({ where: { id: profileId }, data: { templateId: template.id } });
         auditOperation = "profile.template.selected";
         auditMetadata = { templateId: template.id };
@@ -663,7 +681,24 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
         const nameAr = bounded(action.nameAr, 160);
         const nameEn = bounded(action.nameEn, 160);
         if (!nameAr && !nameEn) throw new Error("FIELD_REQUIRED");
-        const data = { nameAr, nameEn, descriptionAr: bounded(action.descriptionAr, 1000), descriptionEn: bounded(action.descriptionEn, 1000), url: action.url ? safeHttpUrl(action.url) : null, isVisible: booleanVisibility(action.visibility) };
+        const existing = action.id ? profile.services.find(item => item.id === action.id) : null;
+        if (action.id && !existing) throw new Error("ITEM_NOT_FOUND");
+        const itemType = String(action.itemType ?? existing?.itemType ?? "SERVICE");
+        const restriction = showcaseWriteError(effective, canonicalProfileKind(profile), itemType, profile.services.length, !existing);
+        if (restriction) throw new Error(restriction);
+        const imageUrl = showcaseImage(action.imageUrl === undefined ? existing?.imageUrl : action.imageUrl);
+        if (imageUrl?.startsWith("/api/profiles/")) {
+          const asset = profile.mediaAssets.find(item => imageUrl === `/api/profiles/${profileId}/media/${item.id}` && item.state !== "DELETED" && item.state !== "ORPHANED");
+          if (!asset) throw new Error("SHOWCASE_IMAGE_INVALID");
+        }
+        if (action.featured !== undefined && typeof action.featured !== "boolean") throw new Error("SHOWCASE_FEATURED_INVALID");
+        const price = showcasePrice(action.price === undefined ? existing?.price?.toString() : action.price);
+        const data = { nameAr, nameEn, descriptionAr: bounded(action.descriptionAr, 1000), descriptionEn: bounded(action.descriptionEn, 1000),
+          url: action.url ? safeHttpUrl(action.url) : null, isVisible: booleanVisibility(action.visibility),
+          itemType: itemType as "PRODUCT" | "SERVICE", imageUrl, price: price === null ? null : new Prisma.Decimal(price),
+          currency: showcaseCurrency(action.currency === undefined ? existing?.currency : action.currency),
+          category: bounded(action.category === undefined ? existing?.category : action.category, 120), featured: (action.featured ?? existing?.featured ?? false) as boolean,
+        };
         if (action.id) {
           const id = requiredId(action.id);
           const updated = await tx.profileService.updateMany({ where: { id, profileId }, data });
@@ -684,10 +719,13 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
         auditTarget = id; auditOperation = "profile.service.removed";
         break;
       }
-      case "SERVICE_REORDER":
-        await reorderExact(tx, "profileService", profileId, uniqueStringList(action.ids));
+      case "SERVICE_REORDER": {
+        const ids = uniqueStringList(action.ids, profile.services.length);
+        if (ids.length !== profile.services.length) throw new Error("ORDER_INVALID");
+        await reorderExact(tx, "profileService", profileId, ids);
         auditOperation = "profile.service.reordered";
         break;
+      }
       case "BRANCH_UPSERT": {
         const nameAr = bounded(action.nameAr, 160);
         const nameEn = bounded(action.nameEn, 160);

@@ -7,7 +7,7 @@ enum class ProfileLoadState { INITIAL_LOADING, CONTENT, EMPTY, ERROR }
 enum class ProfileBackendKind { PERSONAL, BUSINESS }
 enum class ProfileCategoryKind { PERSONAL, PROFESSIONAL, BUSINESS, RESTAURANT, CLINIC, SERVICES, CREATOR, OTHER }
 enum class ProfileVerificationState { UNAVAILABLE, UNVERIFIED, PENDING, VERIFIED, REJECTED }
-enum class ProfileEditorSection { BASIC_INFORMATION, ABOUT, CONTACT_LINKS, TYPE_DETAILS, MEDIA, APPEARANCE, VERIFICATION, VISIBILITY, SERVICES, LOCATIONS }
+enum class ProfileEditorSection { BASIC_INFORMATION, ABOUT, CONTACT_LINKS, TYPE_DETAILS, MEDIA, APPEARANCE, VERIFICATION, VISIBILITY, SERVICES, LOCATIONS, TEMPLATE }
 enum class ProfileSaveState { IDLE, SAVING, SUCCESS, FAILURE }
 enum class ProfilePendingCapability { WORKING_HOURS, TEAM, EDUCATION, EXPERIENCE, SKILLS, PROJECTS, CERTIFICATES, MENU, DELIVERY_RESERVATION, DOCTORS, BOOKING, LICENSE_VERIFICATION }
 
@@ -23,6 +23,7 @@ data class ProfileMutationResult(
     val successful: Boolean = true,
     val errorCode: String? = null,
     val contentCompletion: ProfileContentCompletion? = null,
+    val editor: com.popwam.pop.data.api.ProfileEditorResponse? = null,
 )
 
 data class OwnedProfile(
@@ -60,6 +61,13 @@ data class ProfileService(
     val descriptionEn: String = "",
     val url: String = "",
     val visibility: String = "ONLY_ME",
+    val itemType: String = "SERVICE",
+    val imageUrl: String? = null,
+    val price: String? = null,
+    val currency: String? = null,
+    val category: String? = null,
+    val featured: Boolean = false,
+    val sortOrder: Int = 0,
 )
 
 data class ProfileLocation(
@@ -194,6 +202,10 @@ data class ProfileContent(
     val industryEn: String = "",
     val documents: List<ProfileDocument> = emptyList(),
     val documentCapability: ProfileDocumentCapability = ProfileDocumentCapability(),
+    val imageUploadMaxBytes: Long = 5L*1024*1024,
+    val templateId: String? = null,
+    val templateImageUrl: String? = null,
+    val storefront: com.popwam.pop.data.api.StorefrontEntitlementsDto = com.popwam.pop.data.api.StorefrontEntitlementsDto(),
 )
 
 data class ProfileCategoryOption(
@@ -230,6 +242,9 @@ data class ProfilesUiState(
     val uploadProgress: Float? = null,
     val errorCode: String? = null,
     val debugErrorCode: String? = null,
+    val templates: List<com.popwam.pop.data.api.ProfileTemplateDto> = emptyList(),
+    val templatesLoading: Boolean = false,
+    val uploadedItemImage: String? = null,
 )
 
 sealed interface ProfileEditorMutation {
@@ -257,6 +272,8 @@ sealed interface ProfileEditorMutation {
     data class LinkDelete(val id:String):ProfileEditorMutation
     data class LinkReorder(val ids:List<String>):ProfileEditorMutation
     data class ServiceUpsert(val service:ProfileService):ProfileEditorMutation
+    data class TemplateSelect(val template:com.popwam.pop.data.api.ProfileTemplateDto):ProfileEditorMutation
+    data class ServiceReorder(val ids:List<String>):ProfileEditorMutation
     data class ServiceDelete(val id:String):ProfileEditorMutation
     data class LocationUpsert(val location:ProfileLocation):ProfileEditorMutation
     data class LocationDelete(val id:String):ProfileEditorMutation
@@ -272,6 +289,9 @@ data class ProfileMediaUpload(val purpose:String,val fileName:String,val mimeTyp
 data class ProfileDocumentUpload(val titleAr:String,val titleEn:String,val fileName:String,val mimeType:String,val bytes:ByteArray)
 
 sealed interface ProfileEvent {
+    data object LoadTemplates:ProfileEvent
+    data object ClearItemImage:ProfileEvent
+    data class UploadItemImage(val media:ProfileMediaUpload):ProfileEvent
     data object Refresh:ProfileEvent
     data object Retry:ProfileEvent
     data object OpenList:ProfileEvent

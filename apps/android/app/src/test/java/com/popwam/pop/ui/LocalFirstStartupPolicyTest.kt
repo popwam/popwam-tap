@@ -34,6 +34,17 @@ class LocalFirstStartupPolicyTest {
         assertTrue(repository.contains("DEFAULT_SYNC_TTL_MILLIS"))
     }
 
+    @Test fun `PASS 6 loads catalogue only from the picker and stores editor responses without full sync`() {
+        val repository=source("src/main/java/com/popwam/pop/data/repository/LocalFirstRepository.kt")
+        val viewModel=source("src/main/java/com/popwam/pop/ui/profile/ProfilesViewModel.kt")
+        assertFalse(repository.substringAfter("suspend fun core(").substringBefore("suspend fun cachedShare").contains("templates("))
+        assertFalse(repository.substringAfter("private suspend fun syncCore").contains("templates("))
+        val mutation=viewModel.substringAfter("override suspend fun mutate(").substringBefore("override suspend fun updateVisibility")
+        assertTrue(mutation.contains("localFirst.persistEditor"))
+        assertFalse(mutation.contains("core("))
+        assertFalse(mutation.contains("refresh("))
+    }
+
     @Test fun `official loader loops and launch has no fixed delay`() {
         val loader = source("src/main/java/com/popwam/pop/ui/components/PopBrandedLoading.kt")
         val launch = source("src/main/java/com/popwam/pop/ui/launch/LaunchViewModel.kt")

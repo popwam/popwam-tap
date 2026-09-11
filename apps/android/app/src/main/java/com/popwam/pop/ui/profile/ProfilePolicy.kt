@@ -28,8 +28,9 @@ object ProfilePolicy {
         if(editableCapabilities(content).isNotEmpty()) add(ProfileEditorSection.TYPE_DETAILS)
         if (content.modules.any { it.supported && it.key in setOf("GALLERY", "PORTFOLIO") } || content.media.isNotEmpty()) add(ProfileEditorSection.MEDIA)
         add(ProfileEditorSection.APPEARANCE)
+        add(ProfileEditorSection.TEMPLATE)
         add(ProfileEditorSection.VISIBILITY)
-        if (content.modules.any { it.supported && it.key == "SERVICES" }) add(ProfileEditorSection.SERVICES)
+        if (content.summary.backendKind == ProfileBackendKind.BUSINESS) add(ProfileEditorSection.SERVICES)
         if (content.modules.any { it.supported && it.key == "BRANCHES" }) add(ProfileEditorSection.LOCATIONS)
         add(ProfileEditorSection.VERIFICATION)
     }

@@ -2,7 +2,7 @@ import { csrfRejected, getCurrentPopUser, isTrustedPopMutation, unauthorized } f
 import { getProfileEditor, mutateProfileEditor, type ProfileEditorAction } from "@/lib/profile-editor";
 
 function failure(error: unknown) {
-  const code = error instanceof Error ? error.message : "PROFILE_EDITOR_FAILED";
+  const code = error instanceof Error && /^[A-Z][A-Z0-9_]{1,80}$/.test(error.message) ? error.message : "PROFILE_EDITOR_FAILED";
   const status = code === "PROFILE_NOT_FOUND" ? 404
     : code === "STALE_DRAFT" ? 409
       : code === "PROFILE_ARCHIVED" ? 410
@@ -31,7 +31,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
   const body = await request.json().catch(() => ({})) as { expectedDraftRevision?: number; action?: ProfileEditorAction };
   try {
     if (!body.action) throw new Error("ACTION_INVALID");
-    return Response.json(await mutateProfileEditor(user.id, profileId, body.expectedDraftRevision ?? -1, body.action));
+    const result = await mutateProfileEditor(user.id, profileId, body.expectedDraftRevision ?? -1, body.action);
+    const url = new URL(request.url);
+    const editor = url.searchParams.get("snapshot") === "true" ? await getProfileEditor(user.id, profileId, url.searchParams.get("locale") === "ar" ? "ar" : "en") : undefined;
+    return Response.json({ ...result, editor }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     return failure(error);
   }

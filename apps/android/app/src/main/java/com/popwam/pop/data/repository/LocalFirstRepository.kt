@@ -12,6 +12,7 @@ import com.popwam.pop.data.api.ShareTargetDto
 import com.popwam.pop.data.api.ShareTargetsResponse
 import com.popwam.pop.data.local.AccountLocalState
 import com.popwam.pop.data.local.CachedShareData
+import com.popwam.pop.data.local.LocalFirstSnapshotStore
 import com.popwam.pop.data.local.LocalFirstStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -22,7 +23,7 @@ import kotlinx.coroutines.sync.withLock
 
 class LocalFirstRepository(
     private val remote: PopwamRepository,
-    private val store: LocalFirstStore,
+    private val store: LocalFirstSnapshotStore,
     private val accountIdProvider: () -> String?,
     private val backgroundScope: CoroutineScope,
     private val now: () -> Long = System::currentTimeMillis,
@@ -83,6 +84,38 @@ class LocalFirstRepository(
             val result = CachedShareData(targets, products, now())
             store.update(accountId) { it.copy(share = it.share + (profileId to result)) }
             result
+        }
+    }
+
+    // Called only on explicit picker entry; never from core/startup/Share.
+    suspend fun templateCatalog(): com.popwam.pop.data.api.TemplatesResponse {
+        val accountId = requireNotNull(accountIdProvider())
+        val cached = store.read(accountId)
+        if (!templateCatalogNeedsRefresh(cached?.templateCatalog?.ok == true, cached?.templateCatalogSyncedAt ?: 0L, now())) return cached!!.templateCatalog!!
+        val result = try { remote.templates().also { if (!it.ok) error(it.error ?: "PROFILE_TEMPLATE_UNAVAILABLE") } }
+            catch (error: Exception) {
+                if (error is retrofit2.HttpException && error.code() == 401) throw error
+                return cached?.templateCatalog?.takeIf { it.ok } ?: throw error
+            }
+        if (accountIdProvider() == accountId) store.update(accountId) { it.copy(templateCatalog = result, templateCatalogSyncedAt = now()) }
+        return result
+    }
+
+    suspend fun cachedEditor(profileId:String):ProfileEditorResponse? {
+        val accountId=accountIdProvider() ?: return null
+        return store.read(accountId)?.editors?.get(profileId)
+    }
+
+    fun currentAccountId(): String? = accountIdProvider()
+
+    suspend fun persistEditor(accountId: String, profileId: String, editor: ProfileEditorResponse) {
+        if (accountIdProvider() != accountId || !editor.ok || editor.profile.id != profileId) return
+        coreMutex.withLock {
+            if (accountIdProvider() == accountId) store.update(accountId) { old ->
+                val current = old.editors[profileId]
+                if (current != null && current.profile.draftRevision > editor.profile.draftRevision) old
+                else old.copy(editors = old.editors + (profileId to editor), publishing = old.publishing - profileId)
+            }
         }
     }
 
@@ -214,3 +247,6 @@ class LocalFirstRepository(
         }
     }
 }
+
+internal fun templateCatalogNeedsRefresh(hasCache: Boolean, syncedAt: Long, now: Long, ttl: Long = 24L * 60 * 60 * 1000): Boolean =
+    !hasCache || syncedAt <= 0 || now - syncedAt !in 0 until ttl

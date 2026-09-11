@@ -45,7 +45,7 @@ interface PopwamApi {
     @POST("api/profiles") suspend fun createAdditionalProfile(@Body body:AdditionalProfileCreateRequest):AdditionalProfileCreateResponse
     @HTTP(method="DELETE",path="api/profiles/{id}",hasBody=true) suspend fun archiveProfile(@Path("id") id:String,@Body body:ArchiveProfileRequest):ArchiveProfileResponse
     @GET("api/profiles/{id}/editor") suspend fun profileEditor(@Path("id") id:String,@Query("locale") locale:String):ProfileEditorResponse
-    @PATCH("api/profiles/{id}/editor") suspend fun mutateProfileEditor(@Path("id") id:String,@Body body:ProfileEditorMutationRequest):ApiResult
+    @PATCH("api/profiles/{id}/editor") suspend fun mutateProfileEditor(@Path("id") id:String,@Body body:ProfileEditorMutationRequest,@Query("snapshot") snapshot:Boolean=true,@Query("locale") locale:String="en"):ApiResult
     @GET("api/profiles/{id}/publishing") suspend fun publishingStatus(@Path("id") id:String,@Query("locale") locale:String):PublishingStatusResponse
     @POST("api/profiles/{id}/publishing") suspend fun publishingAction(@Path("id") id:String,@Body body:PublishingActionRequest):PublishingActionResponse
     @PATCH("api/profiles/{id}/visibility") suspend fun updatePublishingVisibility(@Path("id") id:String,@Body body:VisibilityUpdateRequest):PublishingActionResponse

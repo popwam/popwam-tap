@@ -10,8 +10,9 @@
 - PASS 5A — TEMPLATES 01–06 VISUAL CORRECTION VERIFIED / CLOSED
 - PASS 5B — TEMPLATES 07–10 VISUAL CORRECTION VERIFIED / CLOSED
 - PASS 5C — TEMPLATES 11–17 VISUAL CORRECTION VERIFIED / CLOSED
-- Scope: WEB/ADMIN only.
-- Android: OUT OF SCOPE / DO NOT TOUCH.
+- PASS 6 — IMPLEMENTED / CODE VERIFIED / AWAITING OWNER PHYSICAL ACCEPTANCE
+- Scope: PASS 1–5 WEB/ADMIN remain the accepted baseline. PASS 6 is Android My Profile templates/storefront and directly required APIs only.
+- Android PASS 6: code/static/build verification only; no emulator, physical device, adb, installation, or instrumentation.
 - Production deployment: PASS 1–4 remain deployed and verified. PASS 5 was deployed to the existing Railway `popwam-tap` service (`popwam` environment) on 2026-09-10 as deployment `8e74ef4b-2058-458a-aa55-82a57c3a0dfe`.
 - Migration state: `20260908190000_plan_storefront_entitlements` was safety-reviewed and applied to Production on 2026-09-10 through `prisma migrate deploy`; all 32 migrations are recorded as applied and there is no failed migration state.
 - NO COMMIT CREATED for the accepted rebuild passes. The accepted worktree contains uncommitted work and must be preserved.
@@ -178,11 +179,29 @@ Accepted uncommitted work exists. Preserve it; do not broadly restore/reset/clea
 
 ## 16. Next Pass
 
-NEXT PASS: SYSTEM ACCEPTANCE TESTING
+NEXT ACTION: OWNER PHYSICAL ACCEPTANCE OF ANDROID PASS 6
 
 STATUS: READY
 
-REASON: PASS 5 migration, deployment, production smoke checks, and handoff closure are complete. Owner may now test the complete system without a new code pass being inferred.
+REASON: PASS 6 implementation and code/build verification are complete. No physical acceptance was performed. PASS 6 API changes remain local and undeployed; the default production-targeted APK requires a separately authorized matching backend release (or a compatible test backend) for end-to-end acceptance. Do not infer deployment, device testing, or another pass.
+
+## 17. PASS 6 — ANDROID TEMPLATES + STOREFRONT MANAGEMENT
+
+Status: **IMPLEMENTED / CODE VERIFIED / AWAITING OWNER PHYSICAL ACCEPTANCE** (2026-09-11).
+
+- My Profile: added Template and BUSINESS Products & Services editing sections below the accepted header/card/actions. Bottom navigation, Home, public Preview, Share, QR and HCE were preserved. Added 65 Android resource strings in each of Arabic, English and French; item content retains the existing Arabic/English schema.
+- Templates: reused `GET /api/mobile/templates` with explicit safe metadata for the 17 approved registry entries, account-kind filtering, Plan/theme availability and selected/locked state. The adaptive grid lazily loads illustrative registry-based thumbnails. There is no Android template authority or implementation asset bundle.
+- Draft preview: `/mobile-preview/[profileId]?templateId=...` requires POP mobile authentication, strict ownership and template/account-kind/Plan validation. It renders the actual draft through `PublicProfile`, with no Admin fixtures or publishing mutation, and private/no-store/noindex/CSP protection. The Android dialog authenticates only the exact trusted-origin document and current-profile media; redirects and navigation are refused, file/content/mixed-content/DOM-storage access is disabled, and no credentials are handed to WebView or external destinations. The existing primary Preview remains the published public profile.
+- Draft mutations: existing editor `TEMPLATE_SELECT` now validates Plan/registry/account kind, increments `draftRevision` and mirrors `Profile.templateId`/`VirtualCard.themeId`. The legacy mobile card-template route delegates to that domain. Optional `snapshot=true&locale=...` returns the editor projection after success. Publish remains explicit; draft template/item edits do not replace the current published revision.
+- Products/Services: reused `ProfileService`/`ProfileRevisionService`, with PRODUCT/SERVICE creation/editing, localized names/descriptions, optional price/currency/category, image upload/replace/remove, featured/visible/hidden state, confirmed deletion, and Move Up/Down. Hidden/missing SERVICES modules use existing module actions. Server checks ownership, item type, Plan flags, exact scoped reorder IDs, field limits, price, visibility and image references. NULL maxItems remains unlimited; finite limits include hidden items.
+- Images: existing private profile media upload handles MIME/signature/size/quota validation. Android caches successful upload responses without a follow-up request. Publish maps owned item-image references into existing revision-bound public media, preserving draft privacy. The shared image/auth client only sends or refreshes credentials for the configured API origin.
+- Contact summary: displays deployed Plan WhatsApp/Email entitlements and valid public profile-contact/module state, linking to existing Contact/visibility editing. No auth/recovery phone, private account email, Plan-override toggle or order-sending behavior was added.
+- LocalFirst: extended the same encrypted account snapshot with selected template, showcase items/entitlements and small catalog metadata. Catalog refresh happens only on explicit picker entry when absent/stale (one day); no startup preload. Server-confirmed mutations persist the active editor without full bootstrap; conflict recovery refreshes only that editor. Cached reads survive offline writes, failures leave session/cache intact, and older/account-switched responses are guarded. AES-256-GCM/Android Keystore encryption and account binding were not changed.
+- Verification: focused Android showcase JVM tests passed; final `:app:testDebugUnitTest` passed **252 tests**, with **0 failures/errors/skips**. `:app:assembleDebug` and `:app:lintDebug` passed; lint reports **0 errors / 362 warnings**. Focused Web policy/API/transaction/projection/publishing/privacy/template tests passed **76 tests across 10 files**. TypeScript/Web lint, final local production Web build and `git diff --check` passed. Performance/security statements are **STATIC / ARCHITECTURAL verification only**, with no measured Android latency claimed.
+- APK: `E:\saas\popwam-tap\apps\android\app\build\outputs\apk\debug\app-debug.apk`; **47,782,724 bytes**; SHA-256 **BD39DE033E0478B47B3031F66701260DBE873AF98EEA4924F3CF987E0762509C**; package **com.popwam.pop.debug**; versionName **0.0.12-debug**; versionCode **12**. Metadata was read from the actual APK and matches Gradle output metadata. **NOT INSTALLED**.
+- Physical limitations: owner must later verify real-device visual/RTL/keyboard/image-picker/WebView behavior, publish/contact scenarios, offline transitions and perceived performance. Thumbnail cards are schematic; full draft preview provides actual template presentation.
+- **NO EMULATOR STARTED. NO PHYSICAL DEVICE USED. NO ADB USED. NO APK INSTALLED. NO ANDROID INSTRUMENTATION. NO PRODUCTION DEPLOYMENT. NO NEW MIGRATION CREATED/APPLIED. NO CART. NO CHECKOUT. NO PAYMENTS. NO COMMIT CREATED.** PASS 1–5 remain preserved; PASS 5 remains deployed. PASS 6 is not marked DEPLOYED or PHYSICALLY VERIFIED.
+- Detailed inspected/modified-file inventory, API contracts, checks and limitations: [PASS 6 code verification report](POP_PASS6_CODE_VERIFICATION.md).
 
 ## Handoff Update Policy
 

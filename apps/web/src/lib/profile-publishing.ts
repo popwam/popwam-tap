@@ -1020,16 +1020,20 @@ export async function publishProfile(
             : ("PUBLIC" as const);
         return [{ item, visibility }];
       });
+      const showcaseImagePaths = new Set(publicModuleKeys.has("SERVICES")
+        ? profile.services.filter(service => service.isVisible).map(service => service.imageUrl)
+        : []);
       const publicAssets = profile.mediaAssets.filter(
         (item) =>
-          item.visibility === "PUBLIC" &&
+          (item.visibility === "PUBLIC" || showcaseImagePaths.has(`/api/profiles/${profileId}/media/${item.id}`)) &&
           (item.state === "DRAFT_ATTACHED" || item.state === "PUBLISHED") &&
           (item.purpose === "GALLERY"
-            ? publicModuleKeys.has("GALLERY")
+            ? publicModuleKeys.has("GALLERY") || showcaseImagePaths.has(`/api/profiles/${profileId}/media/${item.id}`)
             : publicModuleKeys.has("IDENTITY")),
       );
       const mediaUrl = (mediaId: string) =>
         `/api/public-profile-media/${mediaId}?revision=${revisionId}`;
+      const showcaseImageUrls = new Map(publicAssets.map(asset => [`/api/profiles/${profileId}/media/${asset.id}`, mediaUrl(asset.id)]));
       const publicMedia = (purpose: string) => {
         const asset = [...publicAssets]
           .reverse()
@@ -1195,7 +1199,9 @@ export async function publishProfile(
                     descriptionAr: item.descriptionAr,
                     descriptionEn: item.descriptionEn,
                     itemType: item.itemType,
-                    imageUrl: item.imageUrl,
+                    imageUrl: item.imageUrl?.startsWith("/api/profiles/")
+                      ? showcaseImageUrls.get(item.imageUrl) ?? null
+                      : item.imageUrl,
                     price: item.price,
                     currency: item.currency,
                     category: item.category,

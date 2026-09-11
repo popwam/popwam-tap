@@ -35,6 +35,8 @@ data class AccountLocalState(
     val share: Map<String, CachedShareData> = emptyMap(),
     val discovery: DiscoveryResponse? = null,
     val lastSuccessfulSyncAt: Long = 0L,
+    val templateCatalog: com.popwam.pop.data.api.TemplatesResponse? = null,
+    val templateCatalogSyncedAt: Long = 0L,
 ) {
     fun hasRenderableCore(): Boolean = profiles?.ok == true && selector?.ok == true
     fun isFresh(now: Long, ttlMillis: Long): Boolean =
@@ -45,7 +47,13 @@ data class AccountLocalState(
  * Small account-scoped JSON snapshots are sufficient for the current read model.
  * Authentication secrets remain exclusively in SecureSessionStore.
  */
-class LocalFirstStore(context: Context, private val gson: Gson) {
+interface LocalFirstSnapshotStore {
+    suspend fun read(accountId:String):AccountLocalState?
+    suspend fun update(accountId:String,transform:(AccountLocalState)->AccountLocalState):AccountLocalState
+    suspend fun clearAccount(accountId:String):Boolean
+}
+
+class LocalFirstStore(context: Context, private val gson: Gson):LocalFirstSnapshotStore {
     private val preferences = context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private val mutex = Mutex()
     private val encryptedStorage = EncryptedSnapshotStorage(
@@ -58,13 +66,13 @@ class LocalFirstStore(context: Context, private val gson: Gson) {
         onFailure = { code -> Log.w(TAG,code) },
     )
 
-    suspend fun read(accountId: String): AccountLocalState? = withContext(Dispatchers.IO) {
+    override suspend fun read(accountId: String): AccountLocalState? = withContext(Dispatchers.IO) {
         val raw = encryptedStorage.read(accountId,legacyKey(accountId),encryptedKey(accountId)) { valid(accountId,it) }
             ?: return@withContext null
         decode(accountId,raw)
     }
 
-    suspend fun update(accountId: String, transform: (AccountLocalState) -> AccountLocalState): AccountLocalState = mutex.withLock {
+    override suspend fun update(accountId: String, transform: (AccountLocalState) -> AccountLocalState): AccountLocalState = mutex.withLock {
         withContext(Dispatchers.IO) {
             val current = encryptedStorage.read(accountId,legacyKey(accountId),encryptedKey(accountId)) { valid(accountId,it) }
                 ?.let { decode(accountId,it) }
@@ -77,7 +85,7 @@ class LocalFirstStore(context: Context, private val gson: Gson) {
         }
     }
 
-    suspend fun clearAccount(accountId: String) = withContext(Dispatchers.IO) {
+    override suspend fun clearAccount(accountId: String) = withContext(Dispatchers.IO) {
         encryptedStorage.clear(legacyKey(accountId),encryptedKey(accountId))
     }
 

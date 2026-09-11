@@ -38,8 +38,11 @@ data class ProfilesSnapshot(
 )
 
 interface ProfilesRepository {
+    suspend fun templates():List<com.popwam.pop.data.api.ProfileTemplateDto> = emptyList()
+    suspend fun uploadItemImage(profileId:String,revision:Int,media:ProfileMediaUpload):Pair<String,ProfileMutationResult> = throw ProfileDataException("PROFILE_MEDIA_UPLOAD_FAILED")
     suspend fun load(activeProfileId:String?):ProfilesSnapshot
     suspend fun refresh(activeProfileId:String?):ProfilesSnapshot=load(activeProfileId)
+    suspend fun refreshEditor(profileId:String):ProfilesSnapshot=load(profileId)
     suspend fun categories(kind:ProfileBackendKind):List<ProfileCategoryOption>
     suspend fun mutate(profileId:String,revision:Int,mutation:ProfileEditorMutation):ProfileMutationResult
     suspend fun updateVisibility(profileId:String,revision:Int,access:String,slug:String?):ProfileMutationResult
@@ -80,6 +83,14 @@ class AndroidProfilesRepository(
         )
     }
 
+    override suspend fun refreshEditor(profileId:String):ProfilesSnapshot {
+        val accountId=requireNotNull(localFirst.currentAccountId())
+        val editor=repository.profileEditor(profileId,localeProvider())
+        if(!editor.ok)throw ProfileDataException(editor.error ?: "PROFILE_CONTENT_UNAVAILABLE")
+        localFirst.persistEditor(accountId,profileId,editor)
+        return loadInternal(profileId,false)
+    }
+
     override suspend fun categories(kind:ProfileBackendKind):List<ProfileCategoryOption> {
         val response=repository.profileCategories(kind.name,localeProvider())
         if(!response.ok) throw ProfileDataException(response.error ?: "PROFILE_CATEGORIES_UNAVAILABLE")
@@ -89,10 +100,25 @@ class AndroidProfilesRepository(
         }
     }
 
+    override suspend fun templates()=localFirst.templateCatalog().templates
+
+    override suspend fun uploadItemImage(profileId:String,revision:Int,media:ProfileMediaUpload):Pair<String,ProfileMutationResult> {
+        val accountId=requireNotNull(localFirst.currentAccountId())
+        val cached=localFirst.cachedEditor(profileId) ?: throw ProfileDataException("PROFILE_CONTENT_UNAVAILABLE")
+        val result=repository.uploadMedia(profileId,"GALLERY",media.fileName,media.mimeType,media.bytes,revision)
+        if(!result.ok || result.asset?.previewUrl==null) throw ProfileDataException(result.error ?: "PROFILE_MEDIA_UPLOAD_FAILED")
+        val editor=cached.copy(profile=cached.profile.copy(draftRevision=result.draftRevision ?: revision+1),
+            media=cached.media+com.popwam.pop.data.api.EditorMediaDto(result.asset.id,"GALLERY","ONLY_ME",0,result.asset.previewUrl))
+        localFirst.persistEditor(accountId,profileId,editor)
+        return result.asset.previewUrl to ProfileMutationResult(editor.profile.draftRevision,editor=editor)
+    }
+
     override suspend fun mutate(profileId:String,revision:Int,mutation:ProfileEditorMutation):ProfileMutationResult {
-        val result=repository.mutateProfileEditor(profileId,revision,mutation.toJson())
+        val accountId=requireNotNull(localFirst.currentAccountId())
+        val result=repository.mutateProfileEditor(profileId,revision,mutation.toJson(),localeProvider())
         if(!result.ok) throw ProfileDataException(result.error ?: "PROFILE_SAVE_FAILED")
-        localFirst.invalidateProfile(profileId)
+        if(result.editor?.ok==true) localFirst.persistEditor(accountId,profileId,result.editor)
+        else localFirst.invalidateProfile(profileId)
         return result.toMutationResult(revision)
     }
 
@@ -215,9 +241,9 @@ internal fun ProfileEditorResponse.toContent(summary:OwnedProfile,slug:String)=P
     title=about.title,bio=about.bio,bioAr=about.bioAr,bioEn=about.bioEn,descriptionAr=about.descriptionAr,descriptionEn=about.descriptionEn,
     phone=contact.phone,alternatePhone=contact.alternatePhone,email=contact.email,website=contact.website,whatsappBusiness=contact.whatsappBusiness,
     whatsappPrivate=contact.whatsappPrivate,locationText=contact.locationText,addressAr=contact.addressAr,addressEn=contact.addressEn,contactVisibility=contact.visibility,
-    slug=slug,theme=appearance.theme,templateName=appearance.templateName,
+    slug=slug,theme=appearance.theme,templateName=appearance.templateName,templateId=appearance.templateId,templateImageUrl=appearance.previewImageUrl,storefront=storefront,imageUploadMaxBytes=imageUploadMaxBytes,
     links=links.map { ProfileLink(it.id,it.title,it.titleAr,it.titleEn,it.type,it.url,it.visibility,it.sortOrder) },
-    services=services.map { ProfileService(it.id,it.name,it.nameAr.orEmpty(),it.nameEn.orEmpty(),it.descriptionAr.orEmpty(),it.descriptionEn.orEmpty(),it.url.orEmpty(),it.visibility) },
+    services=services.map { ProfileService(it.id,it.name,it.nameAr.orEmpty(),it.nameEn.orEmpty(),it.descriptionAr.orEmpty(),it.descriptionEn.orEmpty(),it.url.orEmpty(),it.visibility,it.itemType,it.imageUrl,it.price,it.currency,it.category,it.featured,it.sortOrder) },
     locations=branches.map { ProfileLocation(it.id,it.name,it.nameAr.orEmpty(),it.nameEn.orEmpty(),it.addressAr.orEmpty(),it.addressEn.orEmpty(),it.phone.orEmpty(),it.mapUrl.orEmpty(),it.visibility) },
     media=media.map { ProfileMedia(it.id,it.purpose,absoluteMediaUrl(it.previewUrl),it.visibility,it.sortOrder) },
     modules=modules.map { ProfileModule(it.key,it.name,it.enabled,it.visibility,it.required,it.supported) },
@@ -249,10 +275,11 @@ private fun com.popwam.pop.data.api.ApiResult.toMutationResult(previousRevision:
     completion=readiness.toCompletionOrNull(),
     lifecycle=lifecycle ?: readiness?.lifecycle,
     contentCompletion=completion?.toContentCompletion(),
+    editor=editor,
 )
 private fun absoluteMediaUrl(value:String)=if(value.startsWith("http")) value else BuildConfig.API_BASE_URL.trimEnd('/')+"/"+value.trimStart('/')
 
-private fun ProfileEditorMutation.toJson()=JsonObject().also { json ->
+internal fun ProfileEditorMutation.toJson()=JsonObject().also { json ->
     fun JsonObject.str(name:String,value:String)=addProperty(name,value)
     when(this) {
         is ProfileEditorMutation.Identity->{json.str("type","IDENTITY_SAVE");json.str("displayName",displayName);json.str("displayLabel",displayLabel);json.str("firstName",firstName);json.str("lastName",lastName);json.str("profession",profession);json.str("customProfession",customProfession);json.str("displayNameAr",displayNameAr);json.str("displayNameEn",displayNameEn);json.str("jobTitleAr",jobTitleAr);json.str("jobTitleEn",jobTitleEn);json.str("company",company);json.str("industryAr",industryAr);json.str("industryEn",industryEn);json.str("organizationNameAr",organizationNameAr);json.str("organizationNameEn",organizationNameEn);json.str("primaryLanguage",primaryLanguage)}
@@ -261,7 +288,9 @@ private fun ProfileEditorMutation.toJson()=JsonObject().also { json ->
         is ProfileEditorMutation.LinkUpsert->{json.str("type","LINK_UPSERT");if(link.id.isNotBlank())json.str("id",link.id);json.str("title",link.title);json.str("titleAr",link.titleAr);json.str("titleEn",link.titleEn);json.str("destinationType",link.type);json.str("url",link.url);json.str("visibility",link.visibility)}
         is ProfileEditorMutation.LinkDelete->{json.str("type","LINK_DELETE");json.str("id",id)}
         is ProfileEditorMutation.LinkReorder->{json.str("type","LINK_REORDER");json.add("ids",JsonArray().also { a->ids.forEach(a::add) })}
-        is ProfileEditorMutation.ServiceUpsert->{json.str("type","SERVICE_UPSERT");if(service.id.isNotBlank())json.str("id",service.id);json.str("nameAr",service.nameAr);json.str("nameEn",service.nameEn);json.str("descriptionAr",service.descriptionAr);json.str("descriptionEn",service.descriptionEn);json.str("url",service.url);json.str("visibility",service.visibility)}
+        is ProfileEditorMutation.ServiceUpsert->{json.str("type","SERVICE_UPSERT");if(service.id.isNotBlank())json.str("id",service.id);json.str("nameAr",service.nameAr);json.str("nameEn",service.nameEn);json.str("descriptionAr",service.descriptionAr);json.str("descriptionEn",service.descriptionEn);json.str("url",service.url);json.str("visibility",service.visibility);json.str("itemType",service.itemType);json.addProperty("imageUrl",service.imageUrl);json.addProperty("price",service.price);json.addProperty("currency",service.currency);json.addProperty("category",service.category);json.addProperty("featured",service.featured)}
+        is ProfileEditorMutation.TemplateSelect->{json.str("type","TEMPLATE_SELECT");json.str("templateId",template.id)}
+        is ProfileEditorMutation.ServiceReorder->{json.str("type","SERVICE_REORDER");json.add("ids",JsonArray().also{array->ids.forEach(array::add)})}
         is ProfileEditorMutation.ServiceDelete->{json.str("type","SERVICE_DELETE");json.str("id",id)}
         is ProfileEditorMutation.LocationUpsert->{json.str("type","BRANCH_UPSERT");if(location.id.isNotBlank())json.str("id",location.id);json.str("nameAr",location.nameAr);json.str("nameEn",location.nameEn);json.str("addressAr",location.addressAr);json.str("addressEn",location.addressEn);json.str("phone",location.phone);json.str("mapUrl",location.mapUrl);json.str("visibility",location.visibility)}
         is ProfileEditorMutation.LocationDelete->{json.str("type","BRANCH_DELETE");json.str("id",id)}
@@ -293,6 +322,9 @@ class ProfilesViewModel(
     init { load(initial=true,selected=initialProfileId) }
 
     fun onEvent(event:ProfileEvent){when(event){
+        ProfileEvent.LoadTemplates->loadTemplates()
+        ProfileEvent.ClearItemImage->_state.value=_state.value.copy(uploadedItemImage=null)
+        is ProfileEvent.UploadItemImage->uploadItemImage(event.media)
         ProfileEvent.Refresh,ProfileEvent.Retry->load(initial=_state.value.profiles.isEmpty(),selected=_state.value.activeProfileId,force=true)
         ProfileEvent.OpenList->navigate(ProfileDestination.List)
         ProfileEvent.OpenCreate->navigate(ProfileDestination.Create)
@@ -348,18 +380,41 @@ class ProfilesViewModel(
         try{_state.value=_state.value.copy(categories=repository.categories(kind),categoryKindLoading=null)}catch(error:Exception){_state.value=_state.value.copy(categoryKindLoading=null,errorCode=error.message ?: "PROFILE_CATEGORIES_UNAVAILABLE")}
     }
 
-    private fun save(mutation:ProfileEditorMutation){val content=_state.value.content?:return;viewModelScope.launch{
+    private fun loadTemplates()=viewModelScope.launch {
+        if(_state.value.templatesLoading)return@launch
+        _state.value=_state.value.copy(templatesLoading=true,errorCode=null)
+        try { val catalog=repository.templates();_state.value=_state.value.copy(templates=catalog,templatesLoading=false) }
+        catch(error:Exception){_state.value=_state.value.copy(templatesLoading=false);handleMutationFailure(error,ProfileOperation.SAVE)}
+    }
+
+    private fun uploadItemImage(media:ProfileMediaUpload){val content=_state.value.content?:return
+        if(_state.value.saveState==ProfileSaveState.SAVING)return
+        viewModelScope.launch {
+            _state.value=_state.value.copy(saveState=ProfileSaveState.SAVING,uploadedItemImage=null,errorCode=null)
+            try { val (url,result)=repository.uploadItemImage(content.summary.id,content.draftRevision,media)
+                if(_state.value.activeProfileId!=content.summary.id)return@launch
+                acceptMutation(content,result);_state.value=_state.value.copy(uploadedItemImage=url)
+            } catch(error:Exception){if(_state.value.activeProfileId==content.summary.id)handleMutationFailure(error,ProfileOperation.SAVE)}
+        }
+    }
+
+    private fun save(mutation:ProfileEditorMutation){val content=_state.value.content?:return
+        if(_state.value.saveState==ProfileSaveState.SAVING)return
+        viewModelScope.launch{
         _state.value=_state.value.copy(saveState=ProfileSaveState.SAVING,errorCode=null,debugErrorCode=null)
         try{
             val result=repository.mutate(content.summary.id,content.draftRevision,mutation)
             analytics.track("profile_editor_saved",mapOf("profile_kind" to content.summary.backendKind.name))
+            if(_state.value.activeProfileId!=content.summary.id)return@launch
             acceptMutation(content.applyMutation(mutation),result)
-            if(result.completion==null || mutation.requiresProjectionRefresh())refreshBestEffort(content.summary.id)
+            if(result.editor==null && (result.completion==null || mutation.requiresProjectionRefresh()))refreshBestEffort(content.summary.id)
         } catch(error:HttpException){
+            if(_state.value.activeProfileId!=content.summary.id)return@launch
+            val code=error.apiCode()
             if(error.code()==401)_effects.emit(ProfileEffect.SessionExpired)
-            else if(error.code()==409)recoverConflict(content.summary.id,mutation,error.apiCode())
-            else saveFailed(profileErrorFor(error.apiCode(),ProfileOperation.SAVE),error.apiCode())
-        } catch(error:Exception){saveFailed(profileErrorFor(error.message,ProfileOperation.SAVE),error.message)}
+            else if(error.code()==409)recoverConflict(content.summary.id,mutation,code)
+            else saveFailed(profileErrorFor(code,ProfileOperation.SAVE),code)
+        } catch(error:Exception){if(_state.value.activeProfileId==content.summary.id)handleMutationFailure(error,ProfileOperation.SAVE)}
     }}
 
     private fun saveVisibility(access:String,slug:String){val content=_state.value.content?:return;viewModelScope.launch{
@@ -434,11 +489,13 @@ class ProfilesViewModel(
         try{val result=repository.removeMedia(content.summary.id,content.draftRevision,mediaId);acceptMutation(content.copy(media=content.media.filterNot{it.id==mediaId}),result);if(result.completion==null)refreshBestEffort(content.summary.id)}catch(error:Exception){handleMutationFailure(error,ProfileOperation.SAVE)}
     }}
 
-    private fun acceptMutation(local:ProfileContent,result:ProfileMutationResult){
+    private fun acceptMutation(previous:ProfileContent,result:ProfileMutationResult){
+        if(_state.value.activeProfileId!=previous.summary.id)return
+        val local=result.editor?.toContent(previous.summary,previous.slug) ?: previous
         val completion=result.completion ?: local.summary.completion
         val contentCompletion=result.contentCompletion ?: local.contentCompletion
         val lifecycle=result.lifecycle ?: local.summary.lifecycle
-        val updated=local.copy(summary=local.summary.copy(completion=completion,lifecycle=lifecycle),contentCompletion=contentCompletion,draftRevision=result.draftRevision)
+        val updated=local.copy(summary=local.summary.copy(completion=completion,lifecycle=lifecycle),contentCompletion=contentCompletion,draftRevision=result.editor?.profile?.draftRevision ?: result.draftRevision)
         _state.value=_state.value.copy(
             profiles=_state.value.profiles.map{if(it.id==updated.summary.id)updated.summary else it},
             content=updated,editorDirty=false,saveState=ProfileSaveState.SUCCESS,errorCode=null,debugErrorCode=null,uploadProgress=null,
@@ -455,20 +512,22 @@ class ProfilesViewModel(
             .onFailure{_state.value=_state.value.copy(partial=true,uploadProgress=null)}
     }
     private suspend fun recoverConflict(id:String,pending:ProfileEditorMutation?,rawCode:String){
-        val refreshed=runCatching{repository.load(id)}.getOrNull()
+        val refreshed=runCatching{repository.refreshEditor(id)}.getOrNull()
         val compatible=refreshed?.content?.let{server->pending?.let(server::applyMutation) ?: server}
         if(refreshed!=null)_state.value=_state.value.copy(profiles=refreshed.profiles,activeProfileId=refreshed.activeProfileId,content=compatible,quota=refreshed.quota,partial=refreshed.partial,refreshing=false,offline=false,editorDirty=pending!=null,saveState=ProfileSaveState.FAILURE,errorCode="PROFILE_CONFLICT_REFRESHED",debugErrorCode=rawCode)
         else saveFailed("PROFILE_CONFLICT_REFRESH_FAILED",rawCode)
     }
     private fun fail(previous:ProfilesUiState,message:String?){_state.value=previous.copy(refreshing=false,loadState=if(previous.profiles.isEmpty())ProfileLoadState.ERROR else previous.loadState,partial=previous.profiles.isNotEmpty(),errorCode=message ?: "PROFILE_UNAVAILABLE")}
     private fun saveFailed(message:String?,debug:String?=message){_state.value=_state.value.copy(saveState=ProfileSaveState.FAILURE,errorCode=message ?: "PROFILE_SAVE_FAILED",debugErrorCode=debug)}
-    private suspend fun handleMutationFailure(error:Exception,operation:ProfileOperation){if(error is HttpException&&error.code()==401)_effects.emit(ProfileEffect.SessionExpired)else{val raw=if(error is HttpException)error.apiCode() else error.message;saveFailed(profileErrorFor(raw,operation),raw)}}
+    private suspend fun handleMutationFailure(error:Exception,operation:ProfileOperation){if(error is HttpException&&error.code()==401)_effects.emit(ProfileEffect.SessionExpired)else{val raw=if(error is HttpException)error.apiCode() else if(error is IOException)"PROFILE_OFFLINE" else error.message;saveFailed(profileErrorFor(raw,operation),raw)}}
     private fun navigate(destination:ProfileDestination){_effects.tryEmit(ProfileEffect.Navigate(destination))}
 }
 
-private enum class ProfileOperation { CREATE, SAVE, VISIBILITY, PUBLISH }
+internal enum class ProfileOperation { CREATE, SAVE, VISIBILITY, PUBLISH }
 
-private fun profileErrorFor(raw:String?,operation:ProfileOperation)=when {
+internal fun profileErrorFor(raw:String?,operation:ProfileOperation)=when {
+    raw=="PROFILE_OFFLINE" -> "PROFILE_OFFLINE"
+    raw in setOf("PROFILE_TEMPLATE_INCOMPATIBLE","PROFILE_TEMPLATE_PLAN_REQUIRED","TEMPLATE_STOREFRONT_REQUIRED","STOREFRONT_PLAN_REQUIRED","STOREFRONT_LIMIT_REACHED","SHOWCASE_PRICE_INVALID","SHOWCASE_CURRENCY_INVALID","SHOWCASE_IMAGE_INVALID","PROFILE_MEDIA_UPLOAD_FAILED") -> raw!!
     raw=="STALE_DRAFT" -> "PROFILE_CONFLICT_REFRESHED"
     raw=="SLUG_TAKEN" -> "PROFILE_SLUG_TAKEN"
     raw=="PROFILE_NAME_REQUIRED" || raw=="FIELD_REQUIRED" || raw=="PROFILE_CATEGORY_INCOMPATIBLE" -> "PROFILE_REQUIRED_DATA_INCOMPLETE"
@@ -499,6 +558,8 @@ private fun ProfileContent.applyMutation(mutation:ProfileEditorMutation)=when(mu
     is ProfileEditorMutation.LinkDelete->copy(links=links.filterNot{it.id==mutation.id})
     is ProfileEditorMutation.LinkReorder->copy(links=links.sortedBy{mutation.ids.indexOf(it.id).let{i->if(i<0)Int.MAX_VALUE else i}}.mapIndexed{i,item->item.copy(sortOrder=i*10)})
     is ProfileEditorMutation.ServiceUpsert->if(mutation.service.id.isBlank())this else copy(services=services.filterNot{it.id==mutation.service.id}+mutation.service)
+    is ProfileEditorMutation.TemplateSelect->copy(templateId=mutation.template.id,templateName=mutation.template.nameEn,templateImageUrl=mutation.template.previewImageUrl)
+    is ProfileEditorMutation.ServiceReorder->copy(services=services.sortedBy{mutation.ids.indexOf(it.id)}.mapIndexed{index,item->item.copy(sortOrder=index*10)})
     is ProfileEditorMutation.ServiceDelete->copy(services=services.filterNot{it.id==mutation.id})
     is ProfileEditorMutation.LocationUpsert->if(mutation.location.id.isBlank())this else copy(locations=locations.filterNot{it.id==mutation.location.id}+mutation.location)
     is ProfileEditorMutation.LocationDelete->copy(locations=locations.filterNot{it.id==mutation.id})

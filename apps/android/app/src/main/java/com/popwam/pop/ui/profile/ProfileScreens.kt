@@ -101,7 +101,7 @@ fun ProfileViewScreen(state:ProfilesUiState,profileId:String,onBack:()->Unit,onE
             if(topLevel)item{PopActiveProfileHeader(content.summary.name,content.summary.subtitle,content.summary.avatarUrl,{profilePicker=true},onNotifications)}
             item{ProfileHero(content)}
             item{ApprovedProfileActions(content.summary.id,onEvent)}
-            items(approvedProfileSections(content),key={it.section.name}){model->ApprovedProfileSectionRow(model){onEvent(ProfileEvent.OpenSection(content.summary.id,model.section))}}
+            items(approvedProfileSections(content),key={it.section.name}){model->val summary=if(model.section==ProfileEditorSection.SERVICES)stringResource(R.string.pass6_summary,content.services.count{it.itemType=="PRODUCT"},content.services.count{it.itemType=="SERVICE"})+content.storefront.storefrontMaxItems?.let{" \u2022 ${content.services.size} / $it"}.orEmpty() else model.summary;ApprovedProfileSectionRow(model.copy(summary=summary)){onEvent(ProfileEvent.OpenSection(content.summary.id,model.section))}}
         }}
     }
     if(profilePicker)ProfileSwitchSheet(state,{profilePicker=false}){id->profilePicker=false;onEvent(ProfileEvent.SelectProfile(id))}
@@ -143,6 +143,7 @@ private data class ApprovedProfileSection(
     val description:Int,
     val icon:Int,
     val complete:Boolean,
+    val summary:String?=null,
 )
 
 private fun approvedProfileCompletion(content:ProfileContent):Int {
@@ -166,7 +167,8 @@ private fun approvedProfileSections(content:ProfileContent):List<ApprovedProfile
         ApprovedProfileSection(ProfileEditorSection.APPEARANCE,R.string.profile_appearance,R.string.profile_appearance_description,R.drawable.pop_approved_section_appearance,content.theme.isNotBlank()),
         ApprovedProfileSection(if(hasTypeDetails)ProfileEditorSection.TYPE_DETAILS else ProfileEditorSection.ABOUT,if(hasTypeDetails)R.string.profile_type_details else R.string.profile_about,R.string.profile_type_details_description,R.drawable.pop_approved_section_business,content.structuredEntries.isNotEmpty()||content.localizedAbout()?.isNotBlank()==true),
         ApprovedProfileSection(ProfileEditorSection.VERIFICATION,R.string.profile_verification,R.string.profile_verification_description,R.drawable.pop_approved_section_verification,content.summary.verification==ProfileVerificationState.VERIFIED),
-    )
+        ApprovedProfileSection(ProfileEditorSection.TEMPLATE,R.string.pass6_template,R.string.pass6_change,R.drawable.pop_approved_section_appearance,content.templateId!=null,content.templateName.takeIf{it.isNotBlank()}),
+    ) + if(content.summary.backendKind==ProfileBackendKind.BUSINESS)listOf(ApprovedProfileSection(ProfileEditorSection.SERVICES,R.string.pass6_products_services,R.string.pass6_showcase_help,R.drawable.pop_approved_section_business,content.services.isNotEmpty())) else emptyList()
 }
 
 @Composable private fun ApprovedProfileActions(profileId:String,onEvent:(ProfileEvent)->Unit){
@@ -194,7 +196,7 @@ private fun approvedProfileSections(content:ProfileContent):List<ApprovedProfile
             PopApprovedAsset(model.icon,null,Modifier.size(42.dp))
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)){
                 Text(stringResource(model.title),style=MaterialTheme.typography.titleSmall)
-                Text(stringResource(model.description),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
+                Text(model.summary ?: stringResource(model.description),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
             }
             Text(if(model.complete)"100%" else "0%",style=MaterialTheme.typography.labelMedium,color=if(model.complete)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
             PopApprovedAsset(R.drawable.pop_approved_chevron,null,Modifier.size(29.dp).graphicsLayer(scaleX=if(direction==LayoutDirection.Ltr)-1f else 1f),tint=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -259,7 +261,8 @@ fun ProfileEditorSectionScreen(state:ProfilesUiState,profileId:String,section:Pr
                 ProfileEditorSection.APPEARANCE->AppearanceEditor(content,state,onEvent)
                 ProfileEditorSection.VERIFICATION->VerificationPanel(content)
                 ProfileEditorSection.VISIBILITY->VisibilityEditor(content,state,onEvent)
-                ProfileEditorSection.SERVICES->ServicesEditor(content,state,onEvent)
+                ProfileEditorSection.SERVICES->StorefrontEditor(content,state,onEvent)
+                ProfileEditorSection.TEMPLATE->TemplateEditor(content,state,onEvent)
                 ProfileEditorSection.LOCATIONS->LocationsEditor(content,state,onEvent)
             }
         }
@@ -536,9 +539,9 @@ fun ProfileCreationScreen(state:ProfilesUiState,onBack:()->Unit,onEvent:(Profile
 @Composable private fun ServiceDialog(initial:ProfileService,dismiss:()->Unit,save:(ProfileService)->Unit){var name by remember{mutableStateOf(initial.nameEn.ifBlank{initial.nameAr})};var desc by remember{mutableStateOf(initial.descriptionEn.ifBlank{initial.descriptionAr})};var url by remember{mutableStateOf(initial.url)};var visibility by remember{mutableStateOf(initial.visibility)};var validation by remember{mutableStateOf(ProfileValidationResult())};PopFormSheet(dismiss,{Text(stringResource(R.string.profile_service),style=MaterialTheme.typography.titleLarge)},validation.firstInvalidField,action={focus->Button({val result=ProfileFormValidation.service(name,desc,url);validation=result;if(result.valid)save(initial.copy(name=name.trim(),nameEn=name.trim(),descriptionEn=desc.trim(),url=ProfileFormValidation.normalizedHttpUrl(url),visibility=visibility))else result.firstInvalidField?.let(focus::focus)},Modifier.fillMaxWidth()){Text(stringResource(R.string.save))};TextButton(dismiss,Modifier.fillMaxWidth()){Text(stringResource(R.string.cancel))}},content={focus->ValidatedProfileField(ProfileFormField.SERVICE_NAME,focus,name,{name=it},R.string.profile_name,validation,next=ProfileFormField.SERVICE_DESCRIPTION);ValidatedProfileField(ProfileFormField.SERVICE_DESCRIPTION,focus,desc,{desc=it},R.string.profile_description,validation,minLines=3);ValidatedProfileField(ProfileFormField.SERVICE_URL,focus,url,{url=it},R.string.profile_website,validation,type=KeyboardType.Uri,ltr=true);ScalarVisibilitySelector(visibility){visibility=it}})}
 @Composable private fun LocationDialog(initial:ProfileLocation,dismiss:()->Unit,save:(ProfileLocation)->Unit){var name by remember{mutableStateOf(initial.nameEn.ifBlank{initial.nameAr})};var address by remember{mutableStateOf(initial.addressEn.ifBlank{initial.addressAr})};var phone by remember{mutableStateOf(initial.phone)};var map by remember{mutableStateOf(initial.mapUrl)};var visibility by remember{mutableStateOf(initial.visibility)};var validation by remember{mutableStateOf(ProfileValidationResult())};PopFormSheet(dismiss,{Text(stringResource(R.string.profile_location),style=MaterialTheme.typography.titleLarge)},validation.firstInvalidField,action={focus->Button({val result=ProfileFormValidation.location(name,address,phone,map);validation=result;if(result.valid)save(initial.copy(name=name.trim(),nameEn=name.trim(),addressEn=address.trim(),phone=ProfileFormValidation.normalizedPhone(phone),mapUrl=ProfileFormValidation.normalizedHttpUrl(map),visibility=visibility))else result.firstInvalidField?.let(focus::focus)},Modifier.fillMaxWidth()){Text(stringResource(R.string.save))};TextButton(dismiss,Modifier.fillMaxWidth()){Text(stringResource(R.string.cancel))}},content={focus->ValidatedProfileField(ProfileFormField.LOCATION_NAME,focus,name,{name=it},R.string.profile_name,validation,next=ProfileFormField.LOCATION_ADDRESS);ValidatedProfileField(ProfileFormField.LOCATION_ADDRESS,focus,address,{address=it},R.string.profile_address,validation,next=ProfileFormField.LOCATION_PHONE);ValidatedProfileField(ProfileFormField.LOCATION_PHONE,focus,phone,{phone=it},R.string.profile_phone,validation,next=ProfileFormField.LOCATION_MAP_URL,type=KeyboardType.Phone,ltr=true);ValidatedProfileField(ProfileFormField.LOCATION_MAP_URL,focus,map,{map=it},R.string.profile_map_url,validation,type=KeyboardType.Uri,ltr=true);ScalarVisibilitySelector(visibility){visibility=it}})}
 
-private fun Context.profileFileName(uri:Uri,fallback:String)=contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->if(cursor.moveToFirst())cursor.getString(0)?.takeIf(String::isNotBlank)else null} ?: fallback
+internal fun Context.profileFileName(uri:Uri,fallback:String)=contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->if(cursor.moveToFirst())cursor.getString(0)?.takeIf(String::isNotBlank)else null} ?: fallback
 private fun Context.profileFileSize(uri:Uri):Long?=contentResolver.query(uri,arrayOf(OpenableColumns.SIZE),null,null,null)?.use{cursor->if(cursor.moveToFirst()&&!cursor.isNull(0))cursor.getLong(0)else null}
-private fun Context.readProfileBytes(uri:Uri,maximum:Long):ByteArray?=contentResolver.openInputStream(uri)?.use{input->
+internal fun Context.readProfileBytes(uri:Uri,maximum:Long):ByteArray?=contentResolver.openInputStream(uri)?.use{input->
     val output=ByteArrayOutputStream();val buffer=ByteArray(16*1024);var total=0L
     while(true){val read=input.read(buffer);if(read<0)break;total+=read;if(total>maximum)return null;output.write(buffer,0,read)}
     output.toByteArray()
@@ -556,8 +559,8 @@ private fun profileFileSizeLabel(bytes:Long)=when{bytes>=1024L*1024L->"%.1f MB".
 @Composable private fun ContactRows(c:ProfileContent){listOf(c.phone to Icons.Default.Phone,c.email to Icons.Default.Email,c.website to Icons.Default.Language,c.locationText to Icons.Default.LocationOn).filter{it.first.isNotBlank()}.forEach{(value,icon)->ListItem(headlineContent={CompositionLocalProvider(LocalLayoutDirection provides if(icon!=Icons.Default.LocationOn)LayoutDirection.Ltr else LocalLayoutDirection.current){Text(value)}},leadingContent={Icon(icon,null)})}}
 @Composable private fun ProfileReadinessCard(completion:ProfileCompletion){Card(colors=CardDefaults.cardColors(containerColor=if(completion.publishReady)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Row(verticalAlignment=Alignment.CenterVertically){Icon(if(completion.publishReady)Icons.Default.CheckCircle else Icons.Default.PendingActions,null,tint=if(completion.publishReady)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary);Spacer(Modifier.width(10.dp));Text(stringResource(if(completion.publishReady)R.string.profile_ready else R.string.profile_incomplete),style=MaterialTheme.typography.titleMedium)};if(!completion.publishReady){Text(stringResource(R.string.profile_issues_count,completion.blockingIssueCodes.size),color=MaterialTheme.colorScheme.onSurfaceVariant);completion.blockingIssueCodes.distinct().forEach{Text("• ${profileReadinessMessage(it)}",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}}}}}
 @Composable private fun ProfileEditorSectionCard(section:ProfileEditorSection,onClick:()->Unit){Card(onClick=onClick){Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically){Icon(sectionIcon(section),null,tint=MaterialTheme.colorScheme.primary);Spacer(Modifier.width(14.dp));Text(sectionTitle(section),Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);Icon(Icons.Default.ChevronRight,null)}}}
-@Composable private fun sectionTitle(section:ProfileEditorSection)=stringResource(when(section){ProfileEditorSection.BASIC_INFORMATION->R.string.profile_basic_information;ProfileEditorSection.ABOUT->R.string.profile_about;ProfileEditorSection.CONTACT_LINKS->R.string.profile_contact_links;ProfileEditorSection.TYPE_DETAILS->R.string.profile_type_details;ProfileEditorSection.MEDIA->R.string.profile_media;ProfileEditorSection.APPEARANCE->R.string.profile_appearance;ProfileEditorSection.VERIFICATION->R.string.profile_verification;ProfileEditorSection.VISIBILITY->R.string.profile_visibility;ProfileEditorSection.SERVICES->R.string.profile_services;ProfileEditorSection.LOCATIONS->R.string.profile_locations})
-private fun sectionIcon(section:ProfileEditorSection)=when(section){ProfileEditorSection.BASIC_INFORMATION->Icons.Default.Badge;ProfileEditorSection.ABOUT->Icons.Default.Article;ProfileEditorSection.CONTACT_LINKS->Icons.Default.Link;ProfileEditorSection.TYPE_DETAILS->Icons.Default.DynamicForm;ProfileEditorSection.MEDIA->Icons.Default.PhotoLibrary;ProfileEditorSection.APPEARANCE->Icons.Default.Palette;ProfileEditorSection.VERIFICATION->Icons.Default.VerifiedUser;ProfileEditorSection.VISIBILITY->Icons.Default.Visibility;ProfileEditorSection.SERVICES->Icons.Default.Work;ProfileEditorSection.LOCATIONS->Icons.Default.LocationOn}
+@Composable private fun sectionTitle(section:ProfileEditorSection)=stringResource(when(section){ProfileEditorSection.BASIC_INFORMATION->R.string.profile_basic_information;ProfileEditorSection.ABOUT->R.string.profile_about;ProfileEditorSection.CONTACT_LINKS->R.string.profile_contact_links;ProfileEditorSection.TYPE_DETAILS->R.string.profile_type_details;ProfileEditorSection.MEDIA->R.string.profile_media;ProfileEditorSection.APPEARANCE->R.string.profile_appearance;ProfileEditorSection.VERIFICATION->R.string.profile_verification;ProfileEditorSection.VISIBILITY->R.string.profile_visibility;ProfileEditorSection.TEMPLATE->R.string.pass6_template;ProfileEditorSection.SERVICES->R.string.pass6_products_services;ProfileEditorSection.LOCATIONS->R.string.profile_locations})
+private fun sectionIcon(section:ProfileEditorSection)=when(section){ProfileEditorSection.BASIC_INFORMATION->Icons.Default.Badge;ProfileEditorSection.ABOUT->Icons.Default.Article;ProfileEditorSection.CONTACT_LINKS->Icons.Default.Link;ProfileEditorSection.TYPE_DETAILS->Icons.Default.DynamicForm;ProfileEditorSection.MEDIA->Icons.Default.PhotoLibrary;ProfileEditorSection.APPEARANCE->Icons.Default.Palette;ProfileEditorSection.VERIFICATION->Icons.Default.VerifiedUser;ProfileEditorSection.VISIBILITY->Icons.Default.Visibility;ProfileEditorSection.TEMPLATE->Icons.Default.Dashboard;ProfileEditorSection.SERVICES->Icons.Default.Work;ProfileEditorSection.LOCATIONS->Icons.Default.LocationOn}
 @Composable private fun ValidatedProfileField(
     field:ProfileFormField,
     focus:PopFormFocusController,
@@ -630,7 +633,7 @@ private fun List<ProfileFormField>.next(field:ProfileFormField)=indexOf(field).t
 
 @Composable private fun ProfileOperationError(code:String,debugCode:String?){Column(Modifier.fillMaxWidth().semantics{liveRegion=LiveRegionMode.Assertive}){Text(profileErrorMessage(code),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodyMedium);if(BuildConfig.DEBUG&&!debugCode.isNullOrBlank())Text(debugCode,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
 
-@Composable private fun profileErrorMessage(code:String)=stringResource(when(code){
+@Composable internal fun profileErrorMessage(code:String)=stringResource(when(code){
     "PROFILE_CREATE_FAILED","PROFILE_CREATE_ENDPOINT_UNAVAILABLE"->R.string.profile_error_create
     "PROFILE_REQUIRED_DATA_INCOMPLETE","PROFILE_NAME_REQUIRED","PROFILE_CATEGORY_REQUIRED"->R.string.profile_error_required
     "PROFILE_SLUG_TAKEN"->R.string.profile_error_slug_taken
@@ -638,7 +641,14 @@ private fun List<ProfileFormField>.next(field:ProfileFormField)=indexOf(field).t
     "PROFILE_CONFLICT_REFRESH_FAILED"->R.string.profile_error_conflict_refresh_failed
     "PROFILE_VISIBILITY_FAILED"->R.string.profile_error_visibility
     "PROFILE_NOT_READY"->R.string.profile_error_not_ready
-    "PROFILE_SERVER_UNAVAILABLE","PROFILE_OFFLINE"->R.string.profile_error_server
+    "PROFILE_OFFLINE"->R.string.pass6_offline
+    "PROFILE_TEMPLATE_INCOMPATIBLE"->R.string.pass6_template_incompatible
+    "PROFILE_TEMPLATE_PLAN_REQUIRED","TEMPLATE_STOREFRONT_REQUIRED","STOREFRONT_PLAN_REQUIRED"->R.string.pass6_plan_locked
+    "STOREFRONT_LIMIT_REACHED"->R.string.pass6_limit_reached
+    "SHOWCASE_PRICE_INVALID"->R.string.pass6_price_invalid
+    "SHOWCASE_CURRENCY_INVALID"->R.string.pass6_currency_invalid
+    "SHOWCASE_IMAGE_INVALID","PROFILE_MEDIA_UPLOAD_FAILED"->R.string.pass6_upload_failed
+    "PROFILE_SERVER_UNAVAILABLE"->R.string.profile_error_server
     "PROFILE_TYPE_NOT_AVAILABLE"->R.string.profile_error_type_unavailable
     "PROFILE_TEMPLATE_UNAVAILABLE"->R.string.profile_error_template_unavailable
     else->R.string.profile_error_save

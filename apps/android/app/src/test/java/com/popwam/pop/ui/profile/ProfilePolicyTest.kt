@@ -26,7 +26,7 @@ class ProfilePolicyTest {
         val base=content(modules=listOf(ProfileModule("IDENTITY","Identity",true,"PUBLIC",true,true)))
         assertFalse(ProfileEditorSection.SERVICES in ProfilePolicy.sections(base))
         assertFalse(ProfileEditorSection.LOCATIONS in ProfilePolicy.sections(base))
-        val service=base.copy(modules=base.modules+ProfileModule("SERVICES","Services",true,"PUBLIC",false,true)+ProfileModule("BRANCHES","Locations",true,"PUBLIC",false,true))
+        val service=base.copy(summary=base.summary.copy(backendKind=ProfileBackendKind.BUSINESS),modules=base.modules+ProfileModule("SERVICES","Services",true,"PUBLIC",false,true)+ProfileModule("BRANCHES","Locations",true,"PUBLIC",false,true))
         assertTrue(ProfileEditorSection.SERVICES in ProfilePolicy.sections(service))
         assertTrue(ProfileEditorSection.LOCATIONS in ProfilePolicy.sections(service))
     }
