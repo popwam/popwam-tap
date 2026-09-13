@@ -54,6 +54,7 @@ export async function verifyPasskeyAssertion(
     lookup.findCredential(body.id),
   ]);
   if(!record||!credential||credential.user.status!=="ACTIVE")return null;
+  if(body.response.userHandle && body.response.userHandle !== Buffer.from(credential.userId).toString("base64url"))return null;
   try{
     const config=passkeyConfig();
     const verification=await verifier({

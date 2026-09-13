@@ -38,11 +38,11 @@ class FirstLaunchAndroidContractTest {
     }
 
     @Test fun `auth legal actions are native and contain no browser or WebView`() {
-        val app=source("src/main/java/com/popwam/pop/ui/PopwamApp.kt")
+        val app=source("src/main/java/com/popwam/pop/ui/auth/PhoneLoginScreen.kt")
         val experience=source("src/main/java/com/popwam/pop/ui/PreAuthExperience.kt")
-        val login=app.substringAfter("private fun LoginScreen(").substringBefore("private fun passkeyErrorString")
-        assertTrue(login.contains("openLegal(PreAuthLegalKind.PRIVACY)"))
-        assertTrue(login.contains("openLegal(PreAuthLegalKind.TERMS)"))
+        val login=app
+        assertTrue(login.contains("legal=PreAuthLegalKind.PRIVACY"))
+        assertTrue(login.contains("legal=PreAuthLegalKind.TERMS"))
         assertFalse(login.contains("openWeb("))
         assertTrue(experience.contains("fun NativeLegalScreen"))
         assertFalse(experience.contains("WebView"))
@@ -50,17 +50,17 @@ class FirstLaunchAndroidContractTest {
     }
 
     @Test fun `country picker is searchable and normalized before OTP submission`() {
-        val app=source("src/main/java/com/popwam/pop/ui/PopwamApp.kt")
-        assertTrue(app.contains("CountryPickerDialog"))
+        val app=source("src/main/java/com/popwam/pop/ui/auth/PhoneLoginScreen.kt")
+        assertTrue(app.contains("AlertDialog"))
         assertTrue(app.contains("PhoneIdentity.search(countries,query)"))
-        assertTrue(app.contains("PhoneIdentity.normalize(phone,country)"))
-        assertTrue(app.contains("auth.startPhoneVerification(activity,normalized,currentLocale())"))
+        assertTrue(source("src/main/java/com/popwam/pop/ui/auth/PhoneLoginViewModel.kt").contains("PhoneIdentity.normalize(before.phone,before.country)"))
+        assertTrue(app.contains("viewModel.request(locale)"))
     }
 
-    @Test fun `initial login is phone first and has no direct passkey sign in`() {
-        val app=source("src/main/java/com/popwam/pop/ui/PopwamApp.kt")
-        assertFalse(app.contains("continue_with_passkey"))
-        assertTrue(app.contains("auth.startPhoneVerification(activity,normalized,currentLocale())"))
+    @Test fun `login offers passkey with explicit WhatsApp fallback`() {
+        val app=source("src/main/java/com/popwam/pop/ui/auth/PhoneLoginScreen.kt")
+        assertTrue(app.contains("p7_passkey_login"))
+        assertTrue(app.contains("viewModel.request(locale)"))
     }
 
     @Test fun `French is declared alongside Arabic and English`() {

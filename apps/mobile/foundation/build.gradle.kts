@@ -21,19 +21,10 @@ kotlin {
         commonMain.dependencies {
             api(libs.coroutines.core)
             api(libs.serialization.json)
-            implementation(libs.ktor.client.content.negotiation)
-            api(libs.ktor.client.core)
-            implementation(libs.ktor.serialization.json)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.coroutines.test)
-        }
-        androidMain.dependencies {
-            implementation(libs.ktor.client.okhttp)
-        }
-        iosMain.dependencies {
-            implementation(libs.ktor.client.darwin)
         }
     }
 }

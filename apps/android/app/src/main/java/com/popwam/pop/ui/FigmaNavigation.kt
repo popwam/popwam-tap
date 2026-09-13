@@ -99,7 +99,7 @@ fun FigmaMainNavigation(
             name = owned?.name ?: homeProfile?.name,
             access = ShareProfileAccess.from(owned?.visibility ?: homeProfile?.visibility),
             lifecycle = owned?.lifecycle ?: homeProfile?.lifecycle,
-            type = owned?.categoryKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase),
+            type = owned?.backendKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase),
         )
     }
     LaunchedEffect(shareState.hce.requested, shareState.hce.activeForProfile, shareState.hce.availability) {
@@ -193,22 +193,22 @@ fun FigmaMainNavigation(
                 composable("profile/share/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
                     val id=entry.arguments?.getString("id").orEmpty()
                     val owned=profileState.profiles.firstOrNull{it.id==id}
-                    val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.categoryKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
+                    val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.backendKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
                     LaunchedEffect(id){home.selectActiveProfile(id)}
                     ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},onBack=nav::popBackStack)
                 }
                 composable("profile/qr/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
-                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.categoryKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
+                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.backendKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
                     LaunchedEffect(id){home.selectActiveProfile(id)}
                     ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.QR,nav::popBackStack)
                 }
                 composable("profile/nfc/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
-                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.categoryKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
+                    val id=entry.arguments?.getString("id").orEmpty();val owned=profileState.profiles.firstOrNull{it.id==id};val selected=ActiveShareProfile(id,owned?.name,ShareProfileAccess.from(owned?.visibility),owned?.lifecycle,owned?.backendKind?.name?.lowercase()?.replaceFirstChar(Char::uppercase))
                     LaunchedEffect(id){home.selectActiveProfile(id)}
                     ProductionShareCenterScreen(shareState,share,selected,{nav.navigate("share-activate")},{nav.navigate(it)},ShareInitialPanel.HCE,nav::popBackStack)
                 }
                 composable("share-activate") { ProductionShareActivationScreen(shareState,share){nav.popBackStack()} }
-                composable("virtual-cards") { VirtualProfiles(state, vm::reload, { nav.navigate("virtual-card/$it") }, { nav.navigate("create-card/start") }) }
+                composable("virtual-cards") { VirtualProfiles(state, vm::reload, { nav.navigate("virtual-card/$it") }, { nav.navigate("profiles/create") }) }
                 composable("products") { PhysicalCards(state, vm::reload) { nav.navigate("card/$it") } }
                 composable("activity") { ActivityFeed(state, vm::reload) }
                 composable("menu") {
@@ -219,7 +219,7 @@ fun FigmaMainNavigation(
                             name=it.name,
                             subtitle=it.subtitle,
                             avatarUrl=it.avatarUrl,
-                            type=it.categoryKind.name.lowercase().replaceFirstChar(Char::uppercase),
+                            type=it.backendKind.name.lowercase().replaceFirstChar(Char::uppercase),
                             verified=it.verification==ProfileVerificationState.VERIFIED,
                             publicUrl=activeContent?.slug?.takeIf(String::isNotBlank)?.let { slug->"https://pop.popwam.com/$slug" },
                             completionPercent=if(it.completion.publishReady)100 else 0,
@@ -231,13 +231,6 @@ fun FigmaMainNavigation(
                 composable("friends") { FriendsScreen(state,vm) }
                 composable("friends/{tab}",arguments=listOf(navArgument("tab"){type=NavType.StringType})){entry->FriendsScreen(state,vm,entry.arguments?.getString("tab") ?: "friends")}
                 composable("nearby") { NearbyScreen(state,vm){nav.navigate(it)} }
-                composable("create-card/{step}", arguments = listOf(navArgument("step") { type = NavType.StringType })) { entry ->
-                    VirtualCardWizardScreen(
-                        step = entry.arguments?.getString("step") ?: "start", state = state, vm = vm,
-                        onBack = { nav.popBackStack() }, navigate = { nav.navigate(it) },
-                        onCreated = { profileId -> nav.navigate("virtual-card/$profileId") { popUpTo("create-card/start") { inclusive = true } } },
-                    )
-                }
                 composable("virtual-card/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     val id = entry.arguments?.getString("id").orEmpty()
                     VirtualCardDetailsScreen(id, state, vm, { nav.popBackStack() }, { nav.navigate("profile/$id") }) { nav.navigate("profile-publish/$id") }
@@ -280,7 +273,7 @@ fun FigmaMainNavigation(
         }
     }
     }
-    HowItWorksSheet(howItWorks,{howItWorks=false}){howItWorks=false;nav.navigate("create-card/start")}
+    HowItWorksSheet(howItWorks,{howItWorks=false}){howItWorks=false;nav.navigate("profiles/create")}
 }
 
 @Composable private fun PublicProfilePreviewDialog(url:String,dismiss:()->Unit){
@@ -423,7 +416,7 @@ private fun VirtualProfileRow(profile: com.popwam.pop.data.api.ProfileDto, click
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             val image = if (profile.type == "ORGANIZATION") profile.logoUrl ?: profile.avatarUrl else profile.avatarUrl
             if (!image.isNullOrBlank()) AsyncImage(image, null, Modifier.size(58.dp).clip(CircleShape), contentScale = ContentScale.Crop) else Box(Modifier.size(58.dp).background(Color(0xFFF1EAFF), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color(0xFF6D3DD7)) }
-            Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(profile.virtualCard?.name ?: profile.displayName, fontWeight = FontWeight.Bold); Text(profile.virtualCard?.template?.let { if (currentLocale() == "ar") it.nameAr else it.nameEn } ?: profile.virtualCard?.type.orEmpty(), style = MaterialTheme.typography.bodySmall, color = Color(0xFF6E6E6E)) }; Icon(Icons.Default.ChevronRight, null)
+            Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(profile.virtualCard?.name ?: profile.displayName, fontWeight = FontWeight.Bold); Text(profile.virtualCard?.template?.let { if (currentLocale() == "ar") it.nameAr else it.nameEn } ?: stringResource(R.string.p7_default_template), style = MaterialTheme.typography.bodySmall, color = Color(0xFF6E6E6E)) }; Icon(Icons.Default.ChevronRight, null)
         }
     }
 }

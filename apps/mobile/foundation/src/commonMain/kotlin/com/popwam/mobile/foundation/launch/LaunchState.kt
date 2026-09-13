@@ -16,7 +16,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 const val CURRENT_LAUNCH_STATE_SCHEMA = 2
-const val CURRENT_WELCOME_VERSION = 1
 
 @Serializable
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
@@ -33,8 +32,6 @@ data class LaunchState(
     val hasSelectedBaseTheme: Boolean = false,
     val selectedBaseTheme: ThemeMode = ThemeMode.SYSTEM,
     val selectedPopStyle: IdentityPalette = IdentityPalette.MINT,
-    val hasCompletedWelcome: Boolean = false,
-    val welcomeVersionSeen: Int = 0,
     val pendingDestination: PopDestination? = null,
     val hasAuthenticatedBefore: Boolean = false,
     val hasCompletedProfileSetup: Boolean = false,
@@ -49,17 +46,11 @@ data class LaunchState(
                 it.matches(Regex("^[a-z]{2}(?:-[a-z0-9]{2,8})?$")) &&
                     it.substringBefore('-') in SUPPORTED_LAUNCH_LANGUAGES
             },
-        welcomeVersionSeen = welcomeVersionSeen.coerceAtLeast(0),
         activeProfileId = activeProfileId?.trim()?.takeIf(String::isNotEmpty),
     ).let {
         val validSelectedLanguage = it.hasSelectedLanguage && it.selectedLanguageTag != null
         it.copy(
             hasSelectedLanguage = validSelectedLanguage,
-            hasCompletedWelcome = it.hasCompletedWelcome &&
-                it.hasSeenFirstLaunchStage &&
-                validSelectedLanguage &&
-                it.hasSelectedBaseTheme &&
-                it.welcomeVersionSeen >= CURRENT_WELCOME_VERSION,
             hasCompletedProfileSetup = it.hasCompletedProfileSetup && it.activeProfileId != null,
         )
     }

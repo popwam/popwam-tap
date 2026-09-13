@@ -1,6 +1,5 @@
 package com.popwam.pop.data.launch
 
-import com.popwam.mobile.foundation.launch.CURRENT_WELCOME_VERSION
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.LaunchState
 import com.popwam.mobile.foundation.launch.ThemeMode
@@ -14,7 +13,6 @@ class LegacyLaunchStateMigrationTest {
         val migrated = migrateLegacyLaunchState(LaunchState(), LegacyLaunchSnapshot(), "en")
         assertFalse(migrated.hasSeenFirstLaunchStage)
         assertFalse(migrated.hasSelectedLanguage)
-        assertFalse(migrated.hasCompletedWelcome)
         assertEquals(IdentityPalette.MINT, migrated.selectedPopStyle)
     }
 
@@ -30,24 +28,20 @@ class LegacyLaunchStateMigrationTest {
         assertTrue(migrated.hasSelectedBaseTheme)
         assertEquals(ThemeMode.DARK, migrated.selectedBaseTheme)
         assertEquals(IdentityPalette.PULSE, migrated.selectedPopStyle)
-        assertFalse(migrated.hasCompletedWelcome)
     }
 
-    @Test fun `completed legacy intro maps to completed versioned welcome`() {
+    @Test fun `old intro preserves language and theme selections`() {
         val migrated = migrateLegacyLaunchState(
             LaunchState(),
             LegacyLaunchSnapshot(introVersionSeen = 1),
             "en",
         )
-        assertTrue(migrated.hasCompletedWelcome)
-        assertEquals(CURRENT_WELCOME_VERSION, migrated.welcomeVersionSeen)
         assertTrue(migrated.hasSelectedLanguage)
         assertTrue(migrated.hasSelectedBaseTheme)
     }
 
     @Test fun `valid restored session adopts an existing user without profile claims`() {
         val migrated = migrateLegacyLaunchState(LaunchState(), LegacyLaunchSnapshot(authenticated = true), "ar")
-        assertTrue(migrated.hasCompletedWelcome)
         assertTrue(migrated.hasAuthenticatedBefore)
         assertFalse(migrated.hasCompletedProfileSetup)
     }

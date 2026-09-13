@@ -58,11 +58,11 @@ export function sessionScopeForNextAction(nextAction: MobileAuthNextAction): Mob
   return "NONE";
 }
 
-export const firebaseOtpConfiguration = (): MobileOtpConfiguration => ({
+export const mobileOtpConfiguration = (): MobileOtpConfiguration => ({
   codeLength: 6,
   expiresAfterSeconds: 300,
   resendAfterSeconds: 60,
   maximumAttempts: 5,
-  automaticSubmissionAllowed: true,
+  automaticSubmissionAllowed: false,
 });
 

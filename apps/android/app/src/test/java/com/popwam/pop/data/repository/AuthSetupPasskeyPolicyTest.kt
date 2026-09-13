@@ -13,7 +13,7 @@ class AuthSetupPasskeyPolicyTest {
     @Test fun `registration options require the WebAuthn creation fields`() {
         val options=JsonObject().apply {
             addProperty("challenge","Y2hhbGxlbmdl")
-            add("rp",JsonObject().apply { addProperty("id","pop.popwam.com");addProperty("name","POP by POPWAM") })
+            add("rp",JsonObject().apply { addProperty("id",java.net.URI(com.popwam.pop.BuildConfig.API_BASE_URL).host);addProperty("name","POP by POPWAM") })
             add("user",JsonObject().apply { addProperty("id","dXNlci0x");addProperty("name","user");addProperty("displayName","POP user") })
             add("pubKeyCredParams",JsonArray().apply { add(JsonObject().apply { addProperty("type","public-key");addProperty("alg",-7) }) })
             add("authenticatorSelection",JsonObject().apply { addProperty("residentKey","required");addProperty("requireResidentKey",true);addProperty("userVerification","required") })

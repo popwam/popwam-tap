@@ -40,12 +40,12 @@ class ProfileFormValidationTest {
     }
 
     @Test fun `canonical identity fields are exposed only to relevant profile categories`() {
-        assertTrue(ProfileIdentityPolicy.showsPersonalName(ProfileCategoryKind.PERSONAL))
-        assertFalse(ProfileIdentityPolicy.showsCompany(ProfileCategoryKind.PERSONAL))
-        assertTrue(ProfileIdentityPolicy.showsProfession(ProfileCategoryKind.PROFESSIONAL))
-        assertTrue(ProfileIdentityPolicy.showsCompany(ProfileCategoryKind.PROFESSIONAL))
-        assertTrue(ProfileIdentityPolicy.showsIndustry(ProfileCategoryKind.BUSINESS))
-        assertFalse(ProfileIdentityPolicy.showsProfession(ProfileCategoryKind.RESTAURANT))
+        assertTrue(ProfileIdentityPolicy.showsPersonalName(ProfileBackendKind.PERSONAL))
+        assertTrue(ProfileIdentityPolicy.showsCompany(ProfileBackendKind.PERSONAL))
+        assertTrue(ProfileIdentityPolicy.showsProfession(ProfileBackendKind.PERSONAL))
+        assertTrue(ProfileIdentityPolicy.showsCompany(ProfileBackendKind.PERSONAL))
+        assertTrue(ProfileIdentityPolicy.showsIndustry(ProfileBackendKind.BUSINESS))
+        assertFalse(ProfileIdentityPolicy.showsProfession(ProfileBackendKind.BUSINESS))
     }
 
     @Test fun `document policy mirrors safe backend type size and extension checks`() {

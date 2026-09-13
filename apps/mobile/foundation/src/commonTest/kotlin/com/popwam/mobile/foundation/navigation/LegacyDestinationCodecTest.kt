@@ -10,7 +10,6 @@ class LegacyDestinationCodecTest {
         assertEquals("home", LegacyDestinationCodec.encode(PopDestination.Home))
         assertEquals("first-launch-final", LegacyDestinationCodec.encode(PopDestination.FirstLaunchFinalStage))
         assertEquals("theme", LegacyDestinationCodec.encode(PopDestination.Theme))
-        assertEquals("welcome/get-started", LegacyDestinationCodec.encode(PopDestination.Welcome(WelcomePage.GET_STARTED)))
         assertEquals("profile/profile-1", LegacyDestinationCodec.encode(PopDestination.Profile("profile-1")))
         assertEquals("public-profile/profile-name", LegacyDestinationCodec.encode(PopDestination.PublicProfile("profile-name")))
         assertEquals(

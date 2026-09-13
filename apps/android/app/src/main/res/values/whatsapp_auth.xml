@@ -1,0 +1,32 @@
+<resources>
+    <string name="wa_auth_personal">Personal</string>
+    <string name="wa_auth_business">Business</string>
+    <string name="wa_auth_setup_failed">Unable to complete this step. Review your choices and try again.</string>
+    <string name="wa_auth_title">Welcome to POP</string>
+    <string name="wa_auth_description">Enter your phone number to receive a verification code on WhatsApp.</string>
+    <string name="wa_auth_country">Country and calling code</string>
+    <string name="wa_auth_phone">Phone number</string>
+    <string name="wa_auth_continue">Continue</string>
+    <string name="wa_auth_legal">By continuing, you acknowledge the Terms and Privacy Policy. Required agreements are confirmed during setup.</string>
+    <string name="wa_auth_code_title">Verify your number</string>
+    <string name="wa_auth_sent">We sent your verification code via WhatsApp.</string>
+    <string name="wa_auth_code">Six-digit verification code</string>
+    <string name="wa_auth_verify">Verify</string>
+    <string name="wa_auth_countdown">Resend in %1$d seconds</string>
+    <string name="wa_auth_resend">Resend code</string>
+    <string name="wa_auth_change">Change number</string>
+    <string name="wa_auth_close">Close</string>
+    <string name="wa_auth_search">Search countries</string>
+    <string name="wa_auth_invalid_phone">Enter a valid number in an enabled country.</string>
+    <string name="wa_auth_invalid_code">The code is incorrect. Try again.</string>
+    <string name="wa_auth_expired">This code has expired or was already used. Request another code.</string>
+    <string name="wa_auth_attempts">Too many attempts. Request a new code when the countdown ends.</string>
+    <string name="wa_auth_wait">Please wait before requesting another code.</string>
+    <string name="wa_auth_offline">No internet connection. Check your connection and try again.</string>
+    <string name="wa_auth_send_failed">We could not send the code. Please try again later.</string>
+    <string name="wa_auth_unavailable">Unable to verify right now. Please try again later.</string>
+    <string name="wa_auth_setup">Set up your profile</string>
+    <string name="wa_auth_name">Display name</string>
+    <string name="wa_auth_agree">Accept required agreements</string>
+    <string name="wa_auth_retry">Try again</string>
+</resources>

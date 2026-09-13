@@ -9,7 +9,6 @@ sealed interface PopDestination {
     @Serializable @SerialName("first_launch_final") data object FirstLaunchFinalStage : PopDestination
     @Serializable @SerialName("language") data object Language : PopDestination
     @Serializable @SerialName("theme") data object Theme : PopDestination
-    @Serializable @SerialName("welcome") data class Welcome(val page: WelcomePage = WelcomePage.ALL_IN_ONE) : PopDestination
     @Serializable @SerialName("phone_auth") data object PhoneAuth : PopDestination
     @Serializable @SerialName("otp") data object Otp : PopDestination
     @Serializable @SerialName("passkey_setup") data object PasskeySetup : PopDestination
@@ -35,20 +34,12 @@ sealed interface PopDestination {
     @Serializable @SerialName("public_profile") data class PublicProfile(val slug: String) : PopDestination
     @Serializable @SerialName("profile_publish") data class ProfilePublish(val profileId: String) : PopDestination
     @Serializable @SerialName("virtual_card") data class VirtualCard(val cardId: String) : PopDestination
-    @Serializable @SerialName("create_card") data class CreateCard(val step: Int) : PopDestination
     @Serializable @SerialName("card") data class Card(val cardId: String) : PopDestination
     @Serializable @SerialName("program") data class Program(val cardId: String) : PopDestination
     @Serializable @SerialName("settings") data class Settings(val section: SettingsSection? = null) : PopDestination
     @Serializable @SerialName("legal") data class Legal(val document: LegalDocument) : PopDestination
 }
 
-@Serializable
-enum class WelcomePage {
-    ALL_IN_ONE,
-    SHARE_YOUR_WAY,
-    PERSONAL_AND_BUSINESS,
-    GET_STARTED,
-}
 
 @Serializable
 enum class ProfileSetupStep {
@@ -93,7 +84,6 @@ object LegacyDestinationCodec {
         PopDestination.FirstLaunchFinalStage -> "first-launch-final"
         PopDestination.Language -> "language"
         PopDestination.Theme -> "theme"
-        is PopDestination.Welcome -> "welcome/${destination.page.name.lowercase().replace('_', '-')}"
         PopDestination.PhoneAuth -> "phone-auth"
         PopDestination.Otp -> "auth/otp"
         PopDestination.PasskeySetup -> "auth/passkey-setup"
@@ -117,7 +107,6 @@ object LegacyDestinationCodec {
         is PopDestination.PublicProfile -> "public-profile/${safeSegment(destination.slug)}"
         is PopDestination.ProfilePublish -> "profile-publish/${safeSegment(destination.profileId)}"
         is PopDestination.VirtualCard -> "virtual-card/${safeSegment(destination.cardId)}"
-        is PopDestination.CreateCard -> "create-card/${destination.step.coerceAtLeast(0)}"
         is PopDestination.Card -> "card/${safeSegment(destination.cardId)}"
         is PopDestination.Program -> "program/${safeSegment(destination.cardId)}"
         is PopDestination.Settings -> destination.section?.let { "settings/${it.name.lowercase().replace('_', '-')}" } ?: "settings"

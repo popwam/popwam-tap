@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { categoryTemplateCompatibility, defaultModuleKeys, idempotentProfileCreationDecision, primaryProfileDecision, profileModuleDecision, profileQuotaDecision } from "./profile-domain-policy";
+import { defaultModuleKeys, idempotentProfileCreationDecision, primaryProfileDecision, profileModuleDecision, profileQuotaDecision } from "./profile-domain-policy";
 
 describe("Phase B profile domain policy", () => {
   it("creates one primary profile and prevents a duplicate primary", () => {
@@ -19,11 +19,6 @@ describe("Phase B profile domain policy", () => {
     expect(profileQuotaDecision({ used: 1, baseLimit: 1, entitlementIncrement: 1, requested: 1, profileKind: "PERSONAL", allowBusinessProfiles: false })).toEqual({ allowed: true });
   });
 
-  it("rejects incompatible business category/template selection", () => {
-    expect(categoryTemplateCompatibility({ profileKind: "PERSONAL", categoryKind: "BUSINESS" })).toEqual({ compatible: false, reason: "PROFILE_CATEGORY_INCOMPATIBLE" });
-    expect(categoryTemplateCompatibility({ profileKind: "BUSINESS", templateKind: "PERSONAL" })).toEqual({ compatible: false, reason: "PROFILE_TEMPLATE_INCOMPATIBLE" });
-    expect(categoryTemplateCompatibility({ profileKind: "BUSINESS", categoryKind: "BUSINESS", templateKind: "BUSINESS", templateCategoryMatches: true })).toEqual({ compatible: true });
-  });
 
   it("initializes required/default modules and keeps profile creation idempotent by key", () => {
     expect(defaultModuleKeys([{ key: "IDENTITY", allowed: true, enabledByDefault: true, required: false }, { key: "ABOUT", allowed: true, enabledByDefault: false, required: true }], ["CONTACT"])).toEqual(["IDENTITY", "ABOUT"]);

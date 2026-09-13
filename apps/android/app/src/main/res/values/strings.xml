@@ -1,13 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-    <string name="asset_statements" translatable="false">[{\"include\":\"https://pop.popwam.com/.well-known/assetlinks.json\"}]</string>
     <string name="app_name">POP</string>
-    <string name="pop_slogan">Your world. One POP.</string>
     <string name="app_version">Version 0.0.12</string>
     <string name="nav_virtual_cards">Virtual Cards</string><string name="nav_products">My Products</string><string name="nav_menu">Menu</string>
     <string name="activate_product">Activate product</string>
     <string name="about_app">About POP</string><string name="logout_all">Log out all devices</string><string name="nearby_users">Nearby POP users</string><string name="activity_identity">Share my identity when viewing POP profiles</string>
     <string name="hce_service_description">POPWAM virtual NFC card</string><string name="hce_aid_description">POPWAM public URL</string>
-    <string name="sign_in">Sign in</string><string name="phone_number">Phone number</string><string name="phone_hint">Phone number</string><string name="send_code">Send verification code</string><string name="verification_code">Verification code</string><string name="verify_continue">Verify and continue</string><string name="phone_help">Choose any country. Your number is normalized to canonical E.164 and remains your primary POP identity.</string><string name="google_optional">Google is available only as an optional connected account after phone sign-in.</string><string name="logout">Log out</string>
+<string name="phone_number">Phone number</string><string name="phone_hint">Phone number</string><string name="send_code">Send verification code</string><string name="verification_code">Verification code</string><string name="verify_continue">Verify and continue</string><string name="phone_help">Choose any country. Your number is normalized to canonical E.164 and remains your primary POP identity.</string><string name="google_optional">Google is available only as an optional connected account after phone sign-in.</string><string name="logout">Log out</string>
     <string name="connected_accounts">Connected Accounts</string><string name="connected_accounts_help">Connect Google, Meta, TikTok, LinkedIn, or GitHub through the secure POP web flow. OAuth opens in a Custom Tab and returns to POP.</string><string name="passkeys">Passkeys</string><string name="passkeys_help">Create and manage FIDO2 passkeys. Phone OTP always remains available as recovery.</string>
     <string name="home">Home</string><string name="my_profile">My Profile</string><string name="my_cards">My NFC cards</string><string name="profiles">Profiles</string><string name="my_profiles">My Profiles</string><string name="my_products">My Products</string><string name="friends">Friends</string><string name="chats">Chats</string><string name="notifications">Notifications</string><string name="scan_qr">Scan activation QR</string><string name="nfc_tools">NFC tools</string><string name="virtual_card">Virtual card</string><string name="settings">Settings</string><string name="refresh">Refresh</string><string name="loading">Loading…</string><string name="retry">Retry</string><string name="cancel">Cancel</string><string name="save">Save</string><string name="create">Create</string><string name="delete">Delete</string><string name="enabled">Enabled</string><string name="disabled">Disabled</string>
     <string name="open_secure_portal">Open secure POPWAM portal</string><string name="products_portal_help">Browse real inventory, build a cart, and request an order through the secure account portal.</string><string name="friends_portal_help">Manage friend requests and per-friend privacy through the secure account portal.</string><string name="chats_portal_help">Open your private chats. Moderation access is restricted to reported conversations.</string><string name="notifications_portal_help">Review current account, order, and activity updates.</string><string name="active_profile">Active profile</string><string name="no_active_profile">No active profile</string><string name="hce_active">Android HCE sharing is active</string><string name="hce_inactive">Android HCE sharing is inactive</string><string name="share">Share</string>
@@ -20,76 +18,19 @@
     <string name="language">Language</string><string name="device_language">Device language</string><string name="arabic">العربية</string><string name="english">English</string><string name="privacy_note">Analytics are limited to total opens, last opened time and optional daily totals. The app does not collect location, browser, device fingerprint or IP analytics.</string>
     <string name="generic_error">The request could not be completed. Please try again.</string><string name="auth_expired">Your session expired. Sign in again.</string><string name="limit_reached">Your plan limit has been reached.</string><string name="not_configured">This feature is not configured.</string><string name="confirm">Confirm</string><string name="close">Close</string><string name="card_claimed">Card added to your account.</string><string name="upload_complete">Upload complete.</string><string name="destination_saved">Destination saved.</string>
     <string name="add_link">Add link</string><string name="link_title">Link title</string><string name="link_url">Link URL or value</string><string name="link_type">Destination type</string><string name="icon">Icon</string><string name="search_icons">Search icons</string><string name="category_all">All</string><string name="category_contact">Contact</string><string name="category_social">Social</string><string name="category_business">Business</string><string name="category_documents">Documents</string><string name="category_location">Location</string><string name="category_communication">Communication</string><string name="category_shopping">Shopping</string><string name="category_media">Media</string><string name="category_custom">Custom</string>
-    <string name="smart_title">Your smart card in one tap</string><string name="welcome_description">Activate, scan and manage your POP products from one secure place.</string><string name="activate_card">Activate a product</string><string name="how_it_works">How it works</string><string name="how_it_works_description">Scan the unique activation QR, verify your phone, confirm the claim, then manage the permanent NFC and QR link.</string><string name="privacy">Privacy</string><string name="terms">Terms</string><string name="online">Online</string><string name="offline">Offline</string><string name="change_language">ع</string><string name="back">Back</string>
+<string name="activate_card">Activate a product</string><string name="how_it_works">How it works</string><string name="how_it_works_description">Scan the unique activation QR, verify your phone, confirm the claim, then manage the permanent NFC and QR link.</string><string name="privacy">Privacy</string><string name="terms">Terms</string><string name="online">Online</string><string name="offline">Offline</string><string name="change_language">ع</string><string name="back">Back</string>
     <string name="active_cards">Active cards</string><string name="recent_activity">Recent activity</string><string name="no_recent_activity">No recent activity yet</string><string name="quick_actions">Quick actions</string>
     <string name="flash">Flash</string><string name="manual_code">Manual code</string><string name="invalid_qr">This QR is not a valid POPWAM activation code.</string><string name="used_qr">This QR has already been used.</string><string name="suspended_card">This card is suspended.</string><string name="activated_card">This card is already activated.</string><string name="camera_preview">Camera preview</string>
     <string name="vc_create">Create Virtual Card</string>
-    <string name="vc_create_description">Build a shareable identity with your details, links, and a real POPWAM template.</string>
-    <string name="vc_resume">Resume saved card</string>
-    <string name="vc_start_new">Start a new card</string>
-    <string name="vc_select_type">Select card type</string>
-    <string name="vc_select_type_description">Choose the identity that best matches how you will use this card.</string>
-    <string name="vc_personal">Personal</string>
-    <string name="vc_personal_description">A simple identity for your contact details and links.</string>
-    <string name="vc_professional">Professional</string>
-    <string name="vc_professional_description">Highlight your role, company, and professional work.</string>
-    <string name="vc_creator">Creator</string>
-    <string name="vc_creator_description">Organize content, channels, and audience links.</string>
-    <string name="vc_business">Business</string>
-    <string name="vc_business_description">A company identity with logo, team details, and services.</string>
-    <string name="vc_plan_required">Requires the %1$s plan</string>
-    <string name="vc_information">Enter information</string>
-    <string name="vc_information_description">These details are saved to the real profile and public page.</string>
-    <string name="vc_card_name">Card name</string>
-    <string name="vc_display_name_ar">Display name in Arabic</string>
-    <string name="vc_display_name_en">Display name in English</string>
-    <string name="vc_job_title_ar">Job title in Arabic</string>
-    <string name="vc_job_title_en">Job title in English</string>
-    <string name="vc_company">Company</string>
-    <string name="vc_bio_ar">Bio in Arabic</string>
-    <string name="vc_bio_en">Bio in English</string>
-    <string name="vc_location">Location</string>
-    <string name="vc_profile_image">Profile image</string>
-    <string name="vc_company_logo">Company logo</string>
-    <string name="vc_choose_image">Choose image</string>
-    <string name="vc_primary_language">Primary language</string>
-    <string name="vc_add_links">Add links</string>
-    <string name="vc_add_links_description">Add and reorder the links that will appear on the card.</string>
-    <string name="vc_link_title">Link title</string>
-    <string name="vc_link_url">URL</string>
-    <string name="vc_add_link_button">Add link</string>
-    <string name="vc_no_links">No links yet. You can continue and add them later.</string>
-    <string name="vc_move_up">Move up</string>
-    <string name="vc_move_down">Move down</string>
-    <string name="vc_remove_link">Remove link</string>
-    <string name="vc_select_template">Select template</string>
-    <string name="vc_select_template_description">Each template changes the image, identity, and link layout—not only the color.</string>
     <string name="vc_selected">Selected</string>
-    <string name="vc_preview_template">Preview</string>
-    <string name="vc_use_template">Use this template</string>
-    <string name="vc_preview">Preview</string>
-    <string name="vc_preview_description">Review the live public-card layout before creating it.</string>
-    <string name="vc_create_card">Create card</string>
-    <string name="vc_creating">Creating card…</string>
-    <string name="vc_next">Next</string>
-    <string name="vc_save_later">Save and resume later</string>
-    <string name="vc_saved">Draft saved on this device</string>
-    <string name="vc_required">Complete the required fields to continue.</string>
-    <string name="vc_invalid_email">Enter a valid email address.</string>
-    <string name="vc_invalid_url">Enter a complete http or https URL.</string>
     <string name="vc_card_details">Card details</string>
-    <string name="vc_edit_card">Edit information</string>
     <string name="vc_open_public_page">Open public page</string>
     <string name="vc_change_template">Change template</string>
     <string name="vc_google_wallet">Add to Google Wallet</string>
     <string name="vc_wallet_setup_required">Google Wallet setup is required.</string>
-    <string name="vc_template_empty">No templates are available. Pull down to try again.</string>
     <string name="vc_links_label">Links</string>
     <string name="vc_contact_label">Contact</string>
     <string name="vc_public_identity">Public identity</string>
-    <string name="vc_step_format">Step %1$d of %2$d</string>
-    <string name="vc_language_ar">Arabic</string>
-    <string name="vc_language_en">English</string>
     <string name="vc_open_editor">Open editor</string>
     <string name="nav_cards">Cards</string>
     <string name="nav_links">Links</string>
@@ -152,24 +93,7 @@
     <string name="legacy_title">Your POP account is ready</string>
     <string name="legacy_description">We kept your existing profiles unchanged. You can continue safely while any account compatibility details are reviewed.</string>
     <string name="continue_with_passkey">Continue with passkey</string>
-    <string name="use_phone_instead">Use phone instead</string>
-    <string name="passkey_login_cancelled">Passkey was cancelled. You can use your phone instead.</string>
-    <string name="passkey_login_unavailable">Passkey is unavailable on this device. Use your phone instead.</string>
-    <string name="passkey_login_no_credential">No POP passkey is available. Use your phone instead.</string>
-    <string name="passkey_login_network">Check your connection and try again, or use your phone.</string>
-    <string name="passkey_login_failed">Passkey authentication failed. Try again or use your phone.</string>
-    <string name="passkey_login_server">Passkey sign-in is temporarily unavailable. Use your phone instead.</string>
     <string name="biometric_quick_unlock_unavailable">Biometric quick unlock is unavailable because this device has no biometric-protected POP sign-in authority.</string>
-    <string name="onboarding_title">Complete your POP profile</string>
-    <string name="onboarding_progress">Step %1$d of %2$d</string>
-    <string name="onboarding_optional">Optional</string>
-    <string name="onboarding_save_resume">Save and resume later</string>
-    <string name="onboarding_required">This answer is required.</string>
-    <string name="onboarding_invalid">Check this answer and try again.</string>
-    <string name="onboarding_error">This step could not be saved. Check your connection and try again.</string>
-    <string name="onboarding_stale">Progress changed on another device. Reload the latest version.</string>
-    <string name="onboarding_unknown_question">This question type is not supported. No data was saved.</string>
-    <string name="onboarding_media_later">Images can be added safely from the profile editor after setup.</string>
     <string name="bootstrap_name_title">Let’s start with your name</string>
     <string name="bootstrap_name_description">This is how your POP profile will introduce you.</string>
     <string name="bootstrap_kind_title">What will you use POP for?</string>
@@ -560,8 +484,6 @@
     <string name="language_choice_ar">العربية</string>
     <string name="language_choice_en">English</string>
     <string name="language_choice_fr">Français</string>
-    <string name="channel_sms">SMS</string>
-    <string name="channel_whatsapp">WhatsApp</string>
     <string name="pre_auth_language_title">Choose your language</string>
     <string name="pre_auth_language_help">POP will use this language now. You can change it later in Settings.</string>
     <string name="pre_auth_appearance_title">Choose your appearance</string>
@@ -570,24 +492,6 @@
     <string name="pre_auth_theme_light_help">Use POP with a bright, clean background.</string>
     <string name="pre_auth_theme_dark_help">Use POP with a rich, low-light background.</string>
     <string name="continue_action">Continue</string>
-    <string name="pre_auth_intro_identity_title">Your world. One POP.</string>
-    <string name="pre_auth_intro_identity_body">One profile for your identity, work, or business.</string>
-    <string name="pre_auth_intro_share_title">Share your world.</string>
-    <string name="pre_auth_intro_share_body">Share your POP using a QR code, NFC, a trusted link, or a compatible physical POP product.</string>
-    <string name="pre_auth_intro_connect_title">Connect on your terms.</string>
-    <string name="pre_auth_intro_connect_body">Your profile brings together the POP connections and discovery features you choose to use.</string>
-    <string name="pre_auth_intro_ready_title">Ready to POP?</string>
-    <string name="pre_auth_intro_ready_body">Start with your phone number. POP will guide you through the secure account steps that apply to you.</string>
-    <string name="continue_to_pop">Continue to POP</string>
-    <string name="back_to_sign_in">Back to sign in</string>
-    <string name="phone_auth_title">Enter POP</string>
-    <string name="phone_auth_help">Use your phone number to create or securely return to your POP account.</string>
-    <string name="phone_national_hint">National phone number</string>
-    <string name="phone_invalid">Enter a valid phone number for the selected country.</string>
-    <string name="choose_country">Choose country or region</string>
-    <string name="search_countries">Search country or dialing code</string>
-    <string name="no_country_results">No matching country or dialing code.</string>
-    <string name="how_pop_works">How POP works</string>
     <string name="legal_current_public_notice">Current public notice included with this app</string>
     <string name="legal_version_format">Version: %1$s</string>
     <string name="legal_reading_not_consent">Reading this page is informational. Required account consent is recorded separately after secure phone verification and remains server-authoritative.</string>
@@ -595,25 +499,6 @@
     <string name="legal_terms_body_two">POP may restrict abusive, unlawful, deceptive, or security-sensitive content and product use. Your current required Terms version is shown and accepted during secure account setup when applicable.</string>
     <string name="legal_privacy_body_one">POP uses your phone number for secure verification and account access. Verification codes are short-lived, single-use, and are not exposed in the interface or logs.</string>
     <string name="legal_privacy_body_two">POP limits collection to the information required for the features you choose. Your current required Privacy version is shown and accepted during secure account setup when applicable.</string>
-    <string name="verify_phone_title">Verify your phone</string>
-    <string name="verify_phone_help">Enter the 6-digit code sent by Firebase. Automatic verification will continue without asking for the code when available.</string>
-    <string name="otp_accessibility">Six-digit phone verification code</string>
-    <string name="resend_code">Resend code</string>
-    <string name="resend_countdown">Resend code in %1$d seconds</string>
-    <string name="change_phone">Change phone number</string>
-    <string name="firebase_phone_invalid">Enter a valid phone number.</string>
-    <string name="firebase_code_invalid">That verification code is not valid. Check all 6 digits and try again.</string>
-    <string name="firebase_session_expired">This verification session expired. Return to your phone number and request a new code.</string>
-    <string name="firebase_too_many_requests">Too many verification attempts. Wait before trying again.</string>
-    <string name="firebase_network_error">Check your connection and try again.</string>
-    <string name="firebase_app_verification_error">POP could not verify this app installation. Check Play services or try the secure browser verification when prompted.</string>
-    <string name="firebase_recaptcha_error">Secure browser verification did not complete. Try again.</string>
-    <string name="firebase_activity_error">Phone verification needs the active POP screen. Return to POP and try again.</string>
-    <string name="firebase_quota_error">Phone verification is temporarily unavailable because the provider limit was reached.</string>
-    <string name="firebase_configuration_error">Phone verification is not configured for this POP app build.</string>
-    <string name="firebase_exchange_error">Your phone was verified, but POP could not start your session. Try again.</string>
-    <string name="firebase_identity_conflict">This verified phone identity needs account support before it can sign in.</string>
-    <string name="firebase_unavailable">Phone verification is temporarily unavailable. Try again.</string>
     <string name="settings_usage">Usage and limits</string>
     <string name="settings_usage_help">Usage is calculated by POP on the server from your effective plan and any administrator override.</string>
     <string name="settings_storage">Storage</string>
@@ -733,7 +618,6 @@
     <string name="profile_section_visibility">Section visibility</string>
     <string name="profile_link_invalid">Enter a valid phone, email, or HTTPS link for this type.</string>
     <string name="profile_business_plan_unavailable">Business profiles are not included in the current plan.</string>
-    <string name="profile_type_reference_unavailable">Temporarily unavailable because its server template is not configured.</string>
     <string name="profile_error_create">Could not create the profile.</string>
     <string name="profile_error_required">Some required profile information is incomplete.</string>
     <string name="profile_error_slug_taken">That profile link is already in use.</string>

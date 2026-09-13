@@ -201,7 +201,8 @@ describe("profile publishing policy", () => {
       new URL("./profile-domain.ts", import.meta.url),
       "utf8",
     );
-    expect(domain).toContain('throw new Error("PROFILE_TEMPLATE_REQUIRED")');
+    expect(domain).toContain("resolveInitialTemplate");
+    expect(domain).not.toContain('throw new Error("PROFILE_TEMPLATE_REQUIRED")');
     expect(domain).toContain("templateCandidates.length > 0");
     expect(domain).toContain("CORE_MODULE_KEYS");
     expect(domain).toContain(

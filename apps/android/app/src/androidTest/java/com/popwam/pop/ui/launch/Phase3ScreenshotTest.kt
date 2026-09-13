@@ -14,12 +14,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.ThemeMode
-import com.popwam.mobile.foundation.navigation.WelcomePage
 import com.popwam.mobile.onboarding.LanguageScreen
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import com.popwam.mobile.onboarding.PopSplashScreen
 import com.popwam.mobile.onboarding.ThemeScreen
-import com.popwam.mobile.onboarding.WelcomeScreen
 import com.popwam.pop.ui.theme.popFontFamilies
 import java.io.File
 import java.io.FileOutputStream
@@ -68,17 +66,11 @@ class Phase3ScreenshotTest {
         ThemeScreenCapture(ThemeMode.SYSTEM, gallery = true)
     }
 
-    @Test fun onboardingArabic() = capture("onboarding-all-in-one-ar", "ar", ThemeMode.LIGHT) {
-        WelcomeScreen(WelcomePage.ALL_IN_ONE, "ar", true, {}, {}, Modifier.fillMaxSize())
-    }
 
-    @Test fun onboardingEnglish() = capture("onboarding-share-en", "en", ThemeMode.LIGHT) {
-        WelcomeScreen(WelcomePage.SHARE_YOUR_WAY, "en", true, {}, {}, Modifier.fillMaxSize())
-    }
 
-    @Test fun getStarted() = capture("get-started", "en", ThemeMode.LIGHT) {
-        WelcomeScreen(WelcomePage.GET_STARTED, "en", true, {}, {}, Modifier.fillMaxSize())
-    }
+
+
+
 
     @androidx.compose.runtime.Composable
     private fun ThemeScreenCapture(mode: ThemeMode, gallery: Boolean) {

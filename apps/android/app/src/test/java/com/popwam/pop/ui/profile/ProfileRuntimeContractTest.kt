@@ -16,20 +16,19 @@ class ProfileRuntimeContractTest {
     private val gson=Gson()
 
     @Test fun `personal and business requests use only canonical backend kinds`() {
-        val personal=AdditionalProfileCreateRequest("Mina","Mina","PERSONAL","professional","template-personal","en","key-personal")
-        val business=AdditionalProfileCreateRequest("Studio","Studio","BUSINESS","restaurant","template-business","en","key-business")
+        val personal=AdditionalProfileCreateRequest("Mina","Mina","PERSONAL","en","key-personal")
+        val business=AdditionalProfileCreateRequest("Studio","Studio","BUSINESS","en","key-business")
         assertEquals("PERSONAL",gson.fromJson(gson.toJson(personal),AdditionalProfileCreateRequest::class.java).profileKind)
         assertEquals("BUSINESS",gson.fromJson(gson.toJson(business),AdditionalProfileCreateRequest::class.java).profileKind)
         assertFalse(gson.toJson(personal).contains("PROFESSIONAL\""))
         assertFalse(gson.toJson(business).contains("RESTAURANT\""))
     }
 
-    @Test fun `derived type remains canonical kind plus live category and template`() {
-        val request=AdditionalProfileCreateRequest("Mina","Mina",ProfileBackendKind.PERSONAL.name,"professional","live-template-id","en","key")
-        assertEquals(ProfileCategoryKind.PROFESSIONAL,ProfilePolicy.categoryKind(request.profileKind,request.categorySlug))
+    @Test fun `creation needs no category or template metadata`() {
+        val request=AdditionalProfileCreateRequest("Mina","Mina",ProfileBackendKind.PERSONAL.name,"en","key")
         assertEquals("PERSONAL",request.profileKind)
-        assertEquals("professional",request.categorySlug)
-        assertEquals("live-template-id",request.templateId)
+        assertFalse(gson.toJsonTree(request).asJsonObject.has("categorySlug"))
+        assertFalse(gson.toJsonTree(request).asJsonObject.has("templateId"))
     }
 
     @Test fun `create response parses profile id wrapper`() {

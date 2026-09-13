@@ -21,9 +21,8 @@ class LaunchViewModelTest {
         assertFalse(source.contains("runBlocking"))
     }
 
-    @Test fun `welcome page and typed pending destination survive recreation boundaries`() {
+    @Test fun `typed pending destination survives recreation boundaries`() {
         assertTrue(source.contains("SavedStateHandle"))
-        assertTrue(source.contains("KEY_WELCOME_PAGE"))
         assertTrue(source.contains("coordinator.preservePendingDestination"))
     }
 }

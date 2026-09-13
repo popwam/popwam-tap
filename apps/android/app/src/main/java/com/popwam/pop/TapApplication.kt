@@ -25,15 +25,6 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
-import com.popwam.mobile.authentication.KtorAuthenticationRemoteDataSource
-import com.popwam.mobile.authentication.PhoneExchangeDiagnostic
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.request.header
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
@@ -67,34 +58,13 @@ class AppContainer(application:Application){
     val api=Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL).client(apiClient).addConverterFactory(GsonConverterFactory.create(gson)).build().create(PopwamApi::class.java)
     val pushTokens=FcmTokenBridge(application,api,sessions)
     val analytics=FirebasePopAnalytics(application)
-    val firebasePhoneAuth=AndroidFirebasePhoneAuthGateway()
-    private val authenticationHttpClient=HttpClient(OkHttp) {
-        expectSuccess=false
-        defaultRequest { header("X-POP-App-Version",BuildConfig.VERSION_NAME.take(32)) }
-        install(ContentNegotiation) { json(Json { ignoreUnknownKeys=true;encodeDefaults=true }) }
-        engine { config { connectTimeout(15,TimeUnit.SECONDS);readTimeout(30,TimeUnit.SECONDS) } }
-    }
-    val authenticationRemote=KtorAuthenticationRemoteDataSource(
-        authenticationHttpClient,
-        BuildConfig.API_BASE_URL,
-        onFailure = { code, status ->
-            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.POP_EXCHANGE_RESPONSE, http = status, safeError = code)
-        },
-        onPhoneExchangeDiagnostic = { boundary, status ->
-            when (boundary) {
-                PhoneExchangeDiagnostic.STARTED -> AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PHONE_EXCHANGE_STARTED)
-                PhoneExchangeDiagnostic.HTTP_STATUS -> AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PHONE_EXCHANGE_HTTP_STATUS, "http_${status ?: 0}")
-                PhoneExchangeDiagnostic.PARSED -> AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PHONE_EXCHANGE_PARSED)
-            }
-        },
-    )
     val repository=PopwamRepository(api)
     val localStore=LocalFirstStore(application,gson)
     val localFirst=LocalFirstRepository(repository,localStore,{sessionStore.snapshot()?.userId},lifecycleScope)
     init { sessions.setLifecycleHooks({
         // A newly authenticated account is not handed to Home until its minimum
         // offline read model is safely persisted.
-        localFirst.core(null,com.popwam.pop.ui.currentLocale())
+        localFirst.core(null,com.popwam.pop.ui.currentLocale(),force=true)
         // Push registration is non-critical and remains event-driven after sign-in.
         lifecycleScope.launch {
             runCatching { pushTokens.uploadPendingIfAuthenticated() }

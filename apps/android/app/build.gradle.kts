@@ -9,7 +9,7 @@ plugins {
 }
 
 // Both release and debug package IDs are present in the checked-in Firebase
-// configuration. Phone verification is a required Phase 4 capability.
+// configuration for messaging, Analytics and Crashlytics.
 val firebaseAndroidIntegrationEnabled = true
 
 val localProperties = Properties().apply { val file=rootProject.file("local.properties"); if(file.exists()) file.inputStream().use(::load) }
@@ -31,6 +31,7 @@ android {
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
         buildConfigField("String", "CREDENTIAL_MANAGER_VERSION", "\"1.6.0\"")
         buildConfigField("Boolean", "FIREBASE_RUNTIME_ENABLED", firebaseAndroidIntegrationEnabled.toString())
+        resValue("string", "asset_statements", "[{\\\"include\\\":\\\"${apiBaseUrl}.well-known/assetlinks.json\\\"}]")
         vectorDrawables { useSupportLibrary = true }
     }
     buildTypes {
@@ -41,6 +42,15 @@ android {
             // debug artifact while leaving release Play delivery ABI-split capable.
             ndk { abiFilters += "arm64-v8a" }
         }
+        create("analysis") {
+            initWith(getByName("debug"))
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            matchingFallbacks += listOf("release")
+            versionNameSuffix = "-analysis"
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -49,7 +59,7 @@ android {
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true; buildConfig = true }
+    buildFeatures { compose = true; buildConfig = true; resValues = true }
     packaging { resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}") }
     lint { abortOnError = true; checkReleaseBuilds = true; warningsAsErrors = false }
     testOptions { unitTests.isIncludeAndroidResources = true }
@@ -61,7 +71,6 @@ dependencies {
     implementation("com.popwam.mobile:foundation:0.1.0")
     implementation("com.popwam.mobile:design-system:0.1.0")
     implementation("com.popwam.mobile:onboarding:0.1.0")
-    implementation("com.popwam.mobile:authentication:0.1.0")
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.appcompat:appcompat:1.7.1")
@@ -75,15 +84,11 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("io.ktor:ktor-client-okhttp:3.3.3")
-    implementation("io.ktor:ktor-client-content-negotiation:3.3.3")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.3")
-    implementation("com.google.android.gms:play-services-auth:21.4.0")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -99,7 +104,6 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.googlecode.libphonenumber:libphonenumber:9.0.10")
     implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
-    implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-crashlytics")
@@ -141,3 +145,6 @@ tasks.register("verifyFirebaseDebugClient") {
 if (firebaseAndroidIntegrationEnabled) {
     tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn("verifyFirebaseDebugClient") }
 }
+
+// Local analysis never uploads mapping files or changes production signing.
+tasks.matching { it.name == "uploadCrashlyticsMappingFileAnalysis" || it.name == "uploadCrashlyticsSymbolFileAnalysis" }.configureEach { enabled = false }

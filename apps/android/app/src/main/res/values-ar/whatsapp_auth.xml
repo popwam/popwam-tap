@@ -1,0 +1,32 @@
+<resources>
+    <string name="wa_auth_personal">شخصي</string>
+    <string name="wa_auth_business">أعمال</string>
+    <string name="wa_auth_setup_failed">تعذر إكمال هذه الخطوة. راجع اختياراتك وحاول مجددًا.</string>
+    <string name="wa_auth_title">مرحبًا بك في POP</string>
+    <string name="wa_auth_description">أدخل رقم هاتفك لتلقي رمز التحقق عبر واتساب.</string>
+    <string name="wa_auth_country">الدولة ورمز الاتصال</string>
+    <string name="wa_auth_phone">رقم الهاتف</string>
+    <string name="wa_auth_continue">متابعة</string>
+    <string name="wa_auth_legal">بالمتابعة، تقرّ بالاطلاع على الشروط وسياسة الخصوصية. تُؤكَّد الموافقات المطلوبة أثناء الإعداد.</string>
+    <string name="wa_auth_code_title">تحقق من رقمك</string>
+    <string name="wa_auth_sent">أرسلنا رمز التحقق عبر واتساب.</string>
+    <string name="wa_auth_code">رمز التحقق المكوّن من ستة أرقام</string>
+    <string name="wa_auth_verify">تحقق</string>
+    <string name="wa_auth_countdown">إعادة الإرسال خلال %1$d ثانية</string>
+    <string name="wa_auth_resend">إعادة إرسال الرمز</string>
+    <string name="wa_auth_change">تغيير الرقم</string>
+    <string name="wa_auth_close">إغلاق</string>
+    <string name="wa_auth_search">ابحث عن دولة</string>
+    <string name="wa_auth_invalid_phone">أدخل رقمًا صالحًا في دولة مفعّلة.</string>
+    <string name="wa_auth_invalid_code">الرمز غير صحيح. حاول مجددًا.</string>
+    <string name="wa_auth_expired">انتهت صلاحية الرمز أو استُخدم بالفعل. اطلب رمزًا آخر.</string>
+    <string name="wa_auth_attempts">محاولات كثيرة. اطلب رمزًا جديدًا بعد انتهاء العد التنازلي.</string>
+    <string name="wa_auth_wait">يرجى الانتظار قبل طلب رمز آخر.</string>
+    <string name="wa_auth_offline">لا يوجد اتصال بالإنترنت. تحقق من اتصالك وحاول مجددًا.</string>
+    <string name="wa_auth_send_failed">تعذر إرسال الرمز. حاول لاحقًا.</string>
+    <string name="wa_auth_unavailable">تعذر التحقق الآن. حاول لاحقًا.</string>
+    <string name="wa_auth_setup">إعداد ملفك الشخصي</string>
+    <string name="wa_auth_name">الاسم الظاهر</string>
+    <string name="wa_auth_agree">الموافقة على الاتفاقيات المطلوبة</string>
+    <string name="wa_auth_retry">حاول مجددًا</string>
+</resources>

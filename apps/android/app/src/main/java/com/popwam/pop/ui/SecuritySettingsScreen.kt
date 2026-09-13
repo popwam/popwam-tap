@@ -222,6 +222,7 @@ fun SecuritySettingsScreen(
                     if(state.securityPasskeys.isEmpty())item{Text(stringResource(R.string.settings_no_passkeys))}
                 }
                 "device-security"->{
+                    item{com.popwam.pop.ui.auth.BiometricSetupCard()}
                     val capability=deviceSecurityCapability(context)
                     item{InfoCard(stringResource(R.string.settings_biometric_status),deviceSecuritySummary(context))}
                     item{Text(stringResource(R.string.settings_device_security_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}

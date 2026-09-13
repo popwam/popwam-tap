@@ -31,12 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
-import com.popwam.mobile.authentication.AuthenticationCallbacks
-import com.popwam.mobile.authentication.AuthenticationCountry
-import com.popwam.mobile.authentication.AuthenticationExperience
-import com.popwam.mobile.authentication.AuthenticationStage
-import com.popwam.mobile.authentication.AuthenticationUiState
-import com.popwam.mobile.authentication.OtpUiState
 import com.popwam.mobile.foundation.auth.AccountState
 import com.popwam.mobile.foundation.auth.AuthChallenge
 import com.popwam.mobile.foundation.auth.AuthenticationMethod
@@ -47,7 +41,6 @@ import com.popwam.mobile.foundation.auth.PasskeyRequirement
 import com.popwam.mobile.foundation.auth.SessionScope
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.ThemeMode
-import com.popwam.mobile.foundation.navigation.WelcomePage
 import com.popwam.mobile.foundation.overlay.OverlayDismissPolicy
 import com.popwam.mobile.foundation.overlay.OverlayEntry
 import com.popwam.mobile.foundation.overlay.OverlayKey
@@ -58,7 +51,6 @@ import com.popwam.mobile.onboarding.LanguageScreen
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import com.popwam.pop.ui.components.PopBrandedLoading
 import com.popwam.mobile.onboarding.ThemeScreen
-import com.popwam.mobile.onboarding.WelcomeScreen
 import com.popwam.pop.ui.theme.popFontFamilies
 import com.popwam.pop.TapApplication
 import com.popwam.pop.ui.currentLocale
@@ -89,12 +81,8 @@ class DesignReviewActivity : AppCompatActivity() {
 
 private enum class ReviewScreen(val label: String) {
     SPLASH("Splash"), LANGUAGE("Language"), THEME("Theme"), THEME_GALLERY("Theme Gallery"),
-    ALL_IN_ONE("All in One"), SHARE("Share Your Way"), PERSONAL("Personal & Business"), GET_STARTED("Get Started"),
-    PHONE("Phone Number"), COUNTRY("Country"), OTP("OTP"), VERIFIED("Verified"), PASSKEY("Passkey"),
-    BIOMETRIC("Biometric"), ACCOUNT_CREATED("Account Created"),
     ROOT_HOME("Root Home + Nav"), HOME_LOADED("Home Loaded"), HOME_LOADING("Home Loading"), HOME_EMPTY("Home Empty"), HOME_ERROR("Home Error"),
     PROFILE_LIST("Profile List"), PROFILE_PERSONAL("Personal Profile"), PROFILE_BUSINESS("Business Profile"),
-    PROFILE_PROFESSIONAL("Professional"), PROFILE_RESTAURANT("Restaurant"), PROFILE_CLINIC("Clinic"),
     PROFILE_CREATE("Create Profile"),
     PROFILE_BASIC("Basic Info"), PROFILE_ABOUT("About"), PROFILE_CONTACT("Contact & Links"), PROFILE_TYPE_DETAILS("Type Details"), PROFILE_MEDIA("Media"),
     PROFILE_VISIBILITY("Visibility"),
@@ -120,7 +108,6 @@ private fun DesignReviewGallery(initialScreen:String?=null,initialLanguage:Strin
         mode = live.selectedBaseTheme
         language = live.selectedLanguageTag?.substringBefore('-') ?: language
     }
-    val countries = listOf(AuthenticationCountry("EG", "+20", "Egypt", "🇪🇬", "00 000 0000 00"))
 
     Phase3OnboardingTheme(mode, palette, isSystemInDarkTheme(), language, popFontFamilies()) {
         if(focused){
@@ -129,7 +116,7 @@ private fun DesignReviewGallery(initialScreen:String?=null,initialLanguage:Strin
                 ReviewScreen.ROOT_HOME->PopBottomNavigationReviewScreen{HomeScreen(homeReviewState(language),{})}
                 ReviewScreen.HOME_LOADING->PopBottomNavigationReviewScreen{HomeScreen(HomeUiState(),{})}
                 ReviewScreen.PROFILE_PERSONAL->PopBottomNavigationReviewScreen(HomePrimaryTab.PROFILE){
-                    ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PERSONAL),"review-primary",{}, {},topLevel=true)
+                    ProfileViewScreen(profileReviewState(language,ProfileBackendKind.PERSONAL),"review-primary",{}, {},topLevel=true)
                 }
                 ReviewScreen.SHARE_CENTER->ShareReviewScreen(shareReviewState(language))
                 ReviewScreen.MENU->PopBottomNavigationReviewScreen(HomePrimaryTab.MENU){
@@ -162,33 +149,19 @@ private fun DesignReviewGallery(initialScreen:String?=null,initialLanguage:Strin
                     ReviewScreen.LANGUAGE -> LanguageScreen(listOf("en", "ar"), language, {})
                     ReviewScreen.THEME -> ThemeScreen(mode, palette, false, { mode = it }, {}, {}, { palette = it }, {})
                     ReviewScreen.THEME_GALLERY -> ThemeScreen(mode, palette, true, { mode = it }, {}, {}, { palette = it }, {})
-                    ReviewScreen.ALL_IN_ONE -> WelcomeScreen(WelcomePage.ALL_IN_ONE, language, reducedMotion = true, {}, {})
-                    ReviewScreen.SHARE -> WelcomeScreen(WelcomePage.SHARE_YOUR_WAY, language, reducedMotion = true, {}, {})
-                    ReviewScreen.PERSONAL -> WelcomeScreen(WelcomePage.PERSONAL_AND_BUSINESS, language, reducedMotion = true, {}, {})
-                    ReviewScreen.GET_STARTED -> WelcomeScreen(WelcomePage.GET_STARTED, language, reducedMotion = true, {}, {})
-                    ReviewScreen.PHONE -> AuthenticationExperience(AuthenticationUiState(phoneInput = "1001234567"), OverlayState(), countries, "", reviewCallbacks)
-                    ReviewScreen.COUNTRY -> AuthenticationExperience(AuthenticationUiState(stage = AuthenticationStage.COUNTRY), OverlayState(), countries, "", reviewCallbacks)
-                    ReviewScreen.OTP -> AuthenticationExperience(reviewState(AuthenticationStage.OTP, AuthenticationNextAction.VERIFY_OTP).copy(otp = OtpUiState(providerChallengeHandle = "review", remainingSeconds = 60)), otpOverlay, countries, "", reviewCallbacks)
-                    ReviewScreen.VERIFIED -> AuthenticationExperience(reviewState(AuthenticationStage.VERIFIED, AuthenticationNextAction.ENROLL_PASSKEY), verifiedOverlay, countries, "", reviewCallbacks)
-                    ReviewScreen.PASSKEY -> AuthenticationExperience(reviewState(AuthenticationStage.PASSKEY, AuthenticationNextAction.ENROLL_PASSKEY), OverlayState(), countries, "", reviewCallbacks)
-                    ReviewScreen.BIOMETRIC -> AuthenticationExperience(reviewState(AuthenticationStage.BIOMETRIC, AuthenticationNextAction.ENROLL_BIOMETRIC).copy(biometricCapability = BiometricCapability.FINGERPRINT), OverlayState(), countries, "", reviewCallbacks)
-                    ReviewScreen.ACCOUNT_CREATED -> AuthenticationExperience(reviewState(AuthenticationStage.ACCOUNT_CREATED, AuthenticationNextAction.PROFILE_SETUP, SessionScope.FULL), OverlayState(), countries, "", reviewCallbacks)
                     ReviewScreen.ROOT_HOME -> PopBottomNavigationReviewScreen { HomeScreen(homeReviewState(language), {}) }
                     ReviewScreen.HOME_LOADED -> HomeScreen(homeReviewState(language), {})
                     ReviewScreen.HOME_LOADING -> HomeScreen(HomeUiState(), {})
                     ReviewScreen.HOME_EMPTY -> HomeScreen(HomeUiState(loadState = HomeLoadState.EMPTY), {})
                     ReviewScreen.HOME_ERROR -> HomeScreen(HomeUiState(loadState = HomeLoadState.ERROR, errorCode = "REVIEW"), {})
                     ReviewScreen.PROFILE_LIST -> ProfileListScreen(profileReviewState(language), {})
-                    ReviewScreen.PROFILE_PERSONAL -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PERSONAL),"review-primary",{}, {},topLevel=true)
-                    ReviewScreen.PROFILE_BUSINESS -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.BUSINESS),"review-primary",{}, {},topLevel=true)
-                    ReviewScreen.PROFILE_PROFESSIONAL -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.PROFESSIONAL),"review-primary",{}, {},topLevel=true)
-                    ReviewScreen.PROFILE_RESTAURANT -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.RESTAURANT),"review-primary",{}, {},topLevel=true)
-                    ReviewScreen.PROFILE_CLINIC -> ProfileViewScreen(profileReviewState(language,ProfileCategoryKind.CLINIC),"review-primary",{}, {},topLevel=true)
-                    ReviewScreen.PROFILE_CREATE -> ProfileCreationScreen(profileReviewState(language).copy(categories=listOf(ProfileCategoryOption("personal","Personal",ProfileBackendKind.PERSONAL,null),ProfileCategoryOption("business","Business",ProfileBackendKind.BUSINESS,null))),{}, {})
+                    ReviewScreen.PROFILE_PERSONAL -> ProfileViewScreen(profileReviewState(language,ProfileBackendKind.PERSONAL),"review-primary",{}, {},topLevel=true)
+                    ReviewScreen.PROFILE_BUSINESS -> ProfileViewScreen(profileReviewState(language,ProfileBackendKind.BUSINESS),"review-primary",{}, {},topLevel=true)
+                    ReviewScreen.PROFILE_CREATE -> ProfileCreationScreen(profileReviewState(language),{}, {})
                     ReviewScreen.PROFILE_BASIC -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.BASIC_INFORMATION,{}, {})
                     ReviewScreen.PROFILE_ABOUT -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.ABOUT,{}, {})
                     ReviewScreen.PROFILE_CONTACT -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.CONTACT_LINKS,{}, {})
-                    ReviewScreen.PROFILE_TYPE_DETAILS -> ProfileEditorSectionScreen(profileReviewState(language,ProfileCategoryKind.PROFESSIONAL),"review-primary",ProfileEditorSection.TYPE_DETAILS,{}, {})
+                    ReviewScreen.PROFILE_TYPE_DETAILS -> ProfileEditorSectionScreen(profileReviewState(language,ProfileBackendKind.PERSONAL),"review-primary",ProfileEditorSection.TYPE_DETAILS,{}, {})
                     ReviewScreen.PROFILE_MEDIA -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.MEDIA,{}, {})
                     ReviewScreen.PROFILE_VISIBILITY -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.VISIBILITY,{}, {})
                     ReviewScreen.PROFILE_APPEARANCE -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.APPEARANCE,{}, {})
@@ -226,10 +199,10 @@ private fun shareReviewState(language:String)=ShareUiState(
     hce=ShareHceState(HceAvailability.READY,false,false),
 )
 
-private fun profileReviewState(language:String,category:ProfileCategoryKind=ProfileCategoryKind.PERSONAL):ProfilesUiState {
-    val name=if(language=="ar") "سارة أحمد" else when(category){ProfileCategoryKind.BUSINESS->"Sarah Studio";ProfileCategoryKind.RESTAURANT->"POP Kitchen";ProfileCategoryKind.CLINIC->"POP Clinic";ProfileCategoryKind.PROFESSIONAL->"Sarah Ahmed, Designer";else->"Sarah Ahmed"}
-    val kind=if(category in setOf(ProfileCategoryKind.BUSINESS,ProfileCategoryKind.RESTAURANT,ProfileCategoryKind.CLINIC))ProfileBackendKind.BUSINESS else ProfileBackendKind.PERSONAL
-    val summary=OwnedProfile("review-primary",name,if(language=="ar")"مصممة منتجات" else "Product designer",null,kind,category,category.name.lowercase(),"PUBLISHED","PUBLIC",true,ProfileVerificationState.UNAVAILABLE,ProfileCompletion(true))
+private fun profileReviewState(language:String,category:ProfileBackendKind=ProfileBackendKind.PERSONAL):ProfilesUiState {
+    val name=if(category==ProfileBackendKind.BUSINESS) "Sarah Studio" else "Sarah Ahmed"
+    val kind=if(category in setOf(ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS))ProfileBackendKind.BUSINESS else ProfileBackendKind.PERSONAL
+    val summary=OwnedProfile("review-primary",name,if(language=="ar")"مصممة منتجات" else "Product designer",null,kind,category.name.lowercase(),"PUBLISHED","PUBLIC",true,ProfileVerificationState.UNAVAILABLE,ProfileCompletion(true))
     val content=ProfileContent(
         summary,4,if(language=="ar")"ar" else "en",name,name,if(language=="ar")name else "سارة أحمد",if(language=="ar")"Sarah Ahmed" else name,"مصممة منتجات","Product designer","استوديو سارة","Sarah Studio","Designing useful things","", "نبذة تعريفية واضحة وقابلة للقراءة.","A clear and readable profile introduction.","","", "+201001234567","","sarah@example.com","https://popwam.com","+201001234567","","Cairo","القاهرة","Cairo",mapOf("phone" to "PUBLIC","email" to "PUBLIC"),"sarah-a1b2c3d4","ELEGANT_LIGHT","Elegant",
         links=listOf(ProfileLink("link-1","Portfolio","","Portfolio","WEBSITE","https://example.com","PUBLIC",0)),
@@ -248,67 +221,22 @@ private fun profileReviewState(language:String,category:ProfileCategoryKind=Prof
             overallStatus="PENDING",
             signals=listOf(ProfileVerificationSignal("IDENTITY","PENDING",null,null,null,false)),
         ),
-        firstName=if(category in setOf(ProfileCategoryKind.PERSONAL,ProfileCategoryKind.PROFESSIONAL))name.substringBefore(' ') else "",
-        lastName=if(category in setOf(ProfileCategoryKind.PERSONAL,ProfileCategoryKind.PROFESSIONAL))name.substringAfter(' ',"") else "",
-        profession=if(category==ProfileCategoryKind.PROFESSIONAL)"DESIGNER" else "PERSONAL",
-        customProfession=if(category==ProfileCategoryKind.PROFESSIONAL)"Product designer" else "",
-        company=if(category in setOf(ProfileCategoryKind.PROFESSIONAL,ProfileCategoryKind.BUSINESS,ProfileCategoryKind.RESTAURANT,ProfileCategoryKind.CLINIC))"POP" else "",
-        industryAr=if(category in setOf(ProfileCategoryKind.BUSINESS,ProfileCategoryKind.RESTAURANT,ProfileCategoryKind.CLINIC))"الخدمات" else "",
-        industryEn=if(category in setOf(ProfileCategoryKind.BUSINESS,ProfileCategoryKind.RESTAURANT,ProfileCategoryKind.CLINIC))"Services" else "",
+        firstName=if(category in setOf(ProfileBackendKind.PERSONAL,ProfileBackendKind.PERSONAL))name.substringBefore(' ') else "",
+        lastName=if(category in setOf(ProfileBackendKind.PERSONAL,ProfileBackendKind.PERSONAL))name.substringAfter(' ',"") else "",
+        profession=if(category==ProfileBackendKind.PERSONAL)"DESIGNER" else "PERSONAL",
+        customProfession=if(category==ProfileBackendKind.PERSONAL)"Product designer" else "",
+        company=if(category in setOf(ProfileBackendKind.PERSONAL,ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS))"POP" else "",
+        industryAr=if(category in setOf(ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS))"الخدمات" else "",
+        industryEn=if(category in setOf(ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS))"Services" else "",
         documents=listOf(ProfileDocument(id="document-1",originalFilename="portfolio.pdf",publicUrl="https://cdn.example/portfolio.pdf",mimeType="application/pdf",sizeBytes=524_288,title="Portfolio",displayTitleAr="ملف الأعمال",displayTitleEn="Portfolio",visibility="PUBLIC",sortOrder=0)),
         documentCapability=ProfileDocumentCapability(uploadSupported=true,uploadEndpoint="/api/mobile/profiles/review-primary/files",unavailableReason="MOBILE_DOCUMENT_REPLACE_DELETE_NOT_IMPLEMENTED"),
     )
-    val second=summary.copy(id="review-business",name=if(language=="ar")"استوديو سارة" else "Sarah Studio",backendKind=ProfileBackendKind.BUSINESS,categoryKind=ProfileCategoryKind.BUSINESS,isPrimary=false,lifecycle="DRAFT",visibility="PRIVATE",completion=ProfileCompletion(false,listOf("VISIBILITY_REQUIRED")))
+    val second=summary.copy(id="review-business",name=if(language=="ar")"استوديو سارة" else "Sarah Studio",backendKind=ProfileBackendKind.BUSINESS,isPrimary=false,lifecycle="DRAFT",visibility="PRIVATE",completion=ProfileCompletion(false,listOf("VISIBILITY_REQUIRED")))
     return ProfilesUiState(ProfileLoadState.CONTENT,listOf(summary,second),summary.id,content,ProfileQuota(2,5,3,true),offline=false)
 }
 
-private fun profileReviewCapabilities(category:ProfileCategoryKind):List<ProfileFieldCapability> = when(category){
-    ProfileCategoryKind.PROFESSIONAL -> listOf(
-        ProfileFieldCapability("education","PORTFOLIO","Education",ProfileStructuredValueType.EDUCATION,true,false,true,20),
-        ProfileFieldCapability("work_experience","PORTFOLIO","Experience",ProfileStructuredValueType.EXPERIENCE,true,false,true,30),
-        ProfileFieldCapability("skills","ABOUT","Skills",ProfileStructuredValueType.STRING_LIST,false,false,true,1),
-        ProfileFieldCapability("portfolio_url","LINKS","Portfolio",ProfileStructuredValueType.URL,false,false,true,1),
-    )
-    ProfileCategoryKind.RESTAURANT -> listOf(
-        ProfileFieldCapability("cuisine","ABOUT","Cuisine",ProfileStructuredValueType.TEXT,false,true,true,1),
-        ProfileFieldCapability("working_hours","CONTACT","Opening hours",ProfileStructuredValueType.WEEKLY_HOURS,false,false,true,1),
-        ProfileFieldCapability("menu_url","CATALOG","Menu",ProfileStructuredValueType.URL,false,false,true,1),
-    )
-    ProfileCategoryKind.CLINIC -> listOf(
-        ProfileFieldCapability("specialty","ABOUT","Specialty",ProfileStructuredValueType.TEXT,false,true,true,1),
-        ProfileFieldCapability("booking_url","LINKS","Booking",ProfileStructuredValueType.URL,false,false,true,1),
-    )
-    ProfileCategoryKind.BUSINESS -> listOf(
-        ProfileFieldCapability("trade_name","IDENTITY","Trade name",ProfileStructuredValueType.TEXT,false,false,true,1),
-        ProfileFieldCapability("business_size","ABOUT","Business size",ProfileStructuredValueType.TEXT,false,false,true,1),
-    )
-    else -> listOf(ProfileFieldCapability("additional_languages","ABOUT","Languages",ProfileStructuredValueType.STRING_LIST,false,false,true,1))
-}
-
-private fun profileReviewEntries(category:ProfileCategoryKind):List<ProfileStructuredEntry> = when(category){
-    ProfileCategoryKind.PROFESSIONAL -> listOf(
-        ProfileStructuredEntry(
-            id="education-1",
-            fieldKey="education",
-            instanceKey="education-1",
-            moduleKey="PORTFOLIO",
-            value=JsonObject().apply{addProperty("institution","Alexandria University");addProperty("qualification","BSc");addProperty("field","Design");addProperty("startYear",2014);addProperty("endYear",2018)},
-            visibility="PUBLIC",
-        ),
-        ProfileStructuredEntry(
-            id="skills-1",
-            fieldKey="skills",
-            moduleKey="ABOUT",
-            value=JsonArray().apply{add(JsonPrimitive("Product strategy"));add(JsonPrimitive("Interaction design"))},
-            visibility="FRIENDS",
-            sortOrder=10,
-        ),
-    )
-    ProfileCategoryKind.RESTAURANT -> listOf(ProfileStructuredEntry("cuisine-1","cuisine","default","ABOUT",JsonPrimitive("Egyptian and Mediterranean"),"PUBLIC",0))
-    ProfileCategoryKind.CLINIC -> listOf(ProfileStructuredEntry("specialty-1","specialty","default","ABOUT",JsonPrimitive("Dermatology"),"PUBLIC",0))
-    ProfileCategoryKind.BUSINESS -> listOf(ProfileStructuredEntry("trade-name-1","trade_name","default","IDENTITY",JsonPrimitive("Sarah Studio"),"PUBLIC",0))
-    else -> listOf(ProfileStructuredEntry("languages-1","additional_languages","default","ABOUT",JsonArray().apply{add(JsonPrimitive("Arabic"));add(JsonPrimitive("English"))},"PUBLIC",0))
-}
+private fun profileReviewCapabilities(category:ProfileBackendKind):List<ProfileFieldCapability> = emptyList()
+private fun profileReviewEntries(category:ProfileBackendKind):List<ProfileStructuredEntry> = emptyList()
 
 private fun homeReviewState(language: String) = HomeUiState(
     loadState = HomeLoadState.CONTENT,
@@ -337,20 +265,4 @@ private fun homeReviewState(language: String) = HomeUiState(
     activeProductCount = 2,
     totalOpenCount = 148,
     isPartial = true,
-)
-
-private val reviewCallbacks = AuthenticationCallbacks({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
-private val otpOverlay = OverlayState(OverlayEntry("review-otp", OverlayKey.OTP, OverlayPresentation.BOTTOM_SHEET, OverlayDismissPolicy.ACTION_REQUIRED))
-private val verifiedOverlay = OverlayState(OverlayEntry("review-verified", OverlayKey.VERIFIED, OverlayPresentation.BOTTOM_SHEET, OverlayDismissPolicy.PROGRAMMATIC_ONLY))
-
-private fun reviewState(stage: AuthenticationStage, action: AuthenticationNextAction, scope: SessionScope = SessionScope.ENROLLMENT) = AuthenticationUiState(
-    stage = stage,
-    challenge = AuthChallenge(
-        challengeId = "review-only", accountState = AccountState.NEW,
-        allowedMethods = listOf(AuthenticationMethod.PHONE_OTP, AuthenticationMethod.PASSKEY), preferredMethod = AuthenticationMethod.PHONE_OTP,
-        otpConfiguration = OtpConfiguration(6, 300, 60, 5, true),
-        passkeyRequirement = if (action == AuthenticationNextAction.ENROLL_PASSKEY) PasskeyRequirement.REQUIRED else PasskeyRequirement.AVAILABLE,
-        biometricEnrollmentPolicy = BiometricEnrollmentPolicy.REQUIRED_WHEN_AVAILABLE,
-        sessionScope = scope, nextAction = action, expiresAt = "2099-01-01T00:00:00Z",
-    ),
 )

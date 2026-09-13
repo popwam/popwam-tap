@@ -12,7 +12,6 @@ import com.popwam.mobile.foundation.overlay.OverlayKey
 import com.popwam.mobile.onboarding.LanguageScreen
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import com.popwam.mobile.onboarding.ThemeScreen
-import com.popwam.mobile.onboarding.WelcomeScreen
 import com.popwam.pop.data.localization.LocalizationAuthoritySnapshot
 import com.popwam.pop.ui.PopSystemBars
 import com.popwam.pop.ui.applyPopLanguage
@@ -67,20 +66,6 @@ fun LaunchExperience(
                     onOpenGallery = viewModel::openThemeGallery,
                     onSelectStyle = viewModel::selectPopStyle,
                     onDismissGallery = viewModel::dismissThemeGallery,
-                )
-            }
-            is PopDestination.Welcome -> {
-                BackHandler { viewModel.backFromWelcome(destination.page) }
-                WelcomeScreen(
-                    page = destination.page,
-                    languageTag = language,
-                    reducedMotion = viewModel.reducedMotion,
-                    onContinue = {
-                        if (destination.page == com.popwam.mobile.foundation.navigation.WelcomePage.GET_STARTED) {
-                            viewModel.completeWelcome()
-                        } else viewModel.nextWelcome(destination.page)
-                    },
-                    onSkip = viewModel::skipWelcome,
                 )
             }
             else -> existingApplication()

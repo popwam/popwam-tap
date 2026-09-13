@@ -7,20 +7,6 @@ import com.google.gson.JsonElement
 object ProfilePolicy {
     private val supportedEditorModules = setOf("IDENTITY", "ABOUT", "CONTACT", "SOCIAL", "LINKS", "SERVICES", "PORTFOLIO", "GALLERY", "BRANCHES")
 
-    fun categoryKind(profileKind:String,categoryKey:String?):ProfileCategoryKind {
-        val key = categoryKey.orEmpty().lowercase()
-        return when {
-            "restaurant" in key || "food" in key -> ProfileCategoryKind.RESTAURANT
-            "clinic" in key || "medical" in key || "health" in key -> ProfileCategoryKind.CLINIC
-            "professional" in key -> ProfileCategoryKind.PROFESSIONAL
-            "service" in key -> ProfileCategoryKind.SERVICES
-            "creator" in key || "public" in key -> ProfileCategoryKind.CREATOR
-            profileKind == "BUSINESS" -> ProfileCategoryKind.BUSINESS
-            profileKind == "PERSONAL" -> ProfileCategoryKind.PERSONAL
-            else -> ProfileCategoryKind.OTHER
-        }
-    }
-
     fun sections(content:ProfileContent):List<ProfileEditorSection> = buildList {
         add(ProfileEditorSection.BASIC_INFORMATION)
         add(ProfileEditorSection.ABOUT)
@@ -35,15 +21,7 @@ object ProfilePolicy {
         add(ProfileEditorSection.VERIFICATION)
     }
 
-    /** Explicit boundary for approved concepts that have no current persisted
-     * module. Production UI does not render or pretend to save these fields. */
-    fun pendingCapabilities(kind:ProfileCategoryKind)=when(kind){
-        ProfileCategoryKind.PROFESSIONAL,ProfileCategoryKind.SERVICES->setOf(ProfilePendingCapability.EDUCATION,ProfilePendingCapability.EXPERIENCE,ProfilePendingCapability.SKILLS,ProfilePendingCapability.PROJECTS,ProfilePendingCapability.CERTIFICATES)
-        ProfileCategoryKind.BUSINESS->setOf(ProfilePendingCapability.WORKING_HOURS,ProfilePendingCapability.TEAM)
-        ProfileCategoryKind.RESTAURANT->setOf(ProfilePendingCapability.WORKING_HOURS,ProfilePendingCapability.MENU,ProfilePendingCapability.DELIVERY_RESERVATION)
-        ProfileCategoryKind.CLINIC->setOf(ProfilePendingCapability.WORKING_HOURS,ProfilePendingCapability.DOCTORS,ProfilePendingCapability.BOOKING,ProfilePendingCapability.LICENSE_VERIFICATION)
-        else->emptySet()
-    }
+
 
     fun canEditModule(module:ProfileModule)=module.supported && module.key in supportedEditorModules
     fun editableCapabilities(content:ProfileContent)=content.fieldCapabilities.filter{it.classification==ProfileDataClassification.PUBLIC_PROFILE}
@@ -221,21 +199,11 @@ object ProfileIdentityPolicy {
         "PERSONAL","BUSINESS_OWNER","COMPANY","DEVELOPER","DESIGNER","CREATOR","MARKETER",
         "REAL_ESTATE","DOCTOR","LAWYER","MUSICIAN","PHOTOGRAPHER","FREELANCER","RESTAURANT","SHOP",
     )
-    fun showsPersonalName(category:ProfileCategoryKind)=category in setOf(
-        ProfileCategoryKind.PERSONAL,ProfileCategoryKind.PROFESSIONAL,ProfileCategoryKind.SERVICES,
-        ProfileCategoryKind.CREATOR,ProfileCategoryKind.OTHER,
-    )
-    fun showsProfession(category:ProfileCategoryKind)=category in setOf(
-        ProfileCategoryKind.PROFESSIONAL,ProfileCategoryKind.SERVICES,ProfileCategoryKind.CREATOR,
-    )
-    fun showsCompany(category:ProfileCategoryKind)=category in setOf(
-        ProfileCategoryKind.PROFESSIONAL,ProfileCategoryKind.BUSINESS,ProfileCategoryKind.RESTAURANT,
-        ProfileCategoryKind.CLINIC,ProfileCategoryKind.SERVICES,
-    )
-    fun showsIndustry(category:ProfileCategoryKind)=category in setOf(
-        ProfileCategoryKind.BUSINESS,ProfileCategoryKind.RESTAURANT,ProfileCategoryKind.CLINIC,
-        ProfileCategoryKind.SERVICES,
-    )
+    fun showsPersonalName(kind:ProfileBackendKind)=kind==ProfileBackendKind.PERSONAL
+    fun showsProfession(kind:ProfileBackendKind)=kind==ProfileBackendKind.PERSONAL
+    fun showsCompany(kind:ProfileBackendKind)=true
+    fun showsIndustry(kind:ProfileBackendKind)=kind==ProfileBackendKind.BUSINESS
+
 }
 
 data class ProfileStructuredValidationResult(

@@ -1,7 +1,6 @@
 package com.popwam.pop.data.launch
 
 import android.content.Context
-import com.popwam.mobile.foundation.launch.CURRENT_WELCOME_VERSION
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.LaunchState
 import com.popwam.mobile.foundation.launch.LaunchStateStore
@@ -28,22 +27,20 @@ fun migrateLegacyLaunchState(
     val migratedStyle = legacy.popStyle?.let(::paletteAlias)
     val completedLegacyIntro = legacy.introVersionSeen >= 1
     val adoptExistingUser = legacy.authenticated
-    val shouldCompleteWelcome = current.hasCompletedWelcome || completedLegacyIntro || adoptExistingUser
+    val adoptSavedPreferences = completedLegacyIntro || adoptExistingUser
     val selectedLanguage = current.selectedLanguageTag
         ?: migratedLanguage
         ?: fallbackLanguageTag.normalizeLanguage()
         ?: "en"
     return current.copy(
         hasSeenFirstLaunchStage = current.hasSeenFirstLaunchStage || legacy.hasProgress || adoptExistingUser,
-        hasSelectedLanguage = current.hasSelectedLanguage || migratedLanguage != null || shouldCompleteWelcome,
+        hasSelectedLanguage = current.hasSelectedLanguage || migratedLanguage != null || adoptSavedPreferences,
         selectedLanguageTag = if (current.hasSelectedLanguage) current.selectedLanguageTag else selectedLanguage,
-        hasSelectedBaseTheme = current.hasSelectedBaseTheme || migratedTheme != null || shouldCompleteWelcome,
+        hasSelectedBaseTheme = current.hasSelectedBaseTheme || migratedTheme != null || adoptSavedPreferences,
         selectedBaseTheme = if (current.hasSelectedBaseTheme) current.selectedBaseTheme else migratedTheme ?: current.selectedBaseTheme,
-        selectedPopStyle = if (current.hasSeenFirstLaunchStage || current.hasSelectedBaseTheme || current.hasCompletedWelcome) {
+        selectedPopStyle = if (current.hasSeenFirstLaunchStage || current.hasSelectedBaseTheme) {
             current.selectedPopStyle
         } else migratedStyle ?: current.selectedPopStyle,
-        hasCompletedWelcome = shouldCompleteWelcome,
-        welcomeVersionSeen = if (shouldCompleteWelcome) CURRENT_WELCOME_VERSION else current.welcomeVersionSeen,
         hasAuthenticatedBefore = current.hasAuthenticatedBefore || adoptExistingUser,
     ).normalized()
 }

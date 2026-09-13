@@ -8,10 +8,8 @@ import retrofit2.http.*
 interface AuthApi {
     @GET("api/localization/bootstrap") suspend fun localizationBootstrap():LocalizationBootstrapResponse
     @GET("api/platform/bootstrap") suspend fun platformBootstrap():PlatformBootstrapResponse
-    @POST("api/mobile/auth/firebase/phone/exchange") suspend fun exchangeFirebasePhone(
-        @Header("X-Firebase-Id-Token") firebaseIdToken:String,
-        @Body body:FirebasePhoneExchangeRequest,
-    ):AuthResponse
+    @POST("api/mobile/auth/otp/request") suspend fun requestOtp(@Body body:OtpRequest):OtpRequestResponse
+    @POST("api/mobile/auth/otp/verify") suspend fun verifyOtp(@Body body:OtpVerifyRequest):AuthResponse
     @POST("api/mobile/auth/passkey/options") suspend fun passkeyAuthenticationOptions():JsonObject
     @POST("api/mobile/auth/passkey/verify") suspend fun verifyPasskey(@Body body:PasskeyAuthVerifyRequest):AuthResponse
     @POST("api/mobile/auth/refresh") suspend fun refresh(@Body body:RefreshRequest):AuthResponse
@@ -26,14 +24,9 @@ interface PopwamApi {
     @GET("api/legal/current") suspend fun currentLegal(@Query("type") type:String,@Query("locale") locale:String):PublishedLegalDocumentResponse
     @POST("api/legal/required") suspend fun acceptLegal(@Body body:LegalConsentRequest):ApiResult
     @GET("api/profile-bootstrap") suspend fun profileBootstrapStatus(@Query("locale") locale:String):ProfileBootstrapStatusResponse
+    @PATCH("api/profile-bootstrap") suspend fun saveAccountSetup(@Body body:AccountSetupRequest):ApiResult
     @POST("api/profile-bootstrap") suspend fun submitProfileBootstrap(@Body body:ProfileBootstrapRequest):ProfileBootstrapResponse
-    @GET("api/onboarding/current") suspend fun currentOnboarding(@Query("locale") locale:String):OnboardingCurrentResponse
-    @POST("api/onboarding/start") suspend fun startOnboarding(@Body body:OnboardingStartRequest):OnboardingCurrentResponse
-    @POST("api/onboarding/progress") suspend fun saveOnboarding(@Body body:OnboardingProgressRequest):OnboardingCurrentResponse
-    @POST("api/onboarding/complete") suspend fun completeOnboarding(@Body body:OnboardingCompleteRequest):OnboardingCurrentResponse
     @Multipart @POST("api/profiles/{id}/media") suspend fun uploadDraftMedia(@Path("id") id:String,@Part("purpose") purpose:RequestBody,@Part file:MultipartBody.Part):ProfileMediaUploadResponse
-    @GET("api/profile-categories") suspend fun profileBootstrapCategories(@Query("profileKind") profileKind:String,@Query("locale") locale:String):ProfileCategoriesBootstrapResponse
-    @GET("api/profile-templates") suspend fun profileBootstrapTemplates(@Query("categorySlug") categorySlug:String,@Query("profileKind") profileKind:String,@Query("locale") locale:String):ProfileTemplatesBootstrapResponse
     @POST("api/passkeys/register/options") suspend fun passkeyRegistrationOptions(@Header("X-POP-Step-Up") grant:String?=null):JsonObject
     @POST("api/passkeys/register/verify") suspend fun verifyPasskeyRegistration(@Body response:JsonObject):ApiResult
     @HTTP(method="DELETE",path="api/mobile/push-tokens",hasBody=true) suspend fun revokePushToken(@Body body:PushTokenRequest):ApiResult
@@ -50,7 +43,6 @@ interface PopwamApi {
     @POST("api/profiles/{id}/publishing") suspend fun publishingAction(@Path("id") id:String,@Body body:PublishingActionRequest):PublishingActionResponse
     @PATCH("api/profiles/{id}/visibility") suspend fun updatePublishingVisibility(@Path("id") id:String,@Body body:VisibilityUpdateRequest):PublishingActionResponse
     @POST("api/mobile/profiles") suspend fun createProfile(@Body body:ProfileWriteRequest):ProfileCreateResponse
-    @POST("api/mobile/profiles") suspend fun createVirtualCard(@Body body:VirtualCardCreateRequest):ProfileCreateResponse
     @PATCH("api/mobile/profiles/{id}") suspend fun updateProfile(@Path("id") id:String,@Body body:ProfileWriteRequest):ApiResult
     @GET("api/mobile/templates") suspend fun templates():TemplatesResponse
     @PATCH("api/mobile/virtual-cards/{id}/template") suspend fun selectTemplate(@Path("id") id:String,@Body body:TemplateSelectionRequest):ApiResult

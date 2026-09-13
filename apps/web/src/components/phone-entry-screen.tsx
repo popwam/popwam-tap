@@ -23,8 +23,8 @@ export function PhoneEntryScreen({ locale, callbackUrl }: { locale: "ar" | "en";
       <PasskeyLogin locale={locale} callbackUrl={callbackUrl}/>
       <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
         {locale==="ar"
-          ?"تسجيل الدخول بالهاتف على الويب متوقف مؤقتًا حتى اكتمال ربط Firebase الآمن بالجلسة. استخدم تطبيق POP على Android أو مفتاح المرور الحالي."
-          :"Web phone sign-in is temporarily gated until Firebase verification is joined safely to the Web session. Use the POP Android app or an existing passkey."}
+          ?"لتسجيل الدخول برقم الهاتف، استخدم تطبيق POP على Android. يمكنك استخدام مفتاح المرور الحالي على الويب."
+          :"For phone sign-in, use POP for Android. You can use an existing passkey on the web."}
       </div>
       <div className="mt-6 border-t border-white/10 pt-4"><button type="button" onClick={() => setHowOpen((value) => !value)} aria-expanded={howOpen} className="flex w-full items-center justify-between py-2 text-sm font-semibold text-slate-200"><span>{t.how}</span>{howOpen ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}</button>{howOpen && <ol className="mt-2 space-y-2 rounded-2xl bg-white/5 p-4 text-sm text-slate-400"><li>1. {t.step1}</li><li>2. {t.step2}</li><li>3. {t.step3}</li><li>4. {t.step4}</li></ol>}</div>
     </div>

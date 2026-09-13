@@ -8,9 +8,11 @@ import {
 import { randomUUID } from "node:crypto";
 import { mergeEntitlements } from "@/lib/plans";
 import { requireValidProfileModuleConfiguration } from "@/lib/profile-module-config";
-import { templateAllowed } from "@/lib/virtual-cards";
-import { categoryTemplateCompatibility, idempotentProfileCreationDecision, primaryProfileDecision, profileModuleDecision, profileQuotaDecision } from "@/lib/profile-domain-policy";
+import { idempotentProfileCreationDecision, primaryProfileDecision, profileModuleDecision, profileQuotaDecision } from "@/lib/profile-domain-policy";
 import { defaultProfileSlug } from "@/lib/profile-slugs";
+
+import { resolveInitialTemplate } from "./profile-bootstrap-template";
+import { getAccountTypePolicies } from "./account-type-policy";
 
 const CORE_MODULE_KEYS = ["IDENTITY", "ABOUT", "CONTACT", "LINKS"];
 
@@ -70,25 +72,6 @@ export async function validateProfileQuota(tx: Tx, userId: string, profileKind: 
   return { ...context, maximum };
 }
 
-export async function validateProfileTemplate(tx: Tx, input: Pick<CreateProfileInput, "profileKind" | "categorySlug" | "templateId">) {
-  const category = input.categorySlug
-    ? await tx.profileCategory.findUnique({ where: { slug: input.categorySlug } })
-    : null;
-  if (category && !category.isActive) throw new Error("PROFILE_CATEGORY_INCOMPATIBLE");
-
-  const selectedTemplateId = input.templateId || category?.defaultTemplateId || null;
-  if (!selectedTemplateId) throw new Error("PROFILE_TEMPLATE_REQUIRED");
-  const template = selectedTemplateId
-    ? await tx.profileTemplate.findUnique({ where: { id: selectedTemplateId }, include: { categoryRef: true } })
-    : null;
-  if (selectedTemplateId && !template) throw new Error("PROFILE_TEMPLATE_NOT_FOUND");
-  if (template && !template.isActive) throw new Error("PROFILE_TEMPLATE_INACTIVE");
-  const compatibility = categoryTemplateCompatibility({ profileKind: input.profileKind, categoryKind: category?.profileKind, templateKind: template?.profileKind || template?.categoryRef?.profileKind, templateCategoryMatches: category && template?.categoryId ? template.categoryId === category.id : undefined });
-  if (!compatibility.compatible) throw new Error(compatibility.reason);
-  const resolvedCategory = category || template?.categoryRef || null;
-  return { category: resolvedCategory, template };
-}
-
 export async function initializeDefaultModules(tx: Tx, profileId: string, templateId?: string | null) {
   const templateCandidates = templateId
     ? await tx.profileTemplateModule.findMany({
@@ -141,8 +124,9 @@ async function createProfileInTransaction(tx: Tx, input: CreateProfileInput, isP
   const quota = await profileQuotaContext(tx, input.userId);
   const quotaDecision = profileQuotaDecision({ used: quota.used, baseLimit: Number(quota.effective.maxProfiles), entitlementIncrement: quota.entitlementIncrement, requested: 1, profileKind: input.profileKind, allowBusinessProfiles: Boolean(quota.effective.allowBusinessCards) });
   if (!quotaDecision.allowed) throw new Error(quotaDecision.reason);
-  const { category, template } = await validateProfileTemplate(tx, input);
-  if (template && !templateAllowed(quota.plan.slug, template.minimumPlan)) throw new Error("PROFILE_TEMPLATE_PLAN_REQUIRED");
+  const policies = await getAccountTypePolicies(tx);
+  if (!policies[input.profileKind].enabled) throw new Error("ACCOUNT_TYPE_UNAVAILABLE");
+  const template = await resolveInitialTemplate(tx, input.profileKind, input.templateId, quota.plan.slug);
 
   const profile = await tx.profile.create({
     data: {
@@ -154,7 +138,7 @@ async function createProfileInTransaction(tx: Tx, input: CreateProfileInput, isP
       lifecycle: "DRAFT",
       isPrimary,
       creationKey: input.creationKey?.trim() || null,
-      categoryId: category?.id || null,
+      categoryId: null,
       templateId: template?.id || null,
       primaryLanguage: input.primaryLanguage || "ar",
     },
@@ -174,7 +158,7 @@ async function createProfileInTransaction(tx: Tx, input: CreateProfileInput, isP
     if (attempt === 4) throw new Error("PROFILE_SLUG_GENERATION_FAILED");
   }
   await initializeDefaultModules(tx, profile.id, template?.id);
-  await tx.auditLog.create({ data: { actorId: input.userId, operation: isPrimary ? "profile.primary.create" : "profile.additional.create", targetId: profile.id, metadata: { profileKind: input.profileKind, categoryId: category?.id || null, templateId: template?.id || null } } });
+  await tx.auditLog.create({ data: { actorId: input.userId, operation: isPrimary ? "profile.primary.create" : "profile.additional.create", targetId: profile.id, metadata: { profileKind: input.profileKind, categoryId: null, templateId: template?.id || null } } });
   return profile;
 }
 

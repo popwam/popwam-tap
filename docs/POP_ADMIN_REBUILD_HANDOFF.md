@@ -2,6 +2,8 @@
 
 ## 1. Current Status
 
+- PASS 7 — IMPLEMENTED / CODE VERIFIED / AWAITING OWNER PHYSICAL ACCEPTANCE. Clean PERSONAL/BUSINESS onboarding, first-profile registry fallback, passkey, biometric session protection and measured APK cleanup. See section 20 and [PASS 7 verification](POP_PASS7_VERIFICATION.md).
+
 - PASS 1 — ACCEPTED / CLOSED
 - PASS 2 — ACCEPTED / CLOSED
 - PASS 3 — ACCEPTED / CLOSED
@@ -11,9 +13,12 @@
 - PASS 5B — TEMPLATES 07–10 VISUAL CORRECTION VERIFIED / CLOSED
 - PASS 5C — TEMPLATES 11–17 VISUAL CORRECTION VERIFIED / CLOSED
 - PASS 6 — IMPLEMENTED / CODE VERIFIED / AWAITING OWNER PHYSICAL ACCEPTANCE
-- Scope: PASS 1–5 WEB/ADMIN remain the accepted baseline. PASS 6 is Android My Profile templates/storefront and directly required APIs only.
+- AUTH REBUILD — EVOLUTION OTP — IMPLEMENTED / CODE VERIFIED / OLD FIREBASE PHONE AUTH DELETED / OLD AUTH UI DELETED / DEPLOYED TO ISOLATED TEST / OWNER OTP PHYSICAL ACCEPTANCE PASSED 100% per PASS 7 owner instruction; new PASS 7 physical acceptance remains pending.
+- AUTH TEST ENVIRONMENT — ISOLATION PROVEN / CLEAN RESET AND CANONICAL SEED COMPLETE / EVOLUTION CONNECTED / TEST APK READY. See section 19.
+- Scope: PASS 1–6 remain preserved outside the explicitly authorized Android authentication, first-user onboarding and directly required backend/auth-retirement scope.
 - Android PASS 6: code/static/build verification only; no emulator, physical device, adb, installation, or instrumentation.
 - Production deployment: PASS 1–4 remain deployed and verified. PASS 5 was deployed to the existing Railway `popwam-tap` service (`popwam` environment) on 2026-09-10 as deployment `8e74ef4b-2058-458a-aa55-82a57c3a0dfe`.
+- Current Production observed read-only on 2026-09-12: pre-existing deployment `59c18ff0-c958-494a-bdb5-70a8ad93daa7` (2026-09-11 10:51:26.394 UTC), unchanged by TEST activation. Production auth rebuild remains NOT DEPLOYED.
 - Migration state: `20260908190000_plan_storefront_entitlements` was safety-reviewed and applied to Production on 2026-09-10 through `prisma migrate deploy`; all 32 migrations are recorded as applied and there is no failed migration state.
 - NO COMMIT CREATED for the accepted rebuild passes. The accepted worktree contains uncommitted work and must be preserved.
 
@@ -124,7 +129,7 @@ Do not rebuild unnecessarily: Auth/Admin authorization; PostgreSQL/Prisma core; 
 - Showcase items intentionally have no inventory, cart state, checkout state, tax, shipping, payment, or order lifecycle. Price is optional and contact enquiry remains the only order intent.
 - Production contains no safe published BUSINESS/STOREFRONT test profile for a non-mutating live canonical PRODUCT/SERVICE/contact-mode matrix; this remains covered by deployed authenticated Admin previews and focused tests.
 - Production schema comparison retains pre-existing schema debt outside PASS 5: PostgreSQL-truncated long index names, database defaults on two `updatedAt` columns that differ from Prisma's `@updatedAt` representation, and the missing composite performance index `ProfilePublication(profileId, publishedRevisionId)`. PASS 5 did not alter or hide these differences.
-- SMS/OTP provider integration awaits provider details.
+- Android phone authentication now uses POP-owned OTP delivered by Evolution WhatsApp; real delivery/owner acceptance awaits TEST deployment. Unrelated legacy SMS/security channels are not a fallback for mobile login.
 - Reports/Disputes and Audit redesigns are deferred.
 - Country availability remains configuration exposed to bootstrap; it is not a new registration/auth enforcement gate.
 - Country-specific legal variants must use distinct legal versions where the existing `(type, version, locale)` uniqueness requires it.
@@ -166,7 +171,7 @@ Storefront templates may display products/services but are not checkout systems.
 
 - Local migrations created: `20260908190000_plan_storefront_entitlements` (PASS 5). It adds six Plan fields: `storefrontEnabled`, `storefrontProductsEnabled`, `storefrontServicesEnabled`, `storefrontWhatsappOrder`, and `storefrontEmailOrder` as non-null booleans defaulting to `false`, plus nullable `storefrontMaxItems` where NULL means Unlimited and non-null values must be non-negative. It also creates `ProfileShowcaseItemType` (`PRODUCT`, `SERVICE`) and adds `itemType` defaulting to `SERVICE`, nullable `imageUrl`, nullable non-negative `price` as `DECIMAL(14,2)`, nullable `currency`, nullable `category`, and non-null `featured` defaulting to `false` to both `ProfileService` and `ProfileRevisionService`.
 - Production migrations deployed in this deployment: `20260908190000_plan_storefront_entitlements`, applied on 2026-09-10. Predeploy verification then reported no pending migrations.
-- Latest relevant Admin/Web deployment: `8e74ef4b-2058-458a-aa55-82a57c3a0dfe` — SUCCESS; image digest `sha256:2b6a90a3499f3584c3102da584e4437e2e5e704deef212e59aa17f3ad6b99bf7`.
+- Historical PASS 5 Admin/Web deployment: `8e74ef4b-2058-458a-aa55-82a57c3a0dfe` — SUCCESS; image digest `sha256:2b6a90a3499f3584c3102da584e4437e2e5e704deef212e59aa17f3ad6b99bf7`. Current pre-existing Production deployment observed during TEST activation is `59c18ff0-c958-494a-bdb5-70a8ad93daa7`; see section 19.
 - Deployment date: 2026-09-10 10:18:11 UTC.
 - Production URLs: `https://pop.popwam.com` (dashboard/admin/auth) and `https://go.popwam.com` (public experience).
 - Deployed source state: a reduced deployment archive of base Git revision `3a52a2202f774b3e64f0f912a4f967f017fd3fb5` plus the accepted uncommitted PASS 1–5 worktree. Android source/build artefacts and visual-review evidence were excluded; only the three existing font files required by Web local-font loading were included. No commit was created.
@@ -179,11 +184,11 @@ Accepted uncommitted work exists. Preserve it; do not broadly restore/reset/clea
 
 ## 16. Next Pass
 
-NEXT ACTION: OWNER PHYSICAL ACCEPTANCE OF ANDROID PASS 6
+NEXT ACTION: OWNER MANUAL OTP ACCEPTANCE ON THE ISOLATED TEST APK
 
-STATUS: READY
+STATUS: TEST ISOLATION PROVEN / CLEAN RESET COMPLETE / TEST BACKEND DEPLOYED / EVOLUTION READY / TEST APK READY / OWNER ACCEPTANCE PENDING
 
-REASON: PASS 6 implementation and code/build verification are complete. No physical acceptance was performed. PASS 6 API changes remain local and undeployed; the default production-targeted APK requires a separately authorized matching backend release (or a compatible test backend) for end-to-end acceptance. Do not infer deployment, device testing, or another pass.
+REASON: The owner-authorized isolated TEST activation is complete. Use `pop-auth-test-debug.apk` and the TEST URLs in section 19. Real WhatsApp delivery and physical acceptance remain pending; no message or device test was performed. EG is the enabled registration country; skip optional media uploads because TEST storage is not configured. PASS 6 non-auth physical acceptance remains pending. STOP; do not start the later Acceptance Correction pass.
 
 ## 17. PASS 6 — ANDROID TEMPLATES + STOREFRONT MANAGEMENT
 
@@ -203,6 +208,63 @@ Status: **IMPLEMENTED / CODE VERIFIED / AWAITING OWNER PHYSICAL ACCEPTANCE** (20
 - **NO EMULATOR STARTED. NO PHYSICAL DEVICE USED. NO ADB USED. NO APK INSTALLED. NO ANDROID INSTRUMENTATION. NO PRODUCTION DEPLOYMENT. NO NEW MIGRATION CREATED/APPLIED. NO CART. NO CHECKOUT. NO PAYMENTS. NO COMMIT CREATED.** PASS 1–5 remain preserved; PASS 5 remains deployed. PASS 6 is not marked DEPLOYED or PHYSICALLY VERIFIED.
 - Detailed inspected/modified-file inventory, API contracts, checks and limitations: [PASS 6 code verification report](POP_PASS6_CODE_VERIFICATION.md).
 
+## 18. AUTH REBUILD — EVOLUTION OTP
+
+Date: 2026-09-12. **IMPLEMENTED / CODE VERIFIED / OLD FIREBASE PHONE AUTH DELETED / OLD AUTH UI DELETED / AWAITING TEST DEPLOYMENT / AWAITING OWNER OTP ACCEPTANCE**.
+
+Historical implementation-phase snapshot below. Its earlier TEST/migration/APK limitations are superseded by the subsequent activation in section 19; Production remains unchanged.
+
+- One Android login flow: new `PhoneLoginScreen`/`PhoneLoginViewModel` → WhatsApp OTP → existing legal/profile/dynamic onboarding when required → authenticated application. Official branding, accepted theme, AR/EN/FR resources, native legal reader, shared country catalogue, LTR numeric input, explicit Verify, deadline-based resend and localized error categories.
+- `POST /api/mobile/auth/otp/request` returns only challenge ID/expiry/cooldown. `POST /api/mobile/auth/otp/verify` returns the existing POP session envelope plus onboarding routing. No account lookup/existence disclosure on request and no OTP/hash/provider content in responses.
+- `EvolutionOtpSender` is the only mobile OTP delivery adapter. Real read-only installation inspection returned **2.3.7**; upstream v2 send-text contract verified. HTTPS, controlled configuration/provider errors, no redirects, 10-second total timeout, localized message, no secret/body logging. No real message sent. Evolution does not own authentication or sessions.
+- Existing `OtpChallenge` reused: secure six-digit generation, challenge/phone-bound HMAC only, expiry, consumed state, committed attempts, delivery state and hashed request source. Env defaults: TTL 300s, cooldown 60s, max attempts 5. Persistent serializable limits: 5 requests/phone/hour, 30/source/hour; existing process-local route throttles supplement them. Used/expired/locked/mismatched challenges fail closed. Unique/serialization retries protect user identity and one-time session issuance.
+- Existing canonical phone owners are reused. New accounts contain only user/Free-plan/onboarding state. `User.email` remains required, so an internal non-deliverable identity is generated and never copied to public contacts. First profile/VirtualCard creation now waits for submitted identity and legal consent; historical single-placeholder compatibility remains, and existing multi-profile accounts are not rewritten.
+- POP access/refresh/DeviceSession/revocation remain. Android retains the same AES-256-GCM/Keystore encrypted v2 record/alias; full sessions survive removal of old restricted-auth fields. An encrypted pending-onboarding marker resumes setup. Successful login/completed onboarding refresh the core snapshot; normal cached launch adds no auth/OTP request. Transport failures retain session/cache. Logout uses POP only and returns to new Phone.
+- Hard deleted: Android Firebase gateway/callbacks, shared auth module/UI/resources/tests, duplicate old Android login/OTP/help UI and exclusive preview/test code, Firebase proof endpoint/resolution/policy/verifier, inactive Firebase/Web OTP tombstones and obsolete Firebase-only Admin status page. Removed Android `firebase-auth`, old module, unused direct Ktor/phone-hint dependencies. No fallback/backup/legacy auth tree.
+- Remaining Firebase: FCM, Analytics, Crashlytics, related SDK/config/build integration, and historical identity/migration/documentation evidence. No Android or Web application Firebase Auth import. The APK DEX check found no retired Firebase Auth/PhoneAuthProvider/PhoneAuthCredential descriptors. Full line-level classification: [Firebase audit](AUTH_REBUILD_FIREBASE_AUDIT.md).
+- Schema/migration: local `20260911190000_retire_firebase_phone_subject` drops only obsolete nullable `MobileAuthChallenge.firebaseSubjectHash`; no OTP table/user/session deletion. Prisma validation/generation and local schema-diff SQL comparison passed. Migration **NOT APPLIED ANYWHERE**; Production usage counts were not queried. Historical `ExternalIdentityProvider.FIREBASE` records remain without a login code dependency. Deployment/rollback must account for the dropped column.
+- TEST: **TEST RESET BLOCKED — ISOLATION NOT PROVEN**. No reset/seed ran. Existing default seed creates demo customer data and is unsuitable. Configuration-only reset/seed specification, six requested env variables, existing app-secret requirements and Production-specific deployment-hook limitations are in [TEST readiness](AUTH_REBUILD_TEST_READINESS.md).
+- Verification: **256 Android JVM tests passed, 0 failures/errors/skips**; final `testDebugUnitTest`, `lintDebug`, `assembleDebug` succeeded. Lint: **0 errors / 366 warnings**. **74 focused backend tests across 12 files passed**. TypeScript/Web lint, final local production Web build, Prisma validation/generation, schema-to-schema migration SQL comparison and `git diff --check` passed. Transaction concurrency is covered by the deterministic serial/rollback harness, not a live database acceptance test.
+- APK: `E:\saas\popwam-tap\apps\android\app\build\outputs\apk\debug\app-debug.apk`; **53,480,757 bytes**; SHA-256 **DC2C564EC1C5F80CA50F4282D2F1D2EF4304983A4AA03F79CF29E0C4ACC49651**; package **com.popwam.pop.debug**; versionName **0.0.12-debug**; versionCode **12**. Actual APK metadata/hash checked; no retired Firebase Auth DEX descriptors found. **NOT INSTALLED**.
+- **NO FIREBASE PHONE AUTH FALLBACK. NO OLD AUTH UI LEFT ACTIVE. NO EMULATOR STARTED. NO PHYSICAL DEVICE USED. NO ADB USED. NO APK INSTALLED. NO INSTRUMENTATION. NO PRODUCTION DATA RESET. NO PRODUCTION DEPLOYMENT. NO PRODUCTION MIGRATION APPLIED. NO INVENTORY CLEANUP. NO ADMIN ACCEPTANCE FIXES. NO COMMIT CREATED.**
+- Detailed implementation, deleted/modified/added-file inventory and verification: [auth rebuild report](POP_AUTH_REBUILD_VERIFICATION.md). Owner physical OTP acceptance: **NOT PERFORMED**.
+
+## 19. AUTH TEST ENVIRONMENT
+
+Date: 2026-09-12. **TEST ISOLATION: PROVEN. TEST RESET: COMPLETED. EVOLUTION OTP TEST BACKEND: DEPLOYED. TEST APK: READY. OWNER OTP ACCEPTANCE: PENDING. Production auth: UNCHANGED / NOT DEPLOYED.**
+
+- Railway project `sparkling-reflection` (`a9d788a7-5ae7-414c-a1c5-fdac81b26227`). Created a blank `test` environment (`ff94b952-4772-4675-905d-b36def679071`), dedicated PostgreSQL service/volume, and distinct API/public services. No Production environment was duplicated.
+- Isolation proven before any migration/reset: Production Neon `ep-muddy-poetry-atc4qupm-pooler.c-9.us-east-1.aws.neon.tech/neondb`, URL SHA-256 prefix `0cfb543c8e1cdb7b`; TEST runtime `postgres.railway.internal:5432/railway`, prefix `0bd28ac56ff70dae`; TEST maintenance `gondola.proxy.rlwy.net:53631/railway`, prefix `ba329a8bcd6991fc`. Both TEST runtime/migration connections resolve to the dedicated TEST DB; no shared writable Production connection. Environment/service IDs and both public domains differ.
+- TEST API/Web: **https://popwam-auth-test-test.up.railway.app**. Service `9202f479-ece7-4253-bf0e-b11bc000cfca`; deployment **`2d976ca5-d8fa-4e6d-a0b4-078d9e21d67d`**, created **11:32:14.870 UTC**, **SUCCESS**.
+- TEST public Web: **https://popwam-public-test-test.up.railway.app**. Service `935087b3-8b1c-4e30-9286-f0c13f85b61d`; deployment **`e5af52b7-742b-4189-87c6-91645878459b`**, created **11:32:27.818 UTC**, **SUCCESS**.
+- Owner-configured Evolution variables are present on TEST, transferred privately; independent TEST auth secrets; TTL 300s, cooldown 60s, max attempts 5. Provider check executed inside deployed TEST API at **11:38:33 UTC**: version **2.3.7**, credentials accepted, instance exists, **open/usable**, HTTP 200. Temporary SSH key revoked and removed after the check. **No real WhatsApp message sent**; no explicitly configured safe delivery number.
+- All **33 migrations applied to TEST only** using `prisma migrate deploy`, including `20260911190000_retire_firebase_phone_subject`; Prisma up to date, 0 failed migrations, retired column absent. Reset/configuration seed completed twice. No `db push` or Production migration.
+- TEST counts after reset and API smoke: **1 Admin; 0 customer users/profiles/revisions/OTP challenges/mobile auth challenges/mobile refresh tokens/Web sessions/device sessions**. **17 approved templates**, **4 plans**, **PERSONAL/BUSINESS enabled**, **EG enabled**, **7 legal documents**, **33 Link Platforms**, **10 categories/10 module definitions**, **7 published onboarding definitions**, **3 SystemSettings**. No customer profiles or Inventory demo data seeded. Admin login uses the owner's local `ADMIN_EMAIL`/`ADMIN_PASSWORD` through the TEST `/admin/login`; no values recorded.
+- Verification: **74 focused backend tests + 6 TEST environment guard tests passed**; TypeScript/Web lint, Prisma validate/generate, root production Web/workspace build and diff check passed. Android TEST `assembleDebug` passed. Live TEST health, public homepage, Admin login, bootstrap, category/template APIs and Terms/Privacy AR/EN/FR resolution: HTTP 200. OTP API: invalid phone 400, disabled country 400, throttle 429 with 60s retry, invalid verify 400; no OTP/hash/token disclosure and no challenge creation.
+- TEST APK: **`E:\saas\popwam-tap\apps\android\app\build\outputs\apk\debug\pop-auth-test-debug.apk`**, **53,480,757 bytes**, SHA-256 **`7F37CE0DB7ABB28544E76D269EDC8B6494B067B25C91851A12BAF64E62FF48A2`**. Package **com.popwam.pop.debug**, versionName **0.0.12-debug**, versionCode **12**. Existing Gradle environment variables reused; actual generated BuildConfig and APK DEX prove API/auth/token forwarding/draft-preview target TEST. Public base is TEST. No Android UI/architecture changes in activation. Same debug package as before; use this clearly named artifact.
+- Limitations: physical/real-delivery acceptance pending. TEST image storage disabled to avoid Production write credentials; skip optional avatar/cover uploads. Existing out-of-scope My Profile share/display strings still mention Production; they are not login/API/draft-preview targets. Do not use those legacy share links as TEST acceptance targets.
+- Production before/after read-only snapshots match: **3 users, 10 profiles, 32 migrations**, matching row fingerprints and full environment-variable fingerprint. Pre-existing Production deployment **`59c18ff0-c958-494a-bdb5-70a8ad93daa7`** remains SUCCESS and unchanged; Evolution variables remain absent exactly as before. **NO PRODUCTION DATA RESET / NO PRODUCTION MIGRATION / NO PRODUCTION AUTH DEPLOYMENT**.
+- **NO EMULATOR / NO ADB / NO PHYSICAL DEVICE / NO APK INSTALLED / NO ADMIN CLEANUP / NO INVENTORY CLEANUP / NO COMMIT CREATED**. No next Acceptance Correction pass.
+- Full topology, redacted isolation proof, seed manifest, deployment/tests, APK evidence, credential-rotation note and owner checklist A–L: [AUTH TEST activation report](AUTH_TEST_ENVIRONMENT_ACTIVATION.md). Rebuild command: `scripts/build-auth-test-apk.ps1`; guarded operational commands: `scripts/auth-test-environment.mjs`.
+
 ## Handoff Update Policy
 
 At the start of every future Web/Admin pass, read this file first, treat CLOSED passes as baseline, and inspect only current-pass files/direct dependencies. At the end, update this same file; close a pass only after successful verification; refresh limitations, canonical routes/components, migration/deployment state, and Next Pass. Keep it concise and do not paste command logs.
+
+## 20. PASS 7 — CLEAN ONBOARDING / FIRST PROFILE / PASSKEY / BIOMETRIC / APK CLEANUP
+
+**IMPLEMENTED / CODE VERIFIED / AWAITING OWNER PHYSICAL ACCEPTANCE.**
+
+Old Android profile-category/type onboarding, the shared tour and the second virtual-card creation wizard are hard deleted. All create entries use PERSONAL/BUSINESS. Account identity, profile existence and template appearance are separate; first and additional profiles use authoritative `personal-sunrise` / `business-horizon` fallback without a client catalog prerequisite. Template selection/preview follow profile creation and retain PASS 6 revision authority.
+
+Credential Manager/WebAuthn registration and returning login use server-owned public credentials/challenges and normal POP sessions. Optional strong biometrics unlock a Keystore-wrapped session encryption key; they are not server identity. Explicit passkey/WhatsApp recovery remains available. Existing encrypted LocalFirst/account isolation is preserved. No new PASS 7 migration was required.
+
+250 app JVM tests passed, plus 8 foundation and 13 shared onboarding JVM tests; zero failures/errors/skips. The focused auth/security set covers 54 tests (14 onboarding, 2 actual profile/catalog-resume view-model, 10 security operations, 17 phone/passkey login and 11 session tests). Default template truth is tested on the backend rather than duplicated in Android. No instrumentation was run. Backend: 508 passed, 9 pre-existing opt-in integration skips; TypeScript/lint, Prisma validate/generate, Web build, Android lint/debug/analysis and diff checks passed.
+
+APK before: **53,480,757 bytes / 53.480757 MB**. APK after: **29,644,975 bytes / 29.644975 MB**. Reduced by **23,835,782 bytes / 23.835782 MB / 44.5689%**. Optimized analysis: **12,333,102 bytes / 12.333102 MB**; raw APK size is not Play download size. Removed unused extended icons/Ktor, obsolete creation code/strings and seven tour PNGs; separately reclaimed measured incremental ZIP free space.
+
+`E:\saas\popwam-tap\apps\android\app\build\outputs\apk\debug\pop-pass7-test-debug.apk`, **29,644,975 bytes / 29.644975 MB**, SHA-256 `188c635440c5648f9d9685386d7ab96ec9627a02a0f29d082c573caf8f31b145`. Package `com.popwam.pop.debug`; versionName `0.0.12-debug`; versionCode `12`; minSdk 26 / targetSdk 36; arm64-v8a. API `https://popwam-auth-test-test.up.railway.app/`; public `https://popwam-public-test-test.up.railway.app/`. This is the APK for owner manual TEST acceptance.
+
+TEST deployments: auth `53d7b1f2-db34-4bbd-9b47-6b965c3aac84`, public `449c5f7c-a236-4666-b1b7-a59ac7db176e` (both SUCCESS). Isolation, health, TEST passkey RP/assetlinks and authenticated/CSRF-protected setup endpoints verified. TEST predeploy found no pending migration. Read-only comparison confirms Production deployment, variables, users, profiles and migrations unchanged.
+
+Full 31-point report, exact deletions, hashes, measurements, security limits and owner physical checklist: [POP_PASS7_VERIFICATION.md](POP_PASS7_VERIFICATION.md). No emulator, ADB, physical device, installation, instrumentation, owner OTP automation, production deployment/migration, Admin/Inventory cleanup or commit. Stop at owner PASS 7 acceptance.

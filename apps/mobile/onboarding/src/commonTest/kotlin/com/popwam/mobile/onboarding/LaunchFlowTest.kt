@@ -1,9 +1,7 @@
 package com.popwam.mobile.onboarding
 
-import com.popwam.mobile.foundation.launch.CURRENT_WELCOME_VERSION
 import com.popwam.mobile.foundation.launch.LaunchState
 import com.popwam.mobile.foundation.navigation.PopDestination
-import com.popwam.mobile.foundation.navigation.WelcomePage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -18,7 +16,7 @@ class LaunchFlowTest {
         val theme = language.copy(hasSelectedBaseTheme = true)
         assertEquals(PopDestination.Language, requiredDestination(splash, false))
         assertEquals(PopDestination.Theme, requiredDestination(language, false))
-        assertEquals(PopDestination.Welcome(), requiredDestination(theme, false))
+        assertEquals(PopDestination.PhoneAuth, requiredDestination(theme, false))
     }
 
     @Test fun completeAndAuthenticatedLaunchesUseExistingDestinations() {
@@ -27,17 +25,10 @@ class LaunchFlowTest {
             hasSelectedLanguage = true,
             selectedLanguageTag = "en",
             hasSelectedBaseTheme = true,
-            hasCompletedWelcome = true,
-            welcomeVersionSeen = CURRENT_WELCOME_VERSION,
         )
         assertEquals(PopDestination.PhoneAuth, requiredDestination(complete, false))
         assertEquals(PopDestination.Home, requiredDestination(complete, true))
     }
 
-    @Test fun welcomeOrderIsExact() {
-        assertEquals(WelcomePage.SHARE_YOUR_WAY, nextWelcomePage(WelcomePage.ALL_IN_ONE))
-        assertEquals(WelcomePage.PERSONAL_AND_BUSINESS, nextWelcomePage(WelcomePage.SHARE_YOUR_WAY))
-        assertEquals(WelcomePage.GET_STARTED, nextWelcomePage(WelcomePage.PERSONAL_AND_BUSINESS))
-        assertNull(nextWelcomePage(WelcomePage.GET_STARTED))
-    }
+
 }

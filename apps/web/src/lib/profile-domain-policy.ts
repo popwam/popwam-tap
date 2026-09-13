@@ -13,13 +13,6 @@ export function primaryProfileDecision(input: { activePrimaryIds: string[]; targ
   return { allowed: true as const };
 }
 
-export function categoryTemplateCompatibility(input: { profileKind: ProfileKind; categoryKind?: ProfileKind | null; templateKind?: ProfileKind | null; templateCategoryMatches?: boolean }) {
-  if (input.categoryKind && input.categoryKind !== input.profileKind) return { compatible: false as const, reason: "PROFILE_CATEGORY_INCOMPATIBLE" };
-  if (input.templateKind && input.templateKind !== input.profileKind) return { compatible: false as const, reason: "PROFILE_TEMPLATE_INCOMPATIBLE" };
-  if (input.templateCategoryMatches === false) return { compatible: false as const, reason: "PROFILE_TEMPLATE_CATEGORY_MISMATCH" };
-  return { compatible: true as const };
-}
-
 export function defaultModuleKeys(rules: Array<{ key: string; allowed: boolean; enabledByDefault: boolean; required: boolean }>, fallback: string[]) {
   const selected = rules.filter((rule) => rule.allowed && (rule.enabledByDefault || rule.required)).map((rule) => rule.key);
   return selected.length ? selected : fallback;

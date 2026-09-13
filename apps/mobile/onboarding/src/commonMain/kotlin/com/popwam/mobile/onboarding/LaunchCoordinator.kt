@@ -1,12 +1,10 @@
 package com.popwam.mobile.onboarding
 
-import com.popwam.mobile.foundation.launch.CURRENT_WELCOME_VERSION
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.LaunchState
 import com.popwam.mobile.foundation.launch.LaunchStateStore
 import com.popwam.mobile.foundation.launch.ThemeMode
 import com.popwam.mobile.foundation.navigation.PopDestination
-import com.popwam.mobile.foundation.navigation.WelcomePage
 import com.popwam.mobile.foundation.overlay.OverlayCoordinator
 import com.popwam.mobile.foundation.overlay.OverlayEntry
 import com.popwam.mobile.foundation.overlay.OverlayKey
@@ -70,7 +68,7 @@ class LaunchCoordinator(
     suspend fun completeThemeSelection() {
         val updated = store.update { it.copy(hasSelectedBaseTheme = true) }
         mutableState.value = mutableState.value.copy(
-            destination = PopDestination.Welcome(WelcomePage.ALL_IN_ONE),
+            destination = PopDestination.PhoneAuth,
             persisted = updated,
         )
     }
@@ -100,46 +98,12 @@ class LaunchCoordinator(
         overlays.dismiss(THEME_GALLERY_OVERLAY_ID)
     }
 
-    fun showWelcome(page: WelcomePage) {
-        mutableState.value = mutableState.value.copy(destination = PopDestination.Welcome(page))
-    }
-
     fun showLanguage() {
         mutableState.value = mutableState.value.copy(destination = PopDestination.Language)
     }
 
     fun showTheme() {
         mutableState.value = mutableState.value.copy(destination = PopDestination.Theme)
-    }
-
-    fun nextWelcome(page: WelcomePage) {
-        nextWelcomePage(page)?.let(::showWelcome)
-    }
-
-    fun previousWelcome(page: WelcomePage): Boolean {
-        val previous = previousWelcomePage(page) ?: return false
-        showWelcome(previous)
-        return true
-    }
-
-    fun skipWelcome() {
-        showWelcome(WelcomePage.GET_STARTED)
-    }
-
-    suspend fun completeWelcome(): Boolean {
-        if (mutableState.value.finalNavigationCommitted) return false
-        mutableState.value = mutableState.value.copy(finalNavigationCommitted = true)
-        val updated = store.update {
-            it.copy(
-                hasCompletedWelcome = true,
-                welcomeVersionSeen = CURRENT_WELCOME_VERSION,
-            )
-        }
-        mutableState.value = mutableState.value.copy(
-            destination = PopDestination.PhoneAuth,
-            persisted = updated,
-        )
-        return true
     }
 
     suspend fun preservePendingDestination(destination: PopDestination?) {

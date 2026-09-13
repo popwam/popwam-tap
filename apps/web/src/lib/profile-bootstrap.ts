@@ -5,12 +5,15 @@ import {
 } from "./legal-consent";
 import {
   initializeDefaultModules,
-  validateProfileTemplate,
+  validateProfileQuota,
 } from "./profile-domain";
 import {
-  accountLegalDocumentTypes,
   legalReadyForDocuments,
 } from "./legal-readiness-policy";
+
+import { getAccountTypePolicies } from "./account-type-policy";
+import { getUserEntitlements } from "./plans";
+import { resolveInitialTemplate } from "./profile-bootstrap-template";
 
 type BootstrapData = Record<string, unknown>;
 const readData = (data: unknown): BootstrapData =>
@@ -23,7 +26,6 @@ export type ProfileBootstrapInput = {
   locale: string;
   displayName: string;
   profileKind: ProfileKind;
-  categorySlug: string;
   templateId?: string | null;
 };
 
@@ -52,7 +54,7 @@ export async function getProfileBootstrapStatus(
   locale: string,
 ) {
   const now = new Date();
-  const [progress, profiles, documents, consents, passkeyCount] =
+  const [progress, profiles, documents, consents, passkeyCount, user, policies, entitlements] =
     await Promise.all([
       prisma.onboardingProgress.findUnique({
         where: { userId },
@@ -67,6 +69,8 @@ export async function getProfileBootstrapStatus(
           categoryId: true,
           templateId: true,
           lifecycle: true,
+          displayName: true,
+          template: { select: { slug: true, nameAr: true, nameEn: true } },
         },
         orderBy: { createdAt: "asc" },
       }),
@@ -76,6 +80,9 @@ export async function getProfileBootstrapStatus(
         select: { legalDocumentId: true },
       }),
       prisma.passkeyCredential.count({ where: { userId, revokedAt: null } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+      getAccountTypePolicies(),
+      getUserEntitlements(userId),
     ]);
   const data = readData(progress?.data);
   const requiredIds = new Set(documents.map((document) => document.id));
@@ -87,8 +94,16 @@ export async function getProfileBootstrapStatus(
     legalReady && [...requiredIds].every((id) => acceptedIds.has(id));
   const primary = profiles.find(
     (profile) => profile.isPrimary && profile.lifecycle !== "ARCHIVED",
-  );
+  ) || profiles.find(profile => profile.lifecycle !== "ARCHIVED");
   return {
+    accountName: user?.name || "",
+    accountKind: data.accountKind || primary?.profileKind || null,
+    setupStep: data.pass7Step || null,
+    profileName: primary?.displayName || "",
+    templateId: primary?.templateId || null,
+    templateName: locale === "ar" ? primary?.template?.nameAr : primary?.template?.nameEn,
+    templateSlug: primary?.template?.slug || null,
+    accountTypes: Object.values(policies).map(policy => ({ key: policy.key, enabled: policy.enabled && (policy.key !== "BUSINESS" || Boolean(entitlements.effective.allowBusinessCards)) })),
     isNewAccount: data.phaseCNewAccount === true,
     bootstrapComplete: data.phaseCProfileBootstrapComplete === true,
     hasPrimaryProfile: Boolean(primary),
@@ -99,8 +114,6 @@ export async function getProfileBootstrapStatus(
       documentType: document.documentType as "TERMS" | "PRIVACY",
     })),
     passkeyCount,
-    legacyProfileCount: profiles.filter((profile) => !profile.profileKind)
-      .length,
     primaryProfileId: primary?.id || null,
   };
 }
@@ -116,14 +129,14 @@ export async function acceptRequiredLegalConsentForBootstrap(
   );
 }
 
-/** Converts only the single placeholder profile created for a marked new OTP
- * account. Existing multi-profile users are deliberately routed to a future
- * compatibility upgrade instead of being silently rewritten. */
+/** Creates the first draft only after user-provided identity and legal consent.
+ * A historical single placeholder can still be completed; multi-profile users
+ * are never silently rewritten. */
 export async function completeInitialProfileBootstrap(
   input: ProfileBootstrapInput,
 ) {
   const displayName = input.displayName.trim();
-  if (!displayName) throw new Error("PROFILE_NAME_REQUIRED");
+  if (!displayName || displayName.length > 160) throw new Error("PROFILE_NAME_REQUIRED");
   const resolvedDocuments = await resolvedAccountLegalDocuments(
     input.userId,
     input.locale,
@@ -144,8 +157,7 @@ export async function completeInitialProfileBootstrap(
       ]);
       const documents = resolvedDocuments;
       const data = readData(progress?.data);
-      if (data.phaseCNewAccount !== true)
-        throw new Error("PROFILE_BOOTSTRAP_COMPATIBILITY_REQUIRED");
+
       if (!legalReadyForDocuments(documents, now))
         throw new Error("LEGAL_DOCUMENTS_UNAVAILABLE");
       const acceptedIds = new Set(
@@ -156,41 +168,41 @@ export async function completeInitialProfileBootstrap(
       const canonicalPrimary = profiles.find(
         (profile) => profile.isPrimary && profile.lifecycle !== "ARCHIVED",
       );
-      if (data.phaseCProfileBootstrapComplete === true && canonicalPrimary)
+      if (canonicalPrimary)
         return canonicalPrimary;
-      if (profiles.length !== 1)
+      if (profiles.length > 1)
         throw new Error("PROFILE_BOOTSTRAP_COMPATIBILITY_REQUIRED");
       const placeholder = profiles[0];
-      const { category, template } = await validateProfileTemplate(tx, {
-        profileKind: input.profileKind,
-        categorySlug: input.categorySlug,
-        templateId: input.templateId || null,
-      });
-      const profile = await tx.profile.update({
-        where: { id: placeholder.id },
-        data: {
+      const policies = await getAccountTypePolicies(tx);
+      if (!policies[input.profileKind].enabled) throw new Error("ACCOUNT_TYPE_UNAVAILABLE");
+      const quota = await validateProfileQuota(tx, input.userId, input.profileKind, placeholder ? 0 : 1);
+      const template = await resolveInitialTemplate(tx, input.profileKind, input.templateId, quota.plan.slug);
+      const identityData = {
           displayName,
           displayLabel: displayName,
           displayNameAr:
-            input.locale === "ar" ? displayName : placeholder.displayNameAr,
+            input.locale === "ar" ? displayName : placeholder?.displayNameAr,
           displayNameEn:
-            input.locale === "en" ? displayName : placeholder.displayNameEn,
-          type: input.profileKind === "BUSINESS" ? "ORGANIZATION" : "PERSONAL",
+            input.locale !== "ar" ? displayName : placeholder?.displayNameEn,
+          type: input.profileKind === "BUSINESS" ? "ORGANIZATION" as const : "PERSONAL" as const,
           profileKind: input.profileKind,
-          categoryId: category?.id || null,
+          categoryId: null,
           templateId: template?.id || null,
-          lifecycle: "DRAFT",
+          lifecycle: "DRAFT" as const,
           isPrimary: true,
-        },
-      });
-      await tx.user.update({
-        where: { id: input.userId },
-        data: { name: displayName },
-      });
+      };
+      const profile = placeholder
+        ? await tx.profile.update({ where: { id: placeholder.id }, data: identityData })
+        : await tx.profile.create({ data: { ...identityData, userId: input.userId, primaryLanguage: input.locale } });
+      await tx.virtualCard.upsert({ where: { profileId: profile.id },
+        update: { name: displayName, themeId: template?.id || null },
+        create: { userId: input.userId, profileId: profile.id, name: displayName, type: input.profileKind, isDefault: true, themeId: template?.id || null } });
       await initializeDefaultModules(tx, profile.id, template?.id);
       const next = {
         ...data,
         phaseCProfileBootstrapComplete: true,
+        accountKind: input.profileKind,
+        pass7Step: "TEMPLATE",
         phaseCProfileBootstrapProfileId: profile.id,
       };
       await tx.onboardingProgress.upsert({
@@ -205,7 +217,7 @@ export async function completeInitialProfileBootstrap(
           targetId: profile.id,
           metadata: {
             profileKind: input.profileKind,
-            categorySlug: category?.slug || null,
+            categorySlug: null,
             templateId: template?.id || null,
           },
         },
@@ -214,4 +226,32 @@ export async function completeInitialProfileBootstrap(
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
+}
+
+/** Small resumable account setup contract; old category questionnaires are not consulted. */
+export async function saveAccountSetup(userId: string, action: string, value?: string) {
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`);
+    const progress = await tx.onboardingProgress.findUnique({ where: { userId } });
+    const data = readData(progress?.data);
+    if (action === "NAME") {
+      const name = value?.trim();
+      if (!name || name.length > 160) throw new Error("PROFILE_NAME_REQUIRED");
+      await tx.user.update({ where: { id: userId }, data: { name } });
+    } else if (action === "ACCOUNT_TYPE") {
+      if (value !== "PERSONAL" && value !== "BUSINESS") throw new Error("PROFILE_KIND_INVALID");
+      const policies = await getAccountTypePolicies(tx);
+      if (!policies[value].enabled) throw new Error("ACCOUNT_TYPE_UNAVAILABLE");
+      await validateProfileQuota(tx, userId, value);
+      data.accountKind = value;
+    } else if (action === "SECURITY" || action === "COMPLETE") {
+      const profile = await tx.profile.findFirst({ where: { userId, isPrimary: true, lifecycle: { not: "ARCHIVED" } } });
+      if (!profile) throw new Error("PROFILE_REQUIRED");
+      data.pass7Step = action === "SECURITY" ? "SECURITY" : "COMPLETE";
+    } else throw new Error("SETUP_ACTION_INVALID");
+    await tx.onboardingProgress.upsert({ where: { userId },
+      create: { userId, data: data as Prisma.InputJsonValue, ...(action === "COMPLETE" ? { completedAt: new Date() } : {}) },
+      update: { data: data as Prisma.InputJsonValue, ...(action === "COMPLETE" ? { completedAt: new Date() } : {}) } });
+    return { ok: true };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

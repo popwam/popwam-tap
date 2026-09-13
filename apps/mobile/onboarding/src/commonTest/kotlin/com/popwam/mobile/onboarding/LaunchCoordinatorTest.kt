@@ -5,7 +5,6 @@ import com.popwam.mobile.foundation.launch.LaunchStatePersistence
 import com.popwam.mobile.foundation.launch.PersistedLaunchStateStore
 import com.popwam.mobile.foundation.launch.ThemeMode
 import com.popwam.mobile.foundation.navigation.PopDestination
-import com.popwam.mobile.foundation.navigation.WelcomePage
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,10 +20,6 @@ class LaunchCoordinatorTest {
         coordinator.selectLanguage("ar")
         coordinator.selectBaseTheme(ThemeMode.DARK)
         coordinator.completeThemeSelection()
-        coordinator.skipWelcome()
-        assertEquals(PopDestination.Welcome(WelcomePage.GET_STARTED), coordinator.state.value.destination)
-        assertTrue(coordinator.completeWelcome())
-        assertFalse(coordinator.completeWelcome())
         assertEquals(PopDestination.PhoneAuth, coordinator.state.value.destination)
     }
 
@@ -52,8 +47,6 @@ class LaunchCoordinatorTest {
         coordinator.selectLanguage("en")
         coordinator.selectBaseTheme(ThemeMode.SYSTEM)
         coordinator.completeThemeSelection()
-        coordinator.skipWelcome()
-        coordinator.completeWelcome()
 
         val restored = LaunchCoordinator(PersistedLaunchStateStore(persistence))
         restored.restore()

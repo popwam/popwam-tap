@@ -42,9 +42,9 @@ import com.popwam.pop.ui.share.AndroidShareRepository
 import com.popwam.pop.ui.share.ShareViewModel
 import com.popwam.pop.ui.share.ShareViewModelFactory
 import com.popwam.pop.ui.currentLocale
-import com.popwam.pop.ui.auth.AuthenticationFlowFactory
-import com.popwam.pop.ui.auth.AuthenticationFlowViewModel
-import com.popwam.pop.ui.auth.AuthenticationHost
+import com.popwam.pop.ui.auth.PhoneLoginFactory
+import com.popwam.pop.ui.auth.PhoneLoginViewModel
+import com.popwam.pop.ui.auth.PhoneLoginScreen
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.popwam.mobile.onboarding.LaunchCoordinator
@@ -57,9 +57,10 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     private val adapter by lazy { NfcAdapter.getDefaultAdapter(this) }
     private var resumed = false
+    private var backgroundLock:kotlinx.coroutines.Job?=null
     private lateinit var appearanceStore: AppearanceStore
     private lateinit var launchViewModel: LaunchViewModel
-    private lateinit var authenticationViewModel: AuthenticationFlowViewModel
+    private lateinit var authenticationViewModel: PhoneLoginViewModel
     private var systemSplashExited by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,8 +105,8 @@ class MainActivity : AppCompatActivity() {
         if (systemSplashExited) launchViewModel.onSystemSplashExited()
         authenticationViewModel = ViewModelProvider(
             this,
-            AuthenticationFlowFactory(app.container.authenticationRemote,app.container.sessionStore,app.container.firebasePhoneAuth),
-        )[AuthenticationFlowViewModel::class.java]
+            PhoneLoginFactory(com.popwam.pop.ui.auth.SessionPhoneLoginGateway(app.container.sessions)),
+        )[PhoneLoginViewModel::class.java]
         setContent {
             val launchState by launchViewModel.state.collectAsStateWithLifecycle()
             val localization by app.container.localization.state.collectAsStateWithLifecycle()
@@ -113,9 +114,14 @@ class MainActivity : AppCompatActivity() {
                 appearanceStore.synchronize(launchState.persisted.selectedBaseTheme.name, launchState.persisted.selectedPopStyle.name)
             }
             LaunchExperience(launchViewModel,localization,popFontFamilies(),systemSplashExited) {
-                val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics,app.container.firebasePhoneAuth))
+                val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics))
                 val authState by auth.state.collectAsStateWithLifecycle()
-                if(!authState.authenticated) {
+                val biometricLocked by app.container.sessionStore.locked.collectAsStateWithLifecycle()
+                if(biometricLocked) {
+                    PopwamTheme(launchState.persisted.selectedBaseTheme.name,"DEFAULT",launchState.persisted.selectedPopStyle.name) {
+                        com.popwam.pop.ui.auth.BiometricUnlockScreen(auth::restoreUnlockedSession)
+                    }
+                } else if(!authState.authenticated) {
                     androidx.compose.runtime.LaunchedEffect(app.container.phoneCountries) {
                         app.container.phoneCountries.refresh()
                     }
@@ -126,11 +132,10 @@ class MainActivity : AppCompatActivity() {
                         currentLocale(),
                         popFontFamilies(),
                     ) {
-                        AuthenticationHost(
+                        PhoneLoginScreen(
                             authenticationViewModel,
                             app.container.phoneCountries,
-                            onAuthenticated=auth::adoptPhase4Session,
-                            onProfileSetup={ destination -> launchViewModel.acceptProfileSetupHandoff(destination) },
+                            onAuthenticated=auth::adoptOtpSession,
                         )
                     }
                 } else {
@@ -158,17 +163,21 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        backgroundLock?.cancel()
         if (::launchViewModel.isInitialized) launchViewModel.setForeground(true)
     }
 
     override fun onStop() {
+        if(!isChangingConfigurations)backgroundLock=lifecycleScope.launch {
+            kotlinx.coroutines.delay(30_000)
+            (application as TapApplication).container.sessionStore.lockForBackground()
+        }
         if (::launchViewModel.isInitialized) launchViewModel.setForeground(false)
         super.onStop()
     }
 
     override fun onResume() {
         super.onResume()
-        if(::authenticationViewModel.isInitialized)authenticationViewModel.refreshBiometric(this)
         resumed = true
         updateNfcMode(NfcCoordinator.active.value)
     }

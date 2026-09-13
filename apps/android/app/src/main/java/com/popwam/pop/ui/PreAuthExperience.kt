@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package com.popwam.pop.ui
 
 import android.content.Context
@@ -66,15 +67,6 @@ import com.popwam.pop.data.api.PublishedLegalDocumentDto
 import kotlinx.coroutines.launch
 
 enum class PreAuthLegalKind { TERMS, PRIVACY }
-enum class UnauthenticatedDestination { PHONE_AUTH, HOW_POP_WORKS, TERMS, PRIVACY }
-
-fun destinationForLegal(kind: PreAuthLegalKind) = when (kind) {
-    PreAuthLegalKind.TERMS -> UnauthenticatedDestination.TERMS
-    PreAuthLegalKind.PRIVACY -> UnauthenticatedDestination.PRIVACY
-}
-
-fun howPopWorksDestination() = UnauthenticatedDestination.HOW_POP_WORKS
-
 fun applyPopLanguage(language: String) {
     if (language !in LocalePolicy.availableLocales()) return
     AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language))
@@ -84,92 +76,6 @@ fun persistPopLanguageChoice(context: Context, language: String) {
     (context.applicationContext as? com.popwam.pop.TapApplication)?.container?.persistSelectedLanguage(language)
 }
 
-private data class IntroPage(val title: Int, val body: Int, val icon: ImageVector)
-
-/** Existing Phone Number help content. Phase 3 first-launch onboarding does not use this pager. */
-@Composable
-fun ProductIntroScreen(
-    onBack: () -> Unit,
-    onComplete: () -> Unit,
-    helpMode: Boolean = false,
-) {
-    PopSystemBars(MaterialTheme.colorScheme.background.red < .2f)
-    val pages = remember {
-        listOf(
-            IntroPage(R.string.pre_auth_intro_identity_title, R.string.pre_auth_intro_identity_body, Icons.Default.Person),
-            IntroPage(R.string.pre_auth_intro_share_title, R.string.pre_auth_intro_share_body, Icons.Default.QrCode2),
-            IntroPage(R.string.pre_auth_intro_connect_title, R.string.pre_auth_intro_connect_body, Icons.Default.Groups),
-            IntroPage(R.string.pre_auth_intro_ready_title, R.string.pre_auth_intro_ready_body, Icons.Default.Celebration),
-        )
-    }
-    val pager = rememberPagerState(pageCount = { pages.size })
-    val scope = rememberCoroutineScope()
-    PreAuthBackdrop {
-        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().weight(1f)) { index ->
-                val page = pages[index]
-                Column(
-                    Modifier.fillMaxSize().padding(horizontal = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Surface(
-                        modifier = Modifier.size(148.dp),
-                        shape = RoundedCornerShape(42.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = .15f),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(page.icon, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    Spacer(Modifier.height(30.dp))
-                    Text(
-                        stringResource(page.title),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Black,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        stringResource(page.body),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.Center) {
-                pages.indices.forEach { index ->
-                    Box(
-                        Modifier.padding(4.dp).size(if (index == pager.currentPage) 22.dp else 8.dp).background(
-                            if (index == pager.currentPage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .35f),
-                            CircleShape,
-                        ),
-                    )
-                }
-            }
-            Button(
-                onClick = {
-                    if (pager.currentPage == pages.lastIndex) onComplete()
-                    else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
-                },
-                modifier = Modifier.fillMaxWidth().padding(24.dp).height(54.dp),
-            ) {
-                Text(
-                    stringResource(
-                        if (pager.currentPage == pages.lastIndex) {
-                            if (helpMode) R.string.back_to_sign_in else R.string.continue_to_pop
-                        } else R.string.next,
-                    ),
-                )
-                Spacer(Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeLegalScreen(kind: PreAuthLegalKind, onBack: () -> Unit) {
     val title = if (kind == PreAuthLegalKind.TERMS) R.string.terms else R.string.privacy
@@ -237,19 +143,4 @@ fun NativeLegalScreen(kind: PreAuthLegalKind, onBack: () -> Unit) {
             item { Text(stringResource(R.string.legal_reading_not_consent), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
-}
-
-@Composable
-private fun PreAuthBackdrop(content: @Composable () -> Unit) {
-    Box(
-        Modifier.fillMaxSize().background(
-            Brush.verticalGradient(
-                listOf(
-                    MaterialTheme.colorScheme.background,
-                    MaterialTheme.colorScheme.surface,
-                    MaterialTheme.colorScheme.primary.copy(alpha = .10f),
-                ),
-            ),
-        ),
-    ) { content() }
 }

@@ -5,11 +5,9 @@ import com.google.gson.JsonPrimitive
 
 enum class ProfileLoadState { INITIAL_LOADING, CONTENT, EMPTY, ERROR }
 enum class ProfileBackendKind { PERSONAL, BUSINESS }
-enum class ProfileCategoryKind { PERSONAL, PROFESSIONAL, BUSINESS, RESTAURANT, CLINIC, SERVICES, CREATOR, OTHER }
 enum class ProfileVerificationState { UNAVAILABLE, UNVERIFIED, PENDING, VERIFIED, REJECTED }
 enum class ProfileEditorSection { BASIC_INFORMATION, ABOUT, CONTACT_LINKS, TYPE_DETAILS, MEDIA, APPEARANCE, VERIFICATION, VISIBILITY, SERVICES, LOCATIONS, TEMPLATE }
 enum class ProfileSaveState { IDLE, SAVING, SUCCESS, FAILURE }
-enum class ProfilePendingCapability { WORKING_HOURS, TEAM, EDUCATION, EXPERIENCE, SKILLS, PROJECTS, CERTIFICATES, MENU, DELIVERY_RESERVATION, DOCTORS, BOOKING, LICENSE_VERIFICATION }
 
 data class ProfileCompletion(
     val publishReady: Boolean = false,
@@ -32,7 +30,6 @@ data class OwnedProfile(
     val subtitle: String? = null,
     val avatarUrl: String? = null,
     val backendKind: ProfileBackendKind,
-    val categoryKind: ProfileCategoryKind,
     val categoryKey: String? = null,
     val lifecycle: String,
     val visibility: String,
@@ -188,7 +185,6 @@ data class ProfileContent(
     val media: List<ProfileMedia>,
     val modules: List<ProfileModule>,
     val addableModules: List<ProfileModuleOption> = emptyList(),
-    val pendingCapabilities: Set<ProfilePendingCapability> = emptySet(),
     val fieldCapabilities: List<ProfileFieldCapability> = emptyList(),
     val structuredEntries: List<ProfileStructuredEntry> = emptyList(),
     val contentCompletion: ProfileContentCompletion = ProfileContentCompletion(),
@@ -208,12 +204,6 @@ data class ProfileContent(
     val storefront: com.popwam.pop.data.api.StorefrontEntitlementsDto = com.popwam.pop.data.api.StorefrontEntitlementsDto(),
 )
 
-data class ProfileCategoryOption(
-    val slug: String,
-    val name: String,
-    val backendKind: ProfileBackendKind,
-    val defaultTemplateId: String?,
-)
 
 data class ProfileQuota(
     val used: Int = 0,
@@ -232,8 +222,6 @@ data class ProfilesUiState(
     val activeProfileId: String? = null,
     val content: ProfileContent? = null,
     val quota: ProfileQuota = ProfileQuota(),
-    val categories: List<ProfileCategoryOption> = emptyList(),
-    val categoryKindLoading: ProfileBackendKind? = null,
     val refreshing: Boolean = false,
     val partial: Boolean = false,
     val offline: Boolean = false,
@@ -305,8 +293,7 @@ sealed interface ProfileEvent {
     data class Save(val mutation:ProfileEditorMutation):ProfileEvent
     data class SaveVisibility(val access:String,val slug:String):ProfileEvent
     data class PublishProfile(val action:String):ProfileEvent
-    data class LoadCategories(val kind:ProfileBackendKind):ProfileEvent
-    data class CreateProfile(val name:String,val kind:ProfileBackendKind,val categorySlug:String?,val templateId:String?):ProfileEvent
+    data class CreateProfile(val name:String,val kind:ProfileBackendKind):ProfileEvent
     data class ArchiveProfile(val id:String,val replacementId:String?):ProfileEvent
     data class UploadMedia(val media:ProfileMediaUpload):ProfileEvent
     data class UploadDocument(val document:ProfileDocumentUpload):ProfileEvent

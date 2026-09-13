@@ -13,10 +13,9 @@ class PasskeyLoginPolicyTest {
     private class GetCredentialCancellationException:Exception()
     private class NoCredentialException:Exception()
 
-    @Test fun `returning entry is passkey first with phone fallback`()=assertEquals(listOf("PASSKEY","PHONE"),returningAuthActionOrder)
     @Test fun `passkey is hidden below Android 9`() { assertFalse(passkeyPlatformSupported(27));assertTrue(passkeyPlatformSupported(28)) }
-    @Test fun `cancellation keeps phone fallback`() { val error=passkeyLoginError(GetCredentialCancellationException());assertEquals(PasskeyLoginError.CANCELLED,error);assertTrue(phoneFallbackAvailable(error)) }
-    @Test fun `unavailable credential keeps phone fallback`() { val error=passkeyLoginError(NoCredentialException());assertEquals(PasskeyLoginError.NO_CREDENTIAL,error);assertTrue(phoneFallbackAvailable(error)) }
+    @Test fun `registration cancellation is classified`() { val error=passkeyLoginError(GetCredentialCancellationException());assertEquals(PasskeyLoginError.CANCELLED,error) }
+    @Test fun `missing credential is classified`() { val error=passkeyLoginError(NoCredentialException());assertEquals(PasskeyLoginError.NO_CREDENTIAL,error) }
     @Test fun `network failure is safe and recoverable`()=assertEquals(PasskeyLoginError.NETWORK,passkeyLoginError(IOException()))
     @Test fun `step up and server options failures remain distinct typed outcomes`() {
         assertEquals(PasskeyLoginError.STEP_UP_REQUIRED,passkeyLoginError(PasskeyOptionsHttpException(428,STEP_UP_REQUIRED,HttpException(Response.error<Any>(428,okhttp3.ResponseBody.create(null,""))))))

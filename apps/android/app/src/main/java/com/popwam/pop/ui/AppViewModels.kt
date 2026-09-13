@@ -18,16 +18,11 @@ import com.popwam.pop.data.api.ProfileTemplateDto
 import com.popwam.pop.data.api.ProfileWriteRequest
 import com.popwam.pop.data.api.PublishingStatusResponse
 import com.popwam.pop.data.api.ProfileEditorResponse
-import com.popwam.pop.data.api.VirtualCardCreateRequest
 import com.popwam.pop.data.api.WalletCapabilitiesDto
 import com.popwam.pop.data.api.VerifyNfcResponse
 import com.popwam.pop.data.api.ProfileBootstrapStatusResponse
 import com.popwam.pop.data.api.ProfileBootstrapRequest
-import com.popwam.pop.data.api.ProfileCategoryBootstrapDto
-import com.popwam.pop.data.api.ProfileBootstrapTemplateDto
 import com.popwam.pop.data.api.LegalDocumentDto
-import com.popwam.pop.data.api.OnboardingCurrentResponse
-import com.popwam.pop.data.api.OnboardingProgressRequest
 import com.popwam.pop.data.api.SettingsPreferencesResponse
 import com.popwam.pop.data.api.NotificationPreferencesDto
 import com.popwam.pop.data.api.SecurityOverviewResponse
@@ -48,9 +43,6 @@ import com.popwam.pop.data.api.NearbySettingsResponse
 import com.popwam.pop.data.api.QuotaUsageResponse
 import com.popwam.pop.data.auth.SessionRepository
 import com.popwam.pop.data.auth.PopAnalytics
-import com.popwam.pop.data.auth.FirebasePhoneAuthGateway
-import com.popwam.pop.data.auth.FirebasePhoneEvent
-import com.popwam.pop.data.auth.FirebasePhoneFailure
 import com.popwam.pop.data.auth.PhoneIdentity
 import com.popwam.pop.data.auth.PasskeyCoordinator
 import com.popwam.pop.data.auth.AuthRuntimeDiagnostics
@@ -72,419 +64,131 @@ import retrofit2.HttpException
 import java.io.ByteArrayOutputStream
 
 data class AuthUiState(
-    val authenticated: Boolean = false,
-    val challengeId: String? = null,
-    val maskedPhone: String? = null,
-    val loading: Boolean = false,
-    val error: String? = null,
-    val phoneFailure: FirebasePhoneFailure? = null,
-    val resendAfterSeconds: Int = 0,
-    @Deprecated("Legacy server OTP UI compatibility only")
-    val channels: List<String> = emptyList(),
-    val setupStage: AuthSetupStage = AuthSetupStage.PUBLIC,
-    val setupStatus: ProfileBootstrapStatusResponse? = null,
-    val legalDocuments: List<LegalDocumentDto> = emptyList(),
-    val profileName: String = "",
-    val profileKind: String? = null,
-    val categories: List<ProfileCategoryBootstrapDto> = emptyList(),
-    val categorySlug: String? = null,
-    val templates: List<ProfileBootstrapTemplateDto> = emptyList(),
-    val templateId: String? = null,
-    val passkeyLoading: Boolean = false,
-    val passkeyError: PasskeyLoginError? = null,
-    /** Ephemeral per authenticated setup journey; it never changes server passkey policy. */
-    val passkeyOfferSkippedForCurrentSetup: Boolean = false,
-    val passkeyExistingDecisionHandled: Boolean = false,
-    val onboarding: OnboardingCurrentResponse? = null,
-    val onboardingFieldErrors: Map<String,String> = emptyMap(),
+    val authenticated:Boolean=false, val loading:Boolean=false, val error:String?=null,
+    val setupStage:AuthSetupStage=AuthSetupStage.PUBLIC,
+    val setupStatus:ProfileBootstrapStatusResponse?=null,
+    val legalDocuments:List<LegalDocumentDto> = emptyList(),
+    val accountName:String="", val profileName:String="", val profileKind:String?=null,
+    val templates:List<ProfileTemplateDto> = emptyList(), val templateId:String?=null,
+    val catalogUnavailable:Boolean=false,
+    val passkeyLoading:Boolean=false, val passkeyError:PasskeyLoginError?=null,
+    val passkeyRegistered:Boolean=false,
 )
-
 enum class PasskeyLoginError { CANCELLED, UNAVAILABLE, NO_CREDENTIAL, NETWORK, STEP_UP_REQUIRED, AUTHENTICATION_FAILED, SERVER_UNAVAILABLE }
-internal val returningAuthActionOrder=listOf("PASSKEY","PHONE")
 internal fun passkeyPlatformSupported(sdkInt:Int)=sdkInt>=28
-internal fun phoneFallbackAvailable(@Suppress("UNUSED_PARAMETER") error:PasskeyLoginError?)=true
 internal fun passkeyLoginError(error:Throwable)=when {
     error::class.simpleName?.contains("Cancellation",true)==true -> PasskeyLoginError.CANCELLED
     error::class.simpleName?.contains("NoCredential",true)==true -> PasskeyLoginError.NO_CREDENTIAL
     error is java.io.IOException -> PasskeyLoginError.NETWORK
     error is PasskeyOptionsHttpException && error.safeCode==STEP_UP_REQUIRED -> PasskeyLoginError.STEP_UP_REQUIRED
     error is PasskeyOptionsHttpException && error.safeCode==PASSKEY_OPTIONS_FAILED -> PasskeyLoginError.SERVER_UNAVAILABLE
-    error is PasskeyOptionsHttpException && error.statusCode>=500 -> PasskeyLoginError.SERVER_UNAVAILABLE
-    error is retrofit2.HttpException && error.code()>=500 -> PasskeyLoginError.SERVER_UNAVAILABLE
-    error is retrofit2.HttpException -> PasskeyLoginError.AUTHENTICATION_FAILED
+    error is HttpException -> PasskeyLoginError.AUTHENTICATION_FAILED
     else -> PasskeyLoginError.UNAVAILABLE
 }
-
-class AuthViewModel(
-    private val sessions: SessionRepository,
-    private val setup: AuthSetupRepository,
-    private val analytics: PopAnalytics,
-    private val firebasePhoneAuth:FirebasePhoneAuthGateway,
-) : ViewModel() {
-    private val _state = MutableStateFlow(AuthUiState(authenticated = sessions.authenticated))
-    val state = _state.asStateFlow()
-    private var bootstrapInFlight=false
-    private var firebaseExchangeInFlight=false
-    private var setupResolutionInFlight=false
-
-    // A restored secure session is sufficient for local/offline access. Setup is
-    // resolved after a new authentication or when its UI explicitly needs it.
-
-    /** Phase 4 has already committed a full session atomically. This bridge only
-     * lets retained post-auth code observe that fact; it owns no enrollment state. */
-    fun adoptPhase4Session() {
-        if(_state.value.authenticated)return
-        _state.value=_state.value.copy(authenticated=true,setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error=null)
-        refreshSetup("en")
+class AuthViewModel(private val sessions:SessionRepository,private val setup:AuthSetupRepository,private val analytics:PopAnalytics):ViewModel() {
+    private val _state=MutableStateFlow(AuthUiState(authenticated=sessions.authenticated,setupStage=if(sessions.needsOnboarding)AuthSetupStage.AUTHENTICATED_CHECKING else AuthSetupStage.PUBLIC))
+    val state=_state.asStateFlow()
+    init { if(sessions.needsOnboarding)refreshSetup(currentLocale()) }
+    fun restoreUnlockedSession() {
+        _state.value=AuthUiState(authenticated=sessions.authenticated,setupStage=if(sessions.needsOnboarding)AuthSetupStage.AUTHENTICATED_CHECKING else AuthSetupStage.PUBLIC)
+        if(sessions.needsOnboarding)refreshSetup(currentLocale())
     }
-
-    fun startPhoneVerification(
-        activity:ComponentActivity,
-        phoneE164:String,
-        locale:String,
-        resend:Boolean=false,
-    ) {
-        if(_state.value.loading)return
-        _state.value=_state.value.copy(
-            loading=true,
-            error=null,
-            phoneFailure=null,
-            maskedPhone=PhoneIdentity.mask(phoneE164),
-        )
-        analytics.track(
-            if(resend)"phone_auth_resend" else "phone_auth_started",
-            mapOf("platform" to "android","provider" to "firebase"),
-        )
-        runCatching {
-            firebasePhoneAuth.start(activity,phoneE164,resend) { event -> handleFirebasePhoneEvent(event,locale) }
-        }.onFailure {
-            handleFirebasePhoneEvent(FirebasePhoneEvent.Failed(FirebasePhoneFailure.UNAVAILABLE),locale)
-        }
+    fun adoptOtpSession() {
+        if(!sessions.authenticated)return
+        _state.value=AuthUiState(authenticated=true,setupStage=AuthSetupStage.AUTHENTICATED_CHECKING)
+        refreshSetup(currentLocale())
     }
-
-    fun verifyPhoneCode(code:String,locale:String="en") {
-        if(!canSubmitOtp(code,_state.value.loading))return
-        _state.value=_state.value.copy(loading=true,error=null,phoneFailure=null)
-        firebasePhoneAuth.verifyCode(code) { event -> handleFirebasePhoneEvent(event,locale) }
+    fun refreshSetup(locale:String)=operate {
+        val status=setup.status(locale)
+        check(status.ok)
+        val stage=resolveAuthSetupStage(true,status)
+        _state.value=_state.value.copy(setupStatus=status,legalDocuments=status.requiredDocuments,
+            accountName=status.accountName,profileName=status.profileName.ifBlank{status.accountName},
+            profileKind=status.accountKind,templateId=status.templateId,setupStage=stage)
+        if(stage==AuthSetupStage.TEMPLATE_CHOICE)loadTemplates()
+        if(stage==AuthSetupStage.READY)sessions.completeOnboarding(refreshSnapshot=false)
     }
-
-    private fun handleFirebasePhoneEvent(event:FirebasePhoneEvent,locale:String) {
-        when(event) {
-            is FirebasePhoneEvent.CodeSent -> {
-                _state.value=_state.value.copy(
-                    challengeId=event.verificationId,
-                    loading=false,
-                    error=null,
-                    phoneFailure=null,
-                    resendAfterSeconds=event.resendAfterSeconds,
-                    setupStage=AuthSetupStage.OTP_REQUIRED,
-                )
-                analytics.track("phone_auth_code_sent",mapOf("platform" to "android","provider" to "firebase"))
-            }
-            is FirebasePhoneEvent.Verified -> exchangeFirebaseProof(event,locale)
-            is FirebasePhoneEvent.Failed -> {
-                _state.value=_state.value.copy(
-                    loading=false,
-                    error="PHONE_AUTH_${event.reason.name}",
-                    phoneFailure=event.reason,
-                )
-                analytics.track("phone_auth_failed",mapOf("platform" to "android","provider" to "firebase","outcome" to event.reason.name.lowercase()))
-            }
-            FirebasePhoneEvent.AutoRetrievalTimedOut -> {
-                _state.value=_state.value.copy(loading=false)
-            }
-        }
+    fun setAccountName(value:String){_state.value=_state.value.copy(accountName=value.take(160))}
+    fun setProfileName(value:String){_state.value=_state.value.copy(profileName=value.take(160))}
+    fun selectProfileKind(kind:String){if(_state.value.setupStatus?.accountTypes?.any{it.key==kind&&it.enabled}==true)_state.value=_state.value.copy(profileKind=kind)}
+    fun saveName(locale:String)=operate {
+        check(_state.value.accountName.isNotBlank())
+        check(setup.saveSetup("NAME",_state.value.accountName).ok)
+        _state.value=_state.value.copy(profileName=_state.value.accountName,setupStage=AuthSetupStage.ACCOUNT_TYPE)
     }
-
-    private fun exchangeFirebaseProof(event:FirebasePhoneEvent.Verified,locale:String)=viewModelScope.launch {
-        if(firebaseExchangeInFlight||_state.value.authenticated)return@launch
-        firebaseExchangeInFlight=true
-        _state.value=_state.value.copy(loading=true,error=null,phoneFailure=null)
-        try {
-            val attempt=runCatching { sessions.exchangeFirebasePhone(event.idToken) }
-            val result=attempt.getOrNull()
-            if(result?.ok==true&&result.user!=null) {
-                analytics.track("phone_auth_verified",mapOf("platform" to "android","provider" to "firebase","outcome" to if(event.automatic)"automatic" else "manual"))
-                _state.value=_state.value.copy(authenticated=true,loading=false,setupStage=AuthSetupStage.AUTHENTICATED_CHECKING,error=null,passkeyExistingDecisionHandled=false,passkeyOfferSkippedForCurrentSetup=false)
-                refreshSetup(locale)
-            } else {
-                val conflict=result?.error?.contains("CONFLICT")==true||
-                    result?.error?.contains("REVOKED")==true||
-                    (attempt.exceptionOrNull() as? HttpException)?.code()==409
-                val failure=if(conflict)FirebasePhoneFailure.IDENTITY_CONFLICT else FirebasePhoneFailure.EXCHANGE
-                handleFirebasePhoneEvent(FirebasePhoneEvent.Failed(failure),locale)
-            }
-        } finally {
-            firebaseExchangeInFlight=false
-        }
+    fun saveKind(locale:String)=operate {
+        check(setup.saveSetup("ACCOUNT_TYPE",_state.value.profileKind).ok)
+        _state.value=_state.value.copy(setupStage=AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED)
     }
-
-    suspend fun passkeyAuthenticationOptions()=sessions.passkeyAuthenticationOptions()
-    fun beginPasskeyAuthentication(){
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SIGNIN_UI_CLICK)
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_CAPABILITY_CHECK,"supported")
-        _state.value=_state.value.copy(passkeyLoading=true,passkeyError=null)
+    fun acceptLegal(locale:String)=operate {
+        check(setup.acceptLegal(locale).ok)
+        val status=setup.status(locale);check(status.ok)
+        _state.value=_state.value.copy(setupStatus=status,setupStage=resolveAuthSetupStage(true,status))
     }
-    fun passkeyClientFailure(error:Throwable){
-        AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_GET_CREDENTIAL_RESULT,error)
-        _state.value=_state.value.copy(passkeyLoading=false,passkeyError=passkeyLoginError(error))
+    fun submitBootstrap(locale:String)=operate {
+        val before=_state.value
+        check(bootstrapValidationError(before.profileName,before.profileKind)==null)
+        val result=setup.bootstrap(ProfileBootstrapRequest(before.profileName,before.profileKind!!,locale=locale))
+        check(result.ok)
+        val status=setup.status(locale);check(status.ok)
+        _state.value=_state.value.copy(setupStatus=status,templateId=status.templateId,setupStage=AuthSetupStage.TEMPLATE_CHOICE)
+        loadTemplates()
     }
-    fun verifyPasskey(assertion:com.google.gson.JsonObject,locale:String="en")=viewModelScope.launch {
-        try{
-            val result=sessions.verifyPasskey(assertion)
-            if(result.ok&&result.user!=null){
-                _state.value=_state.value.copy(authenticated=true,passkeyLoading=false,passkeyError=null,setupStage=AuthSetupStage.AUTHENTICATED_CHECKING)
-                refreshSetup(locale)
-            }else _state.value=_state.value.copy(passkeyLoading=false,passkeyError=PasskeyLoginError.AUTHENTICATION_FAILED)
-        }catch(error:Throwable){passkeyClientFailure(error)}
+    private suspend fun loadTemplates() {
+        val catalog=runCatching { setup.templates() }.getOrNull()
+        _state.value=_state.value.copy(templates=catalog?.templates.orEmpty().filter{it.profileKind==_state.value.profileKind},catalogUnavailable=catalog?.ok!=true)
     }
-
-    fun refreshSetup(locale:String) {
-        if (!sessions.authenticated || setupResolutionInFlight) return
-        setupResolutionInFlight=true
-        viewModelScope.launch { try {
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,"started")
-        _state.value = _state.value.copy(setupStage = AuthSetupStage.AUTHENTICATED_CHECKING, error = null)
-        runCatching { setup.status(locale) }.onSuccess { status ->
-            if(!status.ok) {
-                AuthRuntimeDiagnostics.failure(AuthRuntimeStage.AUTH_SETUP_RESOLVE,safeError=status.error ?: "response_not_ok")
-                if(_state.value.passkeyOfferSkippedForCurrentSetup) {
-                    passkeySkipRouteFailure(safeError=status.error ?: "response_not_ok")
-                    return@onSuccess
-                }
-                _state.value=_state.value.copy(error="SETUP_STATUS_UNAVAILABLE",setupStage=AuthSetupStage.SETUP_UNAVAILABLE)
-                return@onSuccess
-            }
-            val skipRouteResolve=_state.value.passkeyOfferSkippedForCurrentSetup
-            val stage=resolveAuthSetupStage(true,status,skipRouteResolve,_state.value.passkeyExistingDecisionHandled)
-            _state.value = _state.value.copy(setupStatus = status, legalDocuments = status.requiredDocuments, setupStage = stage, error = null)
-            AuthRuntimeDiagnostics.mark(AuthRuntimeStage.AUTH_SETUP_RESOLVE,"endpoint_api_profile_bootstrap_http_200_${stage.name.lowercase()}_new_${status.isNewAccount}_legal_ready_${status.legalReady}_legal_accepted_${status.legalAccepted}")
-            if(stage==AuthSetupStage.READY)refreshDynamicOnboarding(locale,skipRouteResolve)
-            else if(skipRouteResolve) completePasskeySkipRouteResolve(stage)
-        }.onFailure { error ->
-            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.AUTH_SETUP_RESOLVE,error,(error as? retrofit2.HttpException)?.code())
-            if(_state.value.passkeyOfferSkippedForCurrentSetup)passkeySkipRouteFailure(error,(error as? retrofit2.HttpException)?.code())
-            else _state.value = _state.value.copy(error = "SETUP_STATUS_UNAVAILABLE", setupStage = AuthSetupStage.SETUP_UNAVAILABLE)
-        }
-        } finally { setupResolutionInFlight=false } }
+    fun selectTemplate(id:String,locale:String)=operate {
+        check(_state.value.templates.any{it.id==id&&it.allowed&&it.isActive})
+        val profileId=_state.value.setupStatus?.primaryProfileId ?: error("PROFILE_REQUIRED")
+        check(setup.selectTemplate(profileId,id,locale).ok)
+        _state.value=_state.value.copy(templateId=id)
     }
-
-    private fun refreshDynamicOnboarding(locale:String,fromPasskeySkip:Boolean=false)=viewModelScope.launch {
-        runCatching { setup.currentOnboarding(locale) }.onSuccess { current->
-            when(current.state) {
-                "BYPASSED","ONBOARDING_COMPLETE" -> {
-                    _state.value=_state.value.copy(setupStage=AuthSetupStage.READY,onboarding=current,error=null)
-                    if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.READY)
-                }
-                "ONBOARDING_REQUIRED" -> runCatching { setup.startOnboarding(locale) }.onSuccess { started->
-                    analytics.track("onboarding_started",mapOf("platform" to "android","profile_kind" to (started.definition?.profileKind ?: ""),"category_key" to (started.definition?.categoryKey ?: "fallback"),"definition_version" to (started.definition?.version?.toString() ?: "0")))
-                    _state.value=_state.value.copy(setupStage=AuthSetupStage.DYNAMIC_ONBOARDING,onboarding=started,error=null)
-                    if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.DYNAMIC_ONBOARDING)
-                }.onFailure { error->
-                    if(fromPasskeySkip)passkeySkipRouteFailure(error,(error as? HttpException)?.code())
-                    else _state.value=_state.value.copy(setupStage=AuthSetupStage.ONBOARDING_UNAVAILABLE,error="ONBOARDING_START_FAILED")
-                }
-                "ONBOARDING_IN_PROGRESS" -> {
-                    analytics.track("onboarding_resumed",mapOf("platform" to "android","definition_version" to (current.definition?.version?.toString() ?: "0")))
-                    _state.value=_state.value.copy(setupStage=AuthSetupStage.DYNAMIC_ONBOARDING,onboarding=current,error=null)
-                    if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.DYNAMIC_ONBOARDING)
-                }
-                "BOOTSTRAP_REQUIRED" -> {
-                    _state.value=_state.value.copy(setupStage=AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED,error=null)
-                    if(fromPasskeySkip)completePasskeySkipRouteResolve(AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED)
-                }
-                else -> {
-                    if(fromPasskeySkip)passkeySkipRouteFailure(safeError="ONBOARDING_STATUS_UNAVAILABLE")
-                    else _state.value=_state.value.copy(setupStage=AuthSetupStage.ONBOARDING_UNAVAILABLE,error="ONBOARDING_STATUS_UNAVAILABLE")
-                }
-            }
-        }.onFailure { error->
-            if(fromPasskeySkip)passkeySkipRouteFailure(error,(error as? HttpException)?.code())
-            else _state.value=_state.value.copy(setupStage=AuthSetupStage.ONBOARDING_UNAVAILABLE,error="ONBOARDING_STATUS_UNAVAILABLE")
-        }
+    fun continueToSecurity()=operate {
+        check(setup.saveSetup("SECURITY").ok)
+        _state.value=_state.value.copy(setupStage=AuthSetupStage.SECURITY_SETUP)
     }
-    fun retryOnboarding(locale:String)=refreshDynamicOnboarding(locale)
-
-    fun setOnboardingAnswer(key:String,value:com.google.gson.JsonElement) {
-        val current=_state.value.onboarding ?: return
-        _state.value=_state.value.copy(onboarding=current.copy(answers=current.answers+mapOf(key to value)),onboardingFieldErrors=_state.value.onboardingFieldErrors-key)
-    }
-
-    fun uploadOnboardingImage(questionKey:String,name:String,mime:String,bytes:ByteArray)=viewModelScope.launch { working {
-        val profileId=_state.value.onboarding?.profileId ?: run { _state.value=_state.value.copy(error="ONBOARDING_PROFILE_UNAVAILABLE");return@working }
-        val result=setup.uploadOnboardingImage(profileId,name,mime,bytes)
-        val assetId=result.asset?.id
-        if(result.ok&&assetId!=null)setOnboardingAnswer(questionKey,com.google.gson.JsonArray().apply{add(assetId)})
-        else _state.value=_state.value.copy(error=result.error ?: "ONBOARDING_MEDIA_INVALID")
-    } }
-
-    fun onboardingStepViewed(stepKey:String) {
-        val definition=_state.value.onboarding?.definition ?: return
-        analytics.track("onboarding_step_viewed",mapOf("platform" to "android","profile_kind" to definition.profileKind,"category_key" to (definition.categoryKey ?: "fallback"),"step_key" to stepKey,"definition_version" to definition.version.toString()))
-    }
-
-    fun saveOnboarding(direction:String,locale:String)=viewModelScope.launch { working {
-        val current=_state.value.onboarding ?: return@working
-        val definition=current.definition ?: return@working
-        val step=visibleOnboardingSteps(definition,current.answers).find { it.key==current.currentStepKey }
-            ?: visibleOnboardingSteps(definition,current.answers).firstOrNull() ?: return@working
-        if(direction=="CONTINUE") {
-            val missing=missingRequiredOnboardingQuestions(step,current.answers)
-            if(missing.isNotEmpty()) {
-                _state.value=_state.value.copy(onboardingFieldErrors=missing.associateWith { "REQUIRED" },error="ONBOARDING_VALIDATION_FAILED")
-                return@working
-            }
-        }
-        val visibleBefore=visibleOnboardingSteps(definition,current.answers)
-        val wasLast=visibleBefore.indexOfFirst { it.key==step.key }==visibleBefore.lastIndex
-        val saved=setup.saveOnboarding(OnboardingProgressRequest(locale,current.revision,step.key,direction,onboardingStepAnswerSubset(step,current.answers)))
-        _state.value=_state.value.copy(onboarding=saved,onboardingFieldErrors=saved.fields,error=saved.error,setupStage=AuthSetupStage.DYNAMIC_ONBOARDING)
-        if(!saved.ok)return@working
-        if(direction!="STAY")analytics.track("onboarding_step_completed",mapOf("platform" to "android","step_key" to step.key,"definition_version" to definition.version.toString()))
-        if(direction=="CONTINUE"&&wasLast) {
-            val completed=setup.completeOnboarding(locale,saved.revision)
-            if(completed.ok) {
-                analytics.track("onboarding_completed",mapOf("platform" to "android","profile_kind" to definition.profileKind,"category_key" to (definition.categoryKey ?: "fallback"),"definition_version" to definition.version.toString(),"outcome" to "success"))
-                _state.value=_state.value.copy(onboarding=completed,setupStage=AuthSetupStage.READY,error=null,onboardingFieldErrors=emptyMap())
-            } else _state.value=_state.value.copy(error=completed.error ?: "ONBOARDING_COMPLETE_FAILED",onboardingFieldErrors=completed.fields)
-        }
-    } }
-
-    fun acceptLegal(locale:String) = viewModelScope.launch { working {
-        val result = setup.acceptLegal(locale)
-        if (!result.ok) { _state.value = _state.value.copy(error = result.error ?: "LEGAL_CONSENT_FAILED"); return@working }
-        analytics.track("legal_consent_completed", mapOf("platform" to "android"))
-        refreshSetup(locale)
-    } }
-
-    fun selectProfileKind(kind:String,locale:String) = viewModelScope.launch { working {
-        analytics.track("profile_kind_selected", mapOf("platform" to "android", "profile_kind" to kind.lowercase()))
-        val result = setup.categories(kind,locale)
-        if (!result.ok) { _state.value = _state.value.copy(error = result.error ?: "PROFILE_CATEGORIES_UNAVAILABLE"); return@working }
-        _state.value = _state.value.copy(profileKind=kind,categories=result.categories,categorySlug=null,templates=emptyList(),templateId=null,error=null)
-    } }
-
-    fun selectCategory(category:String,locale:String) = viewModelScope.launch { working {
-        val kind = _state.value.profileKind ?: return@working
-        analytics.track("profile_category_selected", mapOf("platform" to "android", "category_key" to category))
-        val result = setup.templates(category,kind,locale)
-        if (!result.ok) { _state.value = _state.value.copy(error = result.error ?: "PROFILE_TEMPLATES_UNAVAILABLE"); return@working }
-        val automatic = result.defaultTemplateId?.takeIf { id -> result.templates.any { it.id == id } } ?: result.templates.singleOrNull()?.id
-        _state.value = _state.value.copy(categorySlug=category,templates=result.templates,templateId=automatic,error=null)
-    } }
-
-    fun selectTemplate(templateId:String?) { _state.value = _state.value.copy(templateId=templateId) }
-    fun setProfileName(value:String) { _state.value = _state.value.copy(profileName=value) }
-
-    fun submitBootstrap(locale:String) = viewModelScope.launch { working {
-        val snapshot = _state.value
-        val kind=snapshot.profileKind ?: return@working
-        val category=snapshot.categorySlug ?: return@working
-        if (bootstrapInFlight) return@working
-        bootstrapValidationError(snapshot.profileName,kind,category,snapshot.templates,snapshot.templateId)?.let { _state.value=_state.value.copy(error=it);return@working }
-        bootstrapInFlight=true
-        try {
-        analytics.track("profile_bootstrap_started", mapOf("platform" to "android", "profile_kind" to kind.lowercase(), "category_key" to category))
-        val result=setup.bootstrap(ProfileBootstrapRequest(snapshot.profileName,kind,category,snapshot.templateId,locale))
-        if (!result.ok) { _state.value = _state.value.copy(error = result.error ?: "PROFILE_BOOTSTRAP_FAILED"); refreshSetup(locale); return@working }
-        analytics.track("profile_bootstrap_completed", mapOf("platform" to "android", "profile_kind" to kind.lowercase(), "category_key" to category))
-        refreshSetup(locale)
-        } finally { bootstrapInFlight=false }
-    } }
-
-    fun passkeyPromptShown() { analytics.track("passkey_enrollment_shown", mapOf("platform" to "android")) }
-    fun completePasskeyRegistration(response:com.google.gson.JsonObject,locale:String) = viewModelScope.launch { working {
-        val result=setup.verifyPasskey(response)
-        if (result.ok) analytics.track("passkey_enrollment_completed",mapOf("platform" to "android")) else _state.value=_state.value.copy(error=result.error ?: "PASSKEY_ENROLLMENT_FAILED")
-        refreshSetup(locale)
-    } }
-    /** Registration always proves possession through Credential Manager and server verification;
-     * no local flag can mark a passkey as registered. */
     fun registerPasskey(activity:ComponentActivity?,locale:String) {
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_UI_CLICK)
-        if(activity==null) {
-            AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_CAPABILITY_CHECK,safeError="ACTIVITY_UNAVAILABLE")
-            _state.value=_state.value.copy(passkeyLoading=false,passkeyError=PasskeyLoginError.UNAVAILABLE)
-            return
-        }
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_CAPABILITY_CHECK,"supported")
+        if(_state.value.passkeyLoading||activity==null)return
         _state.value=_state.value.copy(passkeyLoading=true,passkeyError=null)
         viewModelScope.launch {
             try {
-                val options=setup.passkeyOptions()
-                val response=PasskeyCoordinator(activity).register(activity,options.toString())
-                val result=setup.verifyPasskey(JsonParser.parseString(response).asJsonObject)
-                if(!result.ok) {
-                    _state.value=passkeyOfferFailure(_state.value,PasskeyLoginError.AUTHENTICATION_FAILED)
-                    return@launch
-                }
-                analytics.track("passkey_enrollment_completed",mapOf("platform" to "android"))
-                _state.value=_state.value.copy(passkeyLoading=false,passkeyError=null,error=null,passkeyExistingDecisionHandled=true)
-                refreshSetup(locale)
+                check(com.popwam.pop.data.auth.registerServerPasskey(
+                    options={setup.passkeyOptions().toString()},
+                    create={PasskeyCoordinator(activity).register(activity,it)},
+                    verify={setup.verifyPasskey(JsonParser.parseString(it).asJsonObject).ok},
+                ))
+                _state.value=_state.value.copy(passkeyRegistered=true)
             } catch(error:Throwable) {
-                _state.value=passkeyOfferFailure(_state.value,passkeyLoginError(error))
-            }
+                if(error is kotlinx.coroutines.CancellationException)throw error
+                _state.value=_state.value.copy(passkeyError=passkeyLoginError(error))
+            } finally {_state.value=_state.value.copy(passkeyLoading=false)}
         }
     }
-    suspend fun passkeyRegistrationOptions()=setup.passkeyOptions()
-    fun useExistingPasskey(activity:ComponentActivity?,locale:String) {
-        if(activity==null) { _state.value=passkeyOfferFailure(_state.value,PasskeyLoginError.UNAVAILABLE);return }
-        _state.value=_state.value.copy(passkeyLoading=true,passkeyError=null)
-        viewModelScope.launch {
-            try {
-                val options=setup.existingPasskeyAssertionOptions()
-                val assertion=PasskeyCoordinator(activity).authenticate(activity,options.toString())
-                val verified=setup.verifyExistingPasskeyAssertion(JsonParser.parseString(assertion).asJsonObject)
-                if(!verified.ok) { _state.value=passkeyOfferFailure(_state.value,PasskeyLoginError.AUTHENTICATION_FAILED);return@launch }
-                _state.value=_state.value.copy(passkeyLoading=false,passkeyError=null,passkeyExistingDecisionHandled=true)
-                refreshSetup(locale)
-            } catch(error:Throwable) { _state.value=passkeyOfferFailure(_state.value,passkeyLoginError(error)) }
+    fun ready(){_state.value=_state.value.copy(setupStage=AuthSetupStage.COMPLETION)}
+    fun enterApp()=operate {
+        check(setup.saveSetup("COMPLETE").ok)
+        sessions.completeOnboarding()
+        _state.value=_state.value.copy(setupStage=AuthSetupStage.READY)
+    }
+    fun back() {
+        if(_state.value.loading||_state.value.passkeyLoading)return
+        val previous=when(_state.value.setupStage){
+            AuthSetupStage.ACCOUNT_TYPE->AuthSetupStage.IDENTITY
+            AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED->AuthSetupStage.ACCOUNT_TYPE
+            AuthSetupStage.COMPLETION->AuthSetupStage.SECURITY_SETUP
+            else->null
         }
+        previous?.let{_state.value=_state.value.copy(setupStage=it,error=null)}
     }
-    fun createReplacementPasskey(activity:ComponentActivity?,locale:String) {
-        _state.value=_state.value.copy(passkeyExistingDecisionHandled=true)
-        registerPasskey(activity,locale)
-    }
-    fun skipPasskey(locale:String) {
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SKIP_UI_CLICK)
-        if(!_state.value.authenticated)return
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SKIP,"accepted")
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SKIP_ROUTE_RESOLVE,"started")
-        _state.value=passkeyOfferSkipped(_state.value)
-        refreshSetup(locale)
-    }
-    private fun completePasskeySkipRouteResolve(stage:AuthSetupStage) {
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_SKIP_ROUTE_RESOLVE,stage.name.lowercase())
-    }
-    private fun passkeySkipRouteFailure(error:Throwable?=null,http:Int?=null,safeError:String?=null) {
-        AuthRuntimeDiagnostics.failure(AuthRuntimeStage.PASSKEY_SKIP_ROUTE_RESOLVE,error,http,safeError)
-        _state.value=_state.value.copy(
-            setupStage=AuthSetupStage.PASSKEY_OFFER,
-            passkeyLoading=false,
-            passkeyError=PasskeyLoginError.SERVER_UNAVAILABLE,
-            error=null,
-        )
-    }
-    fun logout() = viewModelScope.launch {
-        sessions.logout()
-        firebasePhoneAuth.signOut()
-        _state.value = AuthUiState()
-    }
-
-    fun changePhone() {
-        firebasePhoneAuth.reset()
-        _state.value = _state.value.copy(challengeId = null, maskedPhone = null, error = null, phoneFailure=null,resendAfterSeconds=0)
-    }
-
-    private suspend fun working(block: suspend () -> Unit) {
-        _state.value = _state.value.copy(loading = true, error = null)
-        try {
-            block()
-        } catch (_: Exception) {
-            _state.value = _state.value.copy(error = "REQUEST_FAILED")
-        } finally {
-            _state.value = _state.value.copy(loading = false)
-        }
+    fun logout()=viewModelScope.launch{sessions.logout();_state.value=AuthUiState()}
+    private fun operate(block:suspend()->Unit) {
+        if(_state.value.loading)return
+        _state.value=_state.value.copy(loading=true,error=null)
+        viewModelScope.launch{try{block()}catch(error:Exception){
+            if(error is kotlinx.coroutines.CancellationException)throw error
+            _state.value=_state.value.copy(error="SETUP_FAILED")
+        }finally{_state.value=_state.value.copy(loading=false)}}
     }
 }
 
@@ -995,36 +699,6 @@ class MainViewModel(
         }
     }
 
-    fun createVirtualCard(
-        context: Context,
-        body: VirtualCardCreateRequest,
-        avatarUri: Uri?,
-        logoUri: Uri?,
-        onCreated: (String) -> Unit,
-    ) = viewModelScope.launch {
-        working {
-            val created = repo.createVirtualCard(body)
-            val profile = created.profile
-            if (!created.ok || profile == null) {
-                fail(created.error ?: "PROFILE_SAVE_FAILED")
-                return@working
-            }
-            suspend fun upload(uri: Uri, kind: String) {
-                val resolver = context.contentResolver
-                val mime = resolver.getType(uri) ?: "image/jpeg"
-                val name = uri.lastPathSegment?.substringAfterLast('/') ?: "$kind.jpg"
-                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return
-                val result = repo.uploadMedia(profile.id, kind, name, mime, bytes)
-                if (!result.ok) throw IllegalStateException(result.error ?: "UPLOAD_FAILED")
-            }
-            avatarUri?.let { upload(it, "avatar") }
-            logoUri?.let { upload(it, "logo") }
-            _state.value = _state.value.copy(message = "PROFILE_SAVED")
-            reload()
-            onCreated(profile.id)
-        }
-    }
-
     fun selectTemplate(virtualCardId: String, templateId: String, onComplete: () -> Unit = {}) = viewModelScope.launch {
         working {
             val result = repo.selectTemplate(virtualCardId, templateId)
@@ -1124,10 +798,10 @@ class MainViewModel(
     }
 }
 
-class AuthFactory(private val sessions: SessionRepository,private val setup: AuthSetupRepository,private val analytics: PopAnalytics,private val firebasePhoneAuth:FirebasePhoneAuthGateway) : ViewModelProvider.Factory {
+class AuthFactory(private val sessions: SessionRepository,private val setup: AuthSetupRepository,private val analytics: PopAnalytics) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        AuthViewModel(sessions,setup,analytics,firebasePhoneAuth) as T
+        AuthViewModel(sessions,setup,analytics) as T
 }
 
 class MainFactory(

@@ -43,11 +43,10 @@ interface ProfilesRepository {
     suspend fun load(activeProfileId:String?):ProfilesSnapshot
     suspend fun refresh(activeProfileId:String?):ProfilesSnapshot=load(activeProfileId)
     suspend fun refreshEditor(profileId:String):ProfilesSnapshot=load(profileId)
-    suspend fun categories(kind:ProfileBackendKind):List<ProfileCategoryOption>
     suspend fun mutate(profileId:String,revision:Int,mutation:ProfileEditorMutation):ProfileMutationResult
     suspend fun updateVisibility(profileId:String,revision:Int,access:String,slug:String?):ProfileMutationResult
     suspend fun publish(profileId:String,revision:Int,lifecycle:String,action:String):ProfileMutationResult
-    suspend fun create(name:String,kind:ProfileBackendKind,categorySlug:String?,templateId:String?,creationKey:String):String
+    suspend fun create(name:String,kind:ProfileBackendKind,creationKey:String):String
     suspend fun archive(profileId:String,replacementId:String?):String?
     suspend fun upload(profileId:String,revision:Int,media:ProfileMediaUpload):ProfileMutationResult
     suspend fun uploadDocument(profileId:String,revision:Int,document:ProfileDocumentUpload):ProfileMutationResult=throw UnsupportedOperationException("PROFILE_DOCUMENT_UPLOAD_UNAVAILABLE")
@@ -91,14 +90,6 @@ class AndroidProfilesRepository(
         return loadInternal(profileId,false)
     }
 
-    override suspend fun categories(kind:ProfileBackendKind):List<ProfileCategoryOption> {
-        val response=repository.profileCategories(kind.name,localeProvider())
-        if(!response.ok) throw ProfileDataException(response.error ?: "PROFILE_CATEGORIES_UNAVAILABLE")
-        val arabic=localeProvider().startsWith("ar")
-        return response.categories.map { category ->
-            ProfileCategoryOption(category.slug,if(arabic) category.nameAr ?: category.nameEn ?: category.slug else category.nameEn ?: category.nameAr ?: category.slug,kind,category.defaultTemplateId)
-        }
-    }
 
     override suspend fun templates()=localFirst.templateCatalog().templates
 
@@ -172,10 +163,10 @@ class AndroidProfilesRepository(
         }
     }
 
-    override suspend fun create(name:String,kind:ProfileBackendKind,categorySlug:String?,templateId:String?,creationKey:String):String {
+    override suspend fun create(name:String,kind:ProfileBackendKind,creationKey:String):String {
         ProfileRuntimeDiagnostics.start(ProfileRuntimeDiagnostics.Operation.CREATE)
         try {
-            val result=repository.createAdditionalProfile(AdditionalProfileCreateRequest(name,name,kind.name,categorySlug,templateId,if(localeProvider().startsWith("ar")) "ar" else "en",creationKey))
+            val result=repository.createAdditionalProfile(AdditionalProfileCreateRequest(name,name,kind.name,if(localeProvider().startsWith("ar")) "ar" else "en",creationKey))
             ProfileRuntimeDiagnostics.parsed(ProfileRuntimeDiagnostics.Operation.CREATE,true,result.error,result.profileId)
             if(!result.ok || result.profileId.isNullOrBlank()) throw ProfileDataException(result.error ?: "PROFILE_CREATE_FAILED")
             localFirst.core(result.profileId,localeProvider(),force=true)
@@ -227,7 +218,7 @@ internal fun ProfileSelectorItemDto.toOwnedProfile(editor:ProfileEditorResponse?
     return OwnedProfile(
         id=id,name=p?.displayName?.takeIf(String::isNotBlank) ?: publicName.ifBlank { label },
         subtitle=editor?.preview?.identity?.title,avatarUrl=(avatarUrl ?: editor?.preview?.identity?.imageUrl)?.let(::absoluteMediaUrl),
-        backendKind=backend,categoryKind=ProfilePolicy.categoryKind(profileKind,categoryKey),categoryKey=categoryKey,
+        backendKind=backend,categoryKey=categoryKey,
         lifecycle=p?.lifecycle ?: lifecycle,visibility=p?.access ?: if(lifecycle=="PUBLISHED") "PUBLIC" else "PRIVATE",isPrimary=isPrimary,
         verification=editor?.verification?.overallStatus.toVerificationState(),
         completion=ProfileCompletion(readiness?.ready==true,readiness?.issues.orEmpty().filter { it.blocking }.map { it.code }),
@@ -248,7 +239,6 @@ internal fun ProfileEditorResponse.toContent(summary:OwnedProfile,slug:String)=P
     media=media.map { ProfileMedia(it.id,it.purpose,absoluteMediaUrl(it.previewUrl),it.visibility,it.sortOrder) },
     modules=modules.map { ProfileModule(it.key,it.name,it.enabled,it.visibility,it.required,it.supported) },
     addableModules=addableModules.map { ProfileModuleOption(it.key,it.name) },
-    pendingCapabilities=ProfilePolicy.pendingCapabilities(summary.categoryKind),
     fieldCapabilities=fieldCapabilities.map { ProfileFieldCapability(it.key,it.moduleKey,it.label,ProfileStructuredPolicy.valueType(it.valueType),it.repeatable,it.requiredForCompletion,it.visibilitySupported,it.maxItems,runCatching{ProfileDataClassification.valueOf(it.classification)}.getOrDefault(ProfileDataClassification.UNKNOWN)) },
     structuredEntries=structuredEntries.map { ProfileStructuredEntry(it.id,it.fieldKey,it.instanceKey,it.moduleKey,it.value.deepCopy(),it.visibility,it.sortOrder) },
     contentCompletion=completion.toContentCompletion(),
@@ -337,7 +327,6 @@ class ProfilesViewModel(
         is ProfileEvent.Save->save(event.mutation)
         is ProfileEvent.SaveVisibility->saveVisibility(event.access,event.slug)
         is ProfileEvent.PublishProfile->publish(event.action)
-        is ProfileEvent.LoadCategories->loadCategories(event.kind)
         is ProfileEvent.CreateProfile->create(event)
         is ProfileEvent.ArchiveProfile->archive(event.id,event.replacementId)
         is ProfileEvent.UploadMedia->upload(event.media)
@@ -373,11 +362,6 @@ class ProfilesViewModel(
             catch(error:IOException){_state.value=previous.copy(refreshing=false,offline=true,partial=previous.profiles.isNotEmpty(),loadState=if(previous.profiles.isEmpty())ProfileLoadState.ERROR else previous.loadState,errorCode="PROFILE_OFFLINE")}
             catch(error:Exception){fail(previous,error.message)}
         }
-    }
-
-    private fun loadCategories(kind:ProfileBackendKind)=viewModelScope.launch {
-        _state.value=_state.value.copy(categoryKindLoading=kind,errorCode=null,debugErrorCode=null)
-        try{_state.value=_state.value.copy(categories=repository.categories(kind),categoryKindLoading=null)}catch(error:Exception){_state.value=_state.value.copy(categoryKindLoading=null,errorCode=error.message ?: "PROFILE_CATEGORIES_UNAVAILABLE")}
     }
 
     private fun loadTemplates()=viewModelScope.launch {
@@ -454,11 +438,9 @@ class ProfilesViewModel(
     private fun create(event:ProfileEvent.CreateProfile)=viewModelScope.launch{
         if(event.name.isBlank())return@launch saveFailed("PROFILE_NAME_REQUIRED")
         if(event.kind !in _state.value.quota.allowedKinds)return@launch saveFailed("PROFILE_TYPE_NOT_AVAILABLE","PROFILE_TYPE_NOT_AVAILABLE")
-        if(event.categorySlug.isNullOrBlank())return@launch saveFailed("PROFILE_CATEGORY_REQUIRED","PROFILE_CATEGORY_REQUIRED")
-        if(event.templateId.isNullOrBlank())return@launch saveFailed("PROFILE_TEMPLATE_UNAVAILABLE","PROFILE_TEMPLATE_REQUIRED")
         _state.value=_state.value.copy(saveState=ProfileSaveState.SAVING,errorCode=null,debugErrorCode=null)
         try{
-            val id=repository.create(event.name,event.kind,event.categorySlug,event.templateId,UUID.randomUUID().toString())
+            val id=repository.create(event.name,event.kind,UUID.randomUUID().toString())
             onActiveProfileChanged(id)
             val snapshot=repository.load(id)
             _state.value=_state.value.copy(loadState=ProfileLoadState.CONTENT,profiles=snapshot.profiles,activeProfileId=snapshot.activeProfileId,content=snapshot.content,quota=snapshot.quota,partial=snapshot.partial,refreshing=false,offline=false,editorDirty=false,saveState=ProfileSaveState.SUCCESS,errorCode=null,debugErrorCode=null)
@@ -531,7 +513,7 @@ internal fun profileErrorFor(raw:String?,operation:ProfileOperation)=when {
     raw=="STALE_DRAFT" -> "PROFILE_CONFLICT_REFRESHED"
     raw=="SLUG_TAKEN" -> "PROFILE_SLUG_TAKEN"
     raw=="PROFILE_NAME_REQUIRED" || raw=="FIELD_REQUIRED" || raw=="PROFILE_CATEGORY_INCOMPATIBLE" -> "PROFILE_REQUIRED_DATA_INCOMPLETE"
-    raw=="PROFILE_TEMPLATE_REQUIRED" || raw=="PROFILE_TEMPLATE_NOT_FOUND" -> "PROFILE_TEMPLATE_UNAVAILABLE"
+    raw=="PROFILE_TEMPLATE_NOT_FOUND" -> "PROFILE_TEMPLATE_UNAVAILABLE"
     raw=="PROFILE_LIMIT_REACHED" || raw=="BUSINESS_PROFILES_NOT_ALLOWED" || raw=="PROFILE_TYPE_NOT_AVAILABLE" -> "PROFILE_TYPE_NOT_AVAILABLE"
     raw=="HTTP_405" && operation==ProfileOperation.CREATE -> "PROFILE_CREATE_ENDPOINT_UNAVAILABLE"
     raw=="PROFILE_OFFLINE" || raw=="PROFILE_CREATE_DATABASE_ERROR" || raw=="PUBLISHING_FAILED" || raw?.startsWith("HTTP_5")==true -> "PROFILE_SERVER_UNAVAILABLE"

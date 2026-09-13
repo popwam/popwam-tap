@@ -5,8 +5,10 @@ import com.google.gson.JsonElement
 
 data class ApiResult(val ok:Boolean=false,val error:String?=null,val url:String?=null,val draftRevision:Int?=null,val lifecycle:String?=null,val readiness:PublishingReadinessDto?=null,val completion:ProfileContentCompletionDto?=null,val editor:ProfileEditorResponse?=null)
 data class UserDto(val id:String="",val name:String?=null,val phone:String?=null,val email:String="",val role:String="USER",val locale:String?=null)
-data class FirebasePhoneExchangeRequest(val deviceName:String)
-data class AuthResponse(val ok:Boolean=false,val accessToken:String="",val refreshToken:String="",val accessExpiresIn:Int=0,val refreshExpiresIn:Int=0,val tokenType:String="Bearer",val user:UserDto?=null,val error:String?=null)
+data class OtpRequest(val phone:String,val countryCode:String,val locale:String)
+data class OtpVerifyRequest(val challengeId:String,val phone:String,val code:String,val deviceName:String)
+data class OtpRequestResponse(val ok:Boolean=false,val challengeId:String="",val expiresInSeconds:Int=0,val resendAfterSeconds:Int=0)
+data class AuthResponse(val ok:Boolean=false,val needsOnboarding:Boolean=false,val accessToken:String="",val refreshToken:String="",val accessExpiresIn:Int=0,val refreshExpiresIn:Int=0,val tokenType:String="Bearer",val user:UserDto?=null,val error:String?=null)
 data class RefreshRequest(val refreshToken:String,val deviceName:String)
 data class LogoutRequest(val refreshToken:String)
 data class PasskeyAuthVerifyRequest(val assertion:JsonObject,val deviceName:String)
@@ -69,70 +71,9 @@ data class LegalRequiredResponse(val ok:Boolean=false,val legalReady:Boolean=fal
 data class PublishedLegalDocumentDto(val documentType:String="",val version:String="",val locale:String="",val title:String="",val content:String="",val effectiveAt:String="")
 data class PublishedLegalDocumentResponse(val ok:Boolean=false,val document:PublishedLegalDocumentDto?=null,val fallbackLocale:Boolean=false,val error:String?=null)
 data class LegalConsentRequest(val accepted:Boolean=true,val locale:String)
-data class ProfileCategoryBootstrapDto(
-    val id:String="",
-    val slug:String="",
-    val nameAr:String?=null,
-    val nameEn:String?=null,
-    val descriptionAr:String?=null,
-    val descriptionEn:String?=null,
-    val profileKind:String="",
-    val defaultTemplateId:String?=null,
-)
-data class ProfileCategoriesBootstrapResponse(val ok:Boolean=false,val categories:List<ProfileCategoryBootstrapDto> = emptyList(),val error:String?=null)
-/**
- * Bootstrap templates are already filtered by the canonical server profile kind/category.
- * The presentation metadata is a compact projection of the same template configuration
- * used by the profile renderer; it is never a second client-side template registry.
- */
-data class ProfileBootstrapTemplateDto(
-    val id:String="",
-    val slug:String="",
-    val nameAr:String?=null,
-    val nameEn:String?=null,
-    val profileKind:String?=null,
-    val category:String?=null,
-    val categorySlug:String?=null,
-    val previewImageUrl:String?=null,
-    val configuration:TemplateConfigurationDto=TemplateConfigurationDto(),
-)
-data class ProfileTemplatesBootstrapResponse(val ok:Boolean=false,val templates:List<ProfileBootstrapTemplateDto> = emptyList(),val defaultTemplateId:String?=null,val error:String?=null)
-data class ProfileBootstrapStatusResponse(val ok:Boolean=false,val isNewAccount:Boolean=false,val bootstrapComplete:Boolean=false,val hasPrimaryProfile:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val requiredDocuments:List<LegalDocumentDto> = emptyList(),val passkeyCount:Int=0,val passkeyState:String="NO_PASSKEY",val passkeyEnrollmentEligible:Boolean=false,val legacyProfileCount:Int=0,val primaryProfileId:String?=null,val error:String?=null)
-data class ProfileBootstrapRequest(val displayName:String,val profileKind:String,val categorySlug:String,val templateId:String?=null,val locale:String)
+data class ProfileBootstrapStatusResponse(val ok:Boolean=false,val isNewAccount:Boolean=false,val bootstrapComplete:Boolean=false,val hasPrimaryProfile:Boolean=false,val legalReady:Boolean=false,val legalAccepted:Boolean=false,val requiredDocuments:List<LegalDocumentDto> = emptyList(),val passkeyCount:Int=0,val passkeyState:String="NO_PASSKEY",val passkeyEnrollmentEligible:Boolean=false,val primaryProfileId:String?=null,val accountName:String="",val accountKind:String?=null,val setupStep:String?=null,val profileName:String="",val templateId:String?=null,val templateName:String?=null,val templateSlug:String?=null,val accountTypes:List<AccountTypeAvailability> = emptyList(),val error:String?=null)
+data class ProfileBootstrapRequest(val displayName:String,val profileKind:String,val templateId:String?=null,val locale:String)
 data class ProfileBootstrapResponse(val ok:Boolean=false,val error:String?=null)
-data class OnboardingOptionDto(val key:String="",val label:String="")
-data class OnboardingConditionDto(val sourceQuestionKey:String="",val operator:String="",val expectedValues:List<String> = emptyList())
-data class OnboardingQuestionDto(
-    val key:String="",
-    val type:String="",
-    val label:String="",
-    val help:String?=null,
-    val required:Boolean=false,
-    val minLength:Int?=null,
-    val maxLength:Int?=null,
-    val minValue:Double?=null,
-    val maxValue:Double?=null,
-    val maxItems:Int?=null,
-    val options:List<OnboardingOptionDto> = emptyList(),
-    val conditions:List<OnboardingConditionDto> = emptyList(),
-)
-data class OnboardingStepDto(val key:String="",val title:String="",val description:String?=null,val required:Boolean=true,val moduleKey:String?=null,val questions:List<OnboardingQuestionDto> = emptyList())
-data class OnboardingDefinitionDto(val id:String="",val key:String="",val version:Int=0,val profileKind:String="",val categoryKey:String?=null,val templateId:String?=null,val steps:List<OnboardingStepDto> = emptyList())
-data class OnboardingCurrentResponse(
-    val ok:Boolean=false,
-    val state:String="",
-    val revision:Int=0,
-    val profileId:String?=null,
-    val currentStepKey:String?=null,
-    val answers:Map<String,JsonElement> = emptyMap(),
-    val definition:OnboardingDefinitionDto?=null,
-    val fields:Map<String,String> = emptyMap(),
-    val error:String?=null,
-)
-data class OnboardingStartRequest(val locale:String)
-data class OnboardingProgressRequest(val locale:String,val revision:Int,val stepKey:String,val direction:String,val answers:Map<String,JsonElement>)
-data class OnboardingCompleteRequest(val locale:String,val revision:Int)
-
 data class DestinationDto(val id:String="",val profileId:String?=null,val title:String="",val titleAr:String?=null,val titleEn:String?=null,val type:String="WEBSITE",val url:String="",val iconKey:String?=null,val isActive:Boolean=true)
 data class ProfileSummaryDto(val id:String="",val displayName:String="",val type:String="PERSONAL")
 data class CardDto(val id:String="",val displayLabel:String?=null,val serialNumber:String="",val publicSlug:String="",val cardType:String="",val assignmentStatus:String="",val cardStatus:String="",val programmedAt:String?=null,val lockedAt:String?=null,val openCount:Int=0,val lastOpenedAt:String?=null,val permanentUrl:String="",val profile:ProfileSummaryDto?=null,val activeDestination:DestinationDto?=null)
@@ -221,14 +162,13 @@ data class ProfileEditorResponse(val ok:Boolean=false,val profile:EditorProfileD
 data class ProfileFileUploadDto(val id:String="",val originalFilename:String="",val displayTitleAr:String?=null,val displayTitleEn:String?=null,val publicUrl:String="",val mimeType:String="",val sizeBytes:String="0",val isVisible:Boolean=false)
 data class ProfileFileUploadResponse(val ok:Boolean=false,val file:ProfileFileUploadDto?=null,val error:String?=null)
 data class ProfileEditorMutationRequest(val expectedDraftRevision:Int,val action:JsonObject)
-data class AdditionalProfileCreateRequest(val displayName:String,val displayLabel:String?=null,val profileKind:String,val categorySlug:String?=null,val templateId:String?=null,val primaryLanguage:String="ar",val creationKey:String)
+data class AdditionalProfileCreateRequest(val displayName:String,val displayLabel:String?=null,val profileKind:String,val primaryLanguage:String="ar",val creationKey:String)
 data class AdditionalProfileCreateResponse(val ok:Boolean=false,val profileId:String?=null,val error:String?=null)
 data class ArchiveProfileRequest(val replacementProfileId:String?=null)
 data class ArchiveProfileResponse(val ok:Boolean=false,val activeProfileId:String?=null,val error:String?=null)
 data class ProfileWriteRequest(val type:String,val primaryLanguage:String="ar",val displayNameAr:String?=null,val displayNameEn:String?=null,val firstName:String?=null,val lastName:String?=null,val jobTitleAr:String?=null,val jobTitleEn:String?=null,val company:String?=null,val bioAr:String?=null,val bioEn:String?=null,val industryAr:String?=null,val industryEn:String?=null,val descriptionAr:String?=null,val descriptionEn:String?=null,val phone:String?=null,val alternatePhone:String?=null,val whatsapp:String?=null,val email:String?=null,val website:String?=null,val addressAr:String?=null,val addressEn:String?=null,val theme:String="CLASSIC_DARK",val cardName:String?=null,val location:String?=null)
 data class ProfileCreateResponse(val ok:Boolean=false,val profile:ProfileDto?=null,val error:String?=null)
 data class CardLinkWriteRequest(val type:String="CUSTOM_URL",val url:String,val titleAr:String?=null,val titleEn:String?=null,val iconKey:String?="link")
-data class VirtualCardCreateRequest(val cardName:String,val cardType:String,val primaryLanguage:String,val displayNameAr:String?=null,val displayNameEn:String?=null,val jobTitleAr:String?=null,val jobTitleEn:String?=null,val company:String?=null,val bioAr:String?=null,val bioEn:String?=null,val phone:String?=null,val email:String?=null,val website:String?=null,val location:String?=null,val templateId:String,val links:List<CardLinkWriteRequest> = emptyList())
 data class TemplatesResponse(val ok:Boolean=false,val planSlug:String="free",val templates:List<ProfileTemplateDto> = emptyList(),val error:String?=null)
 data class TemplateSelectionRequest(val templateId:String)
 data class GoogleWalletLinkResponse(val ok:Boolean=false,val url:String?=null,val error:String?=null)
@@ -561,3 +501,6 @@ data class StorefrontEntitlementsDto(
     val storefrontWhatsappOrder:Boolean=false, val storefrontEmailOrder:Boolean=false,
     val publicWhatsappReady:Boolean=false, val publicEmailReady:Boolean=false, val contactModulePublic:Boolean=false,
 )
+
+data class AccountTypeAvailability(val key:String="",val enabled:Boolean=false)
+data class AccountSetupRequest(val action:String,val value:String?=null)

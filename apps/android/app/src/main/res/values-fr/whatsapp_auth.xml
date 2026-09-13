@@ -1,0 +1,32 @@
+<resources>
+    <string name="wa_auth_personal">Personnel</string>
+    <string name="wa_auth_business">Entreprise</string>
+    <string name="wa_auth_setup_failed">Impossible de terminer cette étape. Vérifiez vos choix et réessayez.</string>
+    <string name="wa_auth_title">Bienvenue sur POP</string>
+    <string name="wa_auth_description">Saisissez votre numéro pour recevoir un code de vérification sur WhatsApp.</string>
+    <string name="wa_auth_country">Pays et indicatif</string>
+    <string name="wa_auth_phone">Numéro de téléphone</string>
+    <string name="wa_auth_continue">Continuer</string>
+    <string name="wa_auth_legal">En continuant, vous reconnaissez avoir pris connaissance des conditions et de la politique de confidentialité. Les accords requis sont confirmés pendant la configuration.</string>
+    <string name="wa_auth_code_title">Vérifiez votre numéro</string>
+    <string name="wa_auth_sent">Votre code a été envoyé via WhatsApp.</string>
+    <string name="wa_auth_code">Code de vérification à six chiffres</string>
+    <string name="wa_auth_verify">Vérifier</string>
+    <string name="wa_auth_countdown">Renvoyer dans %1$d secondes</string>
+    <string name="wa_auth_resend">Renvoyer le code</string>
+    <string name="wa_auth_change">Changer de numéro</string>
+    <string name="wa_auth_close">Fermer</string>
+    <string name="wa_auth_search">Rechercher un pays</string>
+    <string name="wa_auth_invalid_phone">Saisissez un numéro valide dans un pays activé.</string>
+    <string name="wa_auth_invalid_code">Code incorrect. Réessayez.</string>
+    <string name="wa_auth_expired">Ce code a expiré ou a déjà été utilisé. Demandez un nouveau code.</string>
+    <string name="wa_auth_attempts">Trop de tentatives. Demandez un nouveau code à la fin du compte à rebours.</string>
+    <string name="wa_auth_wait">Veuillez patienter avant de demander un autre code.</string>
+    <string name="wa_auth_offline">Aucune connexion Internet. Vérifiez votre connexion et réessayez.</string>
+    <string name="wa_auth_send_failed">Impossible d’envoyer le code. Réessayez plus tard.</string>
+    <string name="wa_auth_unavailable">Vérification indisponible. Réessayez plus tard.</string>
+    <string name="wa_auth_setup">Configurez votre profil</string>
+    <string name="wa_auth_name">Nom affiché</string>
+    <string name="wa_auth_agree">Accepter les accords requis</string>
+    <string name="wa_auth_retry">Réessayer</string>
+</resources>

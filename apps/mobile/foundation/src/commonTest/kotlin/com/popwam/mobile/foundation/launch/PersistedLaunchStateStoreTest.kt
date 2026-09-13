@@ -69,18 +69,16 @@ class PersistedLaunchStateStoreTest {
         assertTrue(restored.hasSelectedBaseTheme)
         assertEquals(ThemeMode.DARK, restored.selectedBaseTheme)
         assertEquals(IdentityPalette.CORAL, restored.selectedPopStyle)
-        assertTrue(restored.hasCompletedWelcome)
     }
 
     @Test
     fun corruptedStateFallsBackToSafeFirstLaunch() = runTest {
         val restored = PersistedLaunchStateStore(FakePersistence().apply { value = "{not-json" }).initialize()
         assertEquals(LaunchState(), restored)
-        assertFalse(restored.hasCompletedWelcome)
     }
 
     @Test
-    fun unsupportedPersistedLanguageCannotKeepWelcomeComplete() = runTest {
+    fun unsupportedPersistedLanguageCannotRemainSelected() = runTest {
         val store = PersistedLaunchStateStore(FakePersistence())
         val updated = store.update {
             it.copy(
@@ -88,12 +86,9 @@ class PersistedLaunchStateStoreTest {
                 hasSelectedLanguage = true,
                 selectedLanguageTag = "zz",
                 hasSelectedBaseTheme = true,
-                hasCompletedWelcome = true,
-                welcomeVersionSeen = CURRENT_WELCOME_VERSION,
             )
         }
         assertFalse(updated.hasSelectedLanguage)
-        assertFalse(updated.hasCompletedWelcome)
     }
 
     private class FakePersistence : LaunchStatePersistence {

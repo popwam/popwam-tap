@@ -34,28 +34,14 @@ class AuthSetupRepository(private val api:PopwamApi) {
     suspend fun status(locale:String)=api.profileBootstrapStatus(locale)
     suspend fun legal(locale:String)=api.requiredLegal(locale)
     suspend fun acceptLegal(locale:String)=api.acceptLegal(LegalConsentRequest(locale=locale))
-    suspend fun categories(kind:String,locale:String)=api.profileBootstrapCategories(kind,locale)
-    suspend fun templates(category:String,kind:String,locale:String)=api.profileBootstrapTemplates(category,kind,locale)
     suspend fun bootstrap(body:ProfileBootstrapRequest)=api.submitProfileBootstrap(body)
-    suspend fun currentOnboarding(locale:String):OnboardingCurrentResponse {
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ONBOARDING_CURRENT_REQUEST)
-        return try { api.currentOnboarding(locale).also { AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ONBOARDING_CURRENT_RESPONSE,"success_http_200") } }
-        catch(error:HttpException) { AuthRuntimeDiagnostics.failure(AuthRuntimeStage.ONBOARDING_CURRENT_RESPONSE,error,error.code(),safeOnboardingErrorCode(error.response()?.errorBody()?.string()));throw error }
+    suspend fun saveSetup(action:String,value:String?=null)=api.saveAccountSetup(AccountSetupRequest(action,value))
+    suspend fun templates()=api.templates()
+    suspend fun selectTemplate(profileId:String,id:String,locale:String):ApiResult {
+        val editor=api.profileEditor(profileId,locale)
+        check(editor.ok)
+        return api.mutateProfileEditor(profileId,ProfileEditorMutationRequest(editor.profile.draftRevision,JsonObject().apply{addProperty("type","TEMPLATE_SELECT");addProperty("templateId",id)}),locale=locale)
     }
-    suspend fun startOnboarding(locale:String):OnboardingCurrentResponse {
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ONBOARDING_START_REQUEST)
-        return try { api.startOnboarding(OnboardingStartRequest(locale)).also { AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ONBOARDING_START_RESPONSE,"success") } }
-        catch(error:HttpException) { AuthRuntimeDiagnostics.failure(AuthRuntimeStage.ONBOARDING_START_RESPONSE,error,error.code(),safeOnboardingErrorCode(error.response()?.errorBody()?.string()));throw error }
-    }
-    suspend fun existingPasskeyAssertionOptions()=api.stepUpOptions(StepUpRequest("ADD_PASSKEY","PASSKEY")).options ?: throw IllegalStateException("PASSKEY_OPTIONS_INVALID")
-    suspend fun verifyExistingPasskeyAssertion(assertion:JsonObject)=api.verifyStepUp(StepUpRequest("ADD_PASSKEY","PASSKEY",assertion=assertion))
-    suspend fun saveOnboarding(body:OnboardingProgressRequest)=api.saveOnboarding(body)
-    suspend fun completeOnboarding(locale:String,revision:Int):OnboardingCurrentResponse {
-        AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ONBOARDING_COMPLETE_REQUEST)
-        return try { api.completeOnboarding(OnboardingCompleteRequest(locale,revision)).also { AuthRuntimeDiagnostics.mark(AuthRuntimeStage.ONBOARDING_COMPLETE_RESPONSE,"success_http_200") } }
-        catch(error:HttpException) { AuthRuntimeDiagnostics.failure(AuthRuntimeStage.ONBOARDING_COMPLETE_RESPONSE,error,error.code(),safeOnboardingErrorCode(error.response()?.errorBody()?.string()));throw error }
-    }
-    suspend fun uploadOnboardingImage(profileId:String,name:String,mime:String,bytes:ByteArray)=api.uploadDraftMedia(profileId,"ONBOARDING_IMAGE".toRequestBody("text/plain".toMediaTypeOrNull()),MultipartBody.Part.createFormData("file",name,bytes.toRequestBody(mime.toMediaTypeOrNull())))
     suspend fun passkeyOptions():JsonObject {
         AuthRuntimeDiagnostics.mark(AuthRuntimeStage.PASSKEY_REGISTER_OPTIONS_REQUEST)
         return try {

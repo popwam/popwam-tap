@@ -21,19 +21,4 @@
     <string name="palette_solar">SOLAIRE</string>
     <string name="palette_graphite">GRAPHITE</string>
     <string name="palette_selected">%1$s sélectionné</string>
-    <string name="onboarding_skip">passer</string>
-    <string name="onboarding_continue">Continuer</string>
-    <string name="onboarding_get_started">commencer</string>
-    <string name="all_in_one_title">Tout ce qu’il vous faut\nUn seul POP</string>
-    <string name="all_in_one_body">Votre identité, votre travail et vos liens\n organisés et prêts à partager</string>
-    <string name="share_your_way_title">Un geste\n Vous êtes connecté.</string>
-    <string name="share_your_way_body">Partagez instantanément par NFC, QR\n ou lien direct</string>
-    <string name="personal_business_title">Conçu pour les personnes et les entreprises</string>
-    <string name="personal_business_body">Du profil personnel aux services et portfolios\nPOP s’adapte à vos besoins.</string>
-    <string name="get_started_title">Vos données. Toujours sécurisées</string>
-    <string name="get_started_body">Vos informations restent protégées, chiffrées et disponibles sur tous vos appareils.</string>
-    <string name="all_in_one_art_description">Une carte de profil POP qui réunit identité, travail et liens</string>
-    <string name="share_your_way_art_description">Un téléphone, un code QR et un appareil POP illustrant le partage</string>
-    <string name="personal_business_art_description">Services POP personnels et professionnels</string>
-    <string name="get_started_art_description">Données POP chiffrées et sécurisées sur vos appareils</string>
 </resources>

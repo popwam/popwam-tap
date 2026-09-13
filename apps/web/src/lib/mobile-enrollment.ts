@@ -8,7 +8,7 @@ import { passkeyChallengeHash, passkeyConfig, passkeyExpectedOrigins, responseCh
 import { verifyMobileDeviceBinding } from "./mobile-device-binding";
 import {
   MOBILE_AUTH_CONTRACT_VERSION,
-  firebaseOtpConfiguration,
+  mobileOtpConfiguration,
   nextEnrollmentAction,
   sessionScopeForNextAction,
   type MobileAuthChallenge,
@@ -32,7 +32,6 @@ function enrollmentDigest(namespace: string, value: string) {
 export const mobilePhoneHash = (phoneE164: string) => enrollmentDigest("phone", phoneE164);
 export const mobileEnrollmentTokenHash = (token: string) => enrollmentDigest("token", token);
 export const mobileDeviceChallengeHash = (challenge: string) => enrollmentDigest("device", challenge);
-export const mobileFirebaseSubjectHash = (subject: string) => enrollmentDigest("firebase", subject);
 export const mobileCompletionKeyHash = (key: string) => enrollmentDigest("completion", key);
 
 export function enrollmentTokenFromRequest(request: Request) {
@@ -61,52 +60,6 @@ export function enrollmentErrorResponse(error: unknown) {
   return Response.json({ ok: false, error: known.code }, { status: known.status, headers: noStore });
 }
 
-export async function createMobileAuthChallenge(input: {
-  phoneE164: string;
-  deviceCredentialId?: string;
-}) {
-  const now = new Date();
-  const phoneHash = mobilePhoneHash(input.phoneE164);
-  const user = await prisma.user.findFirst({
-    where: { status: "ACTIVE", OR: [{ phoneE164: input.phoneE164 }, { phone: input.phoneE164 }] },
-    select: {
-      id: true,
-      passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
-      mobileDeviceCredentials: {
-        where: { credentialId: input.deviceCredentialId || "", status: "ACTIVE", revokedAt: null },
-        select: { id: true },
-        take: 1,
-      },
-    },
-  });
-  const methods: MobileAuthMethod[] = [];
-  if (user?.mobileDeviceCredentials.length) methods.push("BIOMETRIC_DEVICE_CREDENTIAL");
-  if (user?.passkeys.length) methods.push("PASSKEY");
-  methods.push("PHONE_OTP");
-  const preferredMethod = methods[0];
-  const challenge = await prisma.$transaction(async tx => {
-    await tx.mobileAuthChallenge.updateMany({
-      where: { phoneHash, state: "OPEN", consumedAt: null, revokedAt: null },
-      data: { state: "REVOKED", revokedAt: now },
-    });
-    return tx.mobileAuthChallenge.create({
-      data: {
-        userId: user?.id,
-        phoneHash,
-        accountState: user ? "RETURNING" : "UNKNOWN",
-        allowedMethods: methods,
-        preferredMethod,
-        expiresAt: new Date(now.getTime() + 5 * 60_000),
-      },
-    });
-  }, { isolationLevel: "Serializable" });
-  return mobileChallengeView(challenge, {
-    nextAction: preferredMethod === "BIOMETRIC_DEVICE_CREDENTIAL"
-      ? "AUTHENTICATE_BIOMETRIC"
-      : preferredMethod === "PASSKEY" ? "AUTHENTICATE_PASSKEY" : "VERIFY_OTP",
-  });
-}
-
 type ChallengeRow = {
   id: string;
   accountState: string;
@@ -130,7 +83,7 @@ export function mobileChallengeView(
     allowedMethods: row.allowedMethods as MobileAuthMethod[],
     preferredMethod: row.preferredMethod as MobileAuthMethod,
     otpConfiguration: {
-      ...firebaseOtpConfiguration(),
+      ...mobileOtpConfiguration(),
       codeLength: row.otpLength,
       resendAfterSeconds: row.otpResendAfterSeconds,
       expiresAfterSeconds: row.otpExpiresAfterSeconds,
@@ -141,50 +94,6 @@ export function mobileChallengeView(
     sessionScope: input.sessionScope || sessionScopeForNextAction(input.nextAction),
     nextAction: input.nextAction,
     expiresAt: row.expiresAt.toISOString(),
-  };
-}
-
-export async function requirePhoneChallenge(
-  db: Db,
-  challengeId: string,
-  verifiedPhoneE164: string,
-) {
-  const now = new Date();
-  const challenge = await db.mobileAuthChallenge.findFirst({
-    where: { id: challengeId, phoneHash: mobilePhoneHash(verifiedPhoneE164), state: "OPEN", revokedAt: null },
-  });
-  if (!challenge) throw new MobileEnrollmentError("AUTH_CHALLENGE_INVALID", 400);
-  if (challenge.expiresAt <= now) throw new MobileEnrollmentError("AUTH_CHALLENGE_EXPIRED", 410);
-  return challenge;
-}
-
-export async function createRestrictedEnrollment(
-  db: Prisma.TransactionClient,
-  input: { challengeId: string; userId: string; firebaseSubject: string },
-): Promise<MobileEnrollmentView> {
-  const rawToken = randomBytes(48).toString("base64url");
-  const expiresAt = new Date(Date.now() + 20 * 60_000);
-  const challenge = await db.mobileAuthChallenge.update({
-    where: { id: input.challengeId },
-    data: {
-      userId: input.userId,
-      accountState: "NEW",
-      state: "PHONE_VERIFIED",
-      firebaseSubjectHash: mobileFirebaseSubjectHash(input.firebaseSubject),
-    },
-  });
-  await db.mobileEnrollmentSession.create({
-    data: {
-      tokenHash: mobileEnrollmentTokenHash(rawToken),
-      challengeId: challenge.id,
-      userId: input.userId,
-      expiresAt,
-    },
-  });
-  return {
-    ...mobileChallengeView(challenge, { nextAction: "ENROLL_PASSKEY", sessionScope: "ENROLLMENT" }),
-    expiresAt: expiresAt.toISOString(),
-    enrollmentSession: { token: rawToken, expiresAt: expiresAt.toISOString() },
   };
 }
 

@@ -2449,7 +2449,6 @@ model MobileAuthChallenge {
   otpMaximumAttempts        Int                      @default(5)
   biometricPolicy           MobileBiometricPolicy    @default(REQUIRED_WHEN_AVAILABLE)
   state                     MobileAuthChallengeState @default(OPEN)
-  firebaseSubjectHash       String?
   deviceChallengeHash       String?
   deviceChallengeExpiresAt  DateTime?
   deviceChallengeConsumedAt DateTime?

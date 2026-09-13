@@ -11,7 +11,6 @@ import androidx.lifecycle.viewModelScope
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.ThemeMode
 import com.popwam.mobile.foundation.navigation.PopDestination
-import com.popwam.mobile.foundation.navigation.WelcomePage
 import com.popwam.mobile.foundation.overlay.OverlayState
 import com.popwam.mobile.onboarding.LaunchCoordinator
 import com.popwam.mobile.onboarding.LaunchUiState
@@ -75,23 +74,6 @@ class LaunchViewModel(
     fun selectActiveProfile(profileId: String) = viewModelScope.launch { coordinator.selectActiveProfile(profileId) }
     fun dismissThemeGallery() = coordinator.dismissThemeGallery()
 
-    fun nextWelcome(page: WelcomePage) {
-        coordinator.nextWelcome(page)
-        saveCurrentWelcomePage()
-    }
-
-    fun skipWelcome() {
-        coordinator.skipWelcome()
-        saveCurrentWelcomePage()
-    }
-
-    fun backFromWelcome(page: WelcomePage) {
-        if (!coordinator.previousWelcome(page)) coordinator.showTheme()
-        saveCurrentWelcomePage()
-    }
-
-    fun completeWelcome() = viewModelScope.launch { coordinator.completeWelcome() }
-
     private fun beginColdLaunch() {
         viewModelScope.launch {
             val startup = async(Dispatchers.IO) {
@@ -114,24 +96,11 @@ class LaunchViewModel(
                 queuedDestination = null
             }
             coordinator.finishInitialSplash(authenticated)
-            val destination = coordinator.state.value.destination
-            if (destination is PopDestination.Welcome) {
-                savedWelcomePage()?.let(coordinator::showWelcome)
-            }
+
         }
     }
 
-    private fun saveCurrentWelcomePage() {
-        val destination = coordinator.state.value.destination as? PopDestination.Welcome ?: return
-        savedStateHandle[KEY_WELCOME_PAGE] = destination.page.name
-    }
 
-    private fun savedWelcomePage(): WelcomePage? = savedStateHandle.get<String>(KEY_WELCOME_PAGE)
-        ?.let { runCatching { WelcomePage.valueOf(it) }.getOrNull() }
-
-    companion object {
-        private const val KEY_WELCOME_PAGE = "phase3_welcome_page"
-    }
 }
 
 class LaunchViewModelFactory(

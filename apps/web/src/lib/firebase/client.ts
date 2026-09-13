@@ -1,7 +1,6 @@
 "use client";
 
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
 import type { Analytics } from "firebase/analytics";
 
 const requiredConfigNames = [
@@ -36,11 +35,6 @@ export function getFirebaseApp(): FirebaseApp | null {
   const config = firebaseConfig();
   if (!config) return null;
   return getApps().length ? getApp() : initializeApp(config);
-}
-
-export function getFirebaseAuth(): Auth | null {
-  const app = getFirebaseApp();
-  return app ? getAuth(app) : null;
 }
 
 export async function getFirebaseAnalytics(): Promise<Analytics | null> {

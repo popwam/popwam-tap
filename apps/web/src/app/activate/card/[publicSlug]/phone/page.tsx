@@ -18,8 +18,8 @@ export default async function ActivationPhonePage({ params }: { params: Promise<
         <h1 className="mt-3 text-2xl font-black">{ar ? "التحقق الهاتفي قيد التحديث" : "Phone verification is being updated"}</h1>
         <p className="mt-2 text-sm text-slate-400">
           {ar
-            ? "تم إيقاف مسار المزود القديم بأمان. سيعود تفعيل الويب بعد ربط Firebase بجلسة الويب الحالية."
-            : "The legacy provider route is safely disabled. Web activation will return after Firebase proof is joined to the existing Web session."}
+            ? "التحقق الهاتفي لتفعيل الويب غير متاح حاليًا. استخدم تطبيق POP على Android."
+            : "Phone verification for Web activation is currently unavailable. Use POP for Android."}
         </p>
       </div>
     </main>
