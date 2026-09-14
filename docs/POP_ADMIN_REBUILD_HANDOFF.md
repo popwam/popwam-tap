@@ -2,6 +2,8 @@
 
 ## 1. Current Status
 
+- ENV CONTRACT CLEANUP — CLOSED for CURRENT PRODUCTION / CURRENT TEST. [Authoritative contract](POP_ENV_CONTRACT.md): 152 variables classified; 26 focused tests and final TypeScript passed. Production Evolution configuration is intentionally absent until auth deployment; release passkey signer and listed native/UI domain consumers remain REVIEW_LATER. READY FOR PASS 7A: YES; PASS 7A NOT STARTED.
+
 - PASS 7 — IMPLEMENTED / CODE VERIFIED / AWAITING OWNER PHYSICAL ACCEPTANCE. Clean PERSONAL/BUSINESS onboarding, first-profile registry fallback, passkey, biometric session protection and measured APK cleanup. See section 20 and [PASS 7 verification](POP_PASS7_VERIFICATION.md).
 
 - PASS 1 — ACCEPTED / CLOSED
@@ -268,3 +270,31 @@ APK before: **53,480,757 bytes / 53.480757 MB**. APK after: **29,644,975 bytes /
 TEST deployments: auth `53d7b1f2-db34-4bbd-9b47-6b965c3aac84`, public `449c5f7c-a236-4666-b1b7-a59ac7db176e` (both SUCCESS). Isolation, health, TEST passkey RP/assetlinks and authenticated/CSRF-protected setup endpoints verified. TEST predeploy found no pending migration. Read-only comparison confirms Production deployment, variables, users, profiles and migrations unchanged.
 
 Full 31-point report, exact deletions, hashes, measurements, security limits and owner physical checklist: [POP_PASS7_VERIFICATION.md](POP_PASS7_VERIFICATION.md). No emulator, ADB, physical device, installation, instrumentation, owner OTP automation, production deployment/migration, Admin/Inventory cleanup or commit. Stop at owner PASS 7 acceptance.
+
+## 21. ENV CONTRACT CLEANUP — CLOSED
+
+Finalized 2026-09-14 local, continuing the 2026-09-13 audit. See [POP_ENV_CONTRACT.md](POP_ENV_CONTRACT.md) for all 152 classified variables, exact retained/removed Railway names, route-level Meta/SMS consumers, every old OTP/ACTIVATION setting and focused domain review.
+
+CURRENT PRODUCTION: current contract passes; Evolution Auth is NOT DEPLOYED / ENV INTENTIONALLY ABSENT per owner deployment staging. No Evolution secrets were added. FUTURE PRODUCTION AUTH REQUIREMENT: complete Evolution group and reviewed release Android origin, checked only by explicit `--future-auth` preflight. CURRENT TEST: isolated Evolution config passes and debug passkey signer is approved; Production release signer review does not block TEST acceptance.
+
+Meta/SMS settings still serve account security/phone change and Admin diagnostics. They are not safe to delete. Old OTP settings protect those separate consumers; ACTIVATION settings protect card claims. All are accounted for, and no provider/feature was refactored.
+
+Bounded URL configuration fixes let the explicitly isolated TEST deployment resolve its application origin under production build mode and give PUBLIC_URL precedence in activation/programming/NFC/CSV links. Remaining native Share/preview/cache and UI hard-coded domains are REVIEW_LATER; universal canonical URL compliance is not claimed. No Android/UI edits or PASS 7A work.
+
+Previously completed stored-variable cleanup: APP_NAME removed from both TEST services; ADMIN_EMAIL, ADMIN_PASSWORD, APP_NAME, DEMO_USER_EMAIL, DEMO_USER_PASSWORD, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and R2_PRIVATE_FOLDER removed from Production with skipDeploys. Every retained value unchanged. No additional Railway mutation during finalization. Manual seed/recovery tooling preserved; R2_ACCOUNT_ID retained for the currently deployed validator. No secret rotation, deployment, restart, database change, migration or commit.
+
+Final verification: 22 environment-validator tests + 4 application-origin tests PASS; final TypeScript PASS; git diff --check PASS. Earlier successful Web build was not repeated; final URL changes received focused tests/TypeScript. Earlier post-cleanup TEST health/provider/assetlinks evidence remains valid; no new TEST variable mutation required another health check. Production deployment 1d2bead1-14a3-4168-8f63-cba891551669 was pre-existing, not created here.
+
+READY FOR PASS 7A: YES. PASS 7A NOT STARTED. Owner physical acceptance remains separate.
+
+## 22. PASS 7A — OWNER ACCEPTANCE CORRECTIONS
+
+**IMPLEMENTED / BUILT / TEST DEPLOYED / READY FOR OWNER RETEST / PHYSICAL ACCEPTANCE PENDING** (2026-09-14).
+
+Android login/onboarding and template selection are compact, scrollable, IME-safe and RTL-aware. TEST enables PERSONAL/BUSINESS for all active plans and exposes all 17 approved templates. Mobile passkey registration now uses a platform authenticator with Android-compatible algorithms and localized failure categories; the exact TEST debug package/certificate Digital Asset Links contract is live. The obsolete public-profile Appearance and dead Verification editor paths/resources are removed; Profession remains optional content. Generated internal email and engineering account copy are hidden. Draft Share now routes through readiness-aware Publish/Resume, then Share. Android public links derive from `PUBLIC_BASE_URL` and the final APK uses the isolated TEST origins.
+
+TEST API deployment `818d14eb-6e07-433f-a786-03eeaf45297d` and Public deployment `fc4a86bc-d594-4b04-abe1-0ad98a22f30a` are **SUCCESS**; both health endpoints return 200. Production deployment remains the pre-existing `1d2bead1-14a3-4168-8f63-cba891551669`; no Production operation occurred.
+
+Final APK: `E:\saas\popwam-tap\apps\android\app\build\outputs\apk\debug\pop-pass7a-test-debug.apk`; **31,151,376 bytes / 31.151376 MB**; SHA-256 `580a794387562cef399a01e19294e38590c314c2453efc38ad8af7ccb31ad021`; package `com.popwam.pop.debug`; versionName `0.0.12-debug`; versionCode `12`; arm64-v8a; valid debug v2 signature; TEST API/public BuildConfig confirmed. **NOT INSTALLED**.
+
+Per owner instruction, no automated tests were run. Android compilation/final assemble, necessary TypeScript compile, deployment-required Web build and `git diff --check` succeeded. Owner physical acceptance remains pending. Full report: [POP_PASS7A_VERIFICATION.md](POP_PASS7A_VERIFICATION.md).

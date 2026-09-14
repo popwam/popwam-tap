@@ -26,6 +26,7 @@ export async function POST(request: Request) {
   if (!context) return unauthorized();
   if (!context.bindingHash) return Response.json({ ok: false, error: "SESSION_CONTEXT_UPGRADE_REQUIRED" }, { status: 409 });
   const config = passkeyConfig();
+  const mobile = request.headers.get("authorization")?.startsWith("Bearer ") === true;
   const existing = await prisma.passkeyCredential.findMany({
     where: { userId: context.user.id, revokedAt: null },
     select: { credentialId: true, transports: true },
@@ -34,11 +35,13 @@ export async function POST(request: Request) {
     rpName: config.rpName,
     rpID: config.rpID,
     userID: Buffer.from(context.user.id),
-    userName: context.user.name || context.user.email,
+    userName: context.user.name?.trim() || "POP account",
     userDisplayName: context.user.name || "POP user",
     attestationType: "none",
-    authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
-    supportedAlgorithmIDs: [...passkeyAlgorithms],
+    authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required", ...(mobile ? { authenticatorAttachment: "platform" as const } : {}) },
+    // Android providers support the established ES256/RS256 algorithms. Do not
+    // send EdDSA to a provider that may reject the entire creation request.
+    supportedAlgorithmIDs: mobile ? [-7, -257] : [...passkeyAlgorithms],
     excludeCredentials: existing.map(item => ({ id: item.credentialId, transports: item.transports as never })),
   });
   const options = withoutUnneededCreationExtensions(generatedOptions);

@@ -359,7 +359,6 @@
     <string name="settings_legal">Terms and Privacy Policy</string>
     <string name="settings_device_authority_help">Device records are descriptive. Real Web sessions and Android refresh families remain authoritative.</string>
     <string name="settings_fcm_help">Push-token cleanup is independent and best-effort; it never grants or preserves POP access.</string>
-    <string name="settings_account_help">Phone change and account deletion use the protected Web/API foundation and never trust Firebase as POP authorization.</string>
     <string name="settings_remove_confirm">Remove this passkey?</string>
     <string name="settings_passkey_failed">Passkey setup did not complete. Your POP session remains usable.</string>
     <string name="settings_report_lost">Report product lost</string>
@@ -559,8 +558,6 @@
     <string name="profile_issues_count">%1$d required items remain</string>
     <string name="profile_basic_information">Basic information</string>
     <string name="profile_contact_links">Contact &amp; links</string>
-    <string name="profile_appearance">Appearance</string>
-    <string name="profile_verification">Verification</string>
     <string name="profile_visibility">Visibility &amp; profile link</string>
     <string name="profile_delete">Delete profile</string>
     <string name="profile_delete_confirm_title">Archive this profile?</string>
@@ -593,7 +590,6 @@
     <string name="profile_link_type">Link type</string>
     <string name="profile_media_help">Upload only supported profile images. Large files are validated and processed by the existing POP media service.</string>
     <string name="profile_upload">Upload media</string>
-    <string name="profile_appearance_separate">Public profile appearance is separate from the app Light or Dark theme.</string>
     <string name="profile_visibility_help">Private profiles are not publicly shareable. Unlisted profiles require the exact link.</string>
     <string name="profile_slug">Profile link</string>
     <string name="profile_slug_server_validation">Availability and reserved names are checked by POP when you save.</string>
@@ -603,9 +599,6 @@
     <string name="profile_service">Service</string>
     <string name="profile_name">Profile name</string>
     <string name="profile_description">Description</string>
-    <string name="profile_verification_unavailable_title">Verification is not available yet</string>
-    <string name="profile_verification_unavailable_body">This profile has no backend verification workflow. No verification status or approval is being simulated.</string>
-    <string name="profile_verification_backend_authority">When verification becomes available, its state and evidence requirements will come from POP.</string>
     <string name="profile_type_personal">Personal</string>
     <string name="profile_type_business">Business</string>
     <string name="profile_create_continue">Create profile and continue</string>
@@ -671,14 +664,6 @@
     <string name="profile_closes_at">Closes at (HH:MM)</string>
     <string name="profile_monday">Monday</string><string name="profile_tuesday">Tuesday</string><string name="profile_wednesday">Wednesday</string><string name="profile_thursday">Thursday</string><string name="profile_friday">Friday</string><string name="profile_saturday">Saturday</string><string name="profile_sunday">Sunday</string>
     <string name="move_up">Move up</string><string name="move_down">Move down</string>
-    <string name="profile_verification_not_started">Verification not started</string>
-    <string name="profile_verification_required">Verification required</string>
-    <string name="profile_verification_in_progress">Verification in progress</string>
-    <string name="profile_verification_pending">Verification pending</string>
-    <string name="profile_verification_rejected">Verification rejected</string>
-    <string name="profile_verification_needs_update">Verification needs an update</string>
-    <string name="profile_verification_expired">Verification expired</string>
-    <string name="profile_verification_identity">Identity</string><string name="profile_verification_business">Business</string><string name="profile_verification_professional">Professional credential</string><string name="profile_verification_medical">Medical credential</string><string name="profile_verification_contact">Contact</string><string name="profile_verification_domain">Domain</string>
     <string name="profile_first_name">First name</string>
     <string name="profile_last_name">Last name</string>
     <string name="profile_profession">Profession</string>
@@ -763,9 +748,7 @@
     <string name="profile_basic_information_description">Name, bio, and basic details</string>
     <string name="profile_contact_links_description">Contact information and social links</string>
     <string name="profile_media_description">Photos, videos, and documents</string>
-    <string name="profile_appearance_description">Customize your profile appearance</string>
     <string name="profile_type_details_description">Work, services, and expertise</string>
-    <string name="profile_verification_description">Verify your identity or business</string>
     <string name="share_hce_guidance">Bring the phone close to an NFC-capable phone</string>
     <string name="home_search_person">Person</string>
     <string name="home_search_business">Business</string>
@@ -776,4 +759,12 @@
     <string name="profile_preview_close">Close preview</string>
     <string name="profile_preview_action">Preview</string>
     <string name="profile_touch_countdown">Bring the phone close · %1$d s</string>
+    <string name="p7a_not_set">Not set</string>
+    <string name="p7a_passkey_cancelled">Passkey setup was cancelled.</string>
+    <string name="p7a_passkey_unsupported">Passkeys are not supported by this device or credential provider.</string>
+    <string name="p7a_passkey_missing">No saved POP passkey was found on this device.</string>
+    <string name="p7a_passkey_reauthenticate">Sign in again before changing passkeys.</string>
+    <string name="p7a_passkey_unavailable">Passkeys are temporarily unavailable. Try WhatsApp login.</string>
+    <string name="p7a_passkey_setup_failed">We could not create the passkey. Check your screen lock and credential provider, then try again.</string>
+    <string name="p7a_passkey_login_failed">Passkey login failed. Try again or use WhatsApp login.</string>
 </resources>

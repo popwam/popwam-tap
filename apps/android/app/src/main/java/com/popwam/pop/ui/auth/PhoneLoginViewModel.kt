@@ -86,7 +86,7 @@ class PhoneLoginViewModel(private val gateway:PhoneLoginGateway, private val now
                 mutable.value=mutable.value.copy(stage=PhoneLoginStage.AUTHENTICATED,loading=false,error=null)
             } catch(error:Throwable) {
                 if(error is CancellationException)throw error
-                mutable.value=mutable.value.copy(loading=false,error="PASSKEY_FALLBACK")
+                mutable.value=mutable.value.copy(loading=false,error="PASSKEY_"+com.popwam.pop.ui.passkeyLoginError(error).name)
             }
         }
     }

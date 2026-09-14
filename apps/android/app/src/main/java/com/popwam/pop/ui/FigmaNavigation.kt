@@ -221,7 +221,7 @@ fun FigmaMainNavigation(
                             avatarUrl=it.avatarUrl,
                             type=it.backendKind.name.lowercase().replaceFirstChar(Char::uppercase),
                             verified=it.verification==ProfileVerificationState.VERIFIED,
-                            publicUrl=activeContent?.slug?.takeIf(String::isNotBlank)?.let { slug->"https://pop.popwam.com/$slug" },
+                            publicUrl=activeContent?.slug?.takeIf(String::isNotBlank)?.let { slug->com.popwam.pop.PublicProfileUrls.profile(slug) },
                             completionPercent=if(it.completion.publishReady)100 else 0,
                         ) },
                         navigate = { nav.navigate(it) },
@@ -235,16 +235,16 @@ fun FigmaMainNavigation(
                     val id = entry.arguments?.getString("id").orEmpty()
                     VirtualCardDetailsScreen(id, state, vm, { nav.popBackStack() }, { nav.navigate("profile/$id") }) { nav.navigate("profile-publish/$id") }
                 }
-                composable("profile-publish/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ProfileEditorSectionScreen(profileState,entry.arguments?.getString("id").orEmpty(),ProfileEditorSection.VISIBILITY,nav::popBackStack,profiles::onEvent)}
+                composable("profile-publish/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->com.popwam.pop.ui.profile.ProfilePublishScreen(profileState,entry.arguments?.getString("id").orEmpty(),nav::popBackStack,profiles::onEvent)}
                 composable("profile/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     ProfileViewScreen(profileState,entry.arguments?.getString("id").orEmpty(),nav::popBackStack,profiles::onEvent)
                 }
                 composable("profile/public-preview/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->
                     val id=entry.arguments?.getString("id").orEmpty()
                     val slug=profileState.content?.takeIf{it.summary.id==id}?.slug
-                    if(slug.isNullOrBlank())nav.popBackStack() else PublicProfilePreviewDialog("https://pop.popwam.com/$slug",nav::popBackStack)
+                    if(slug.isNullOrBlank())nav.popBackStack() else PublicProfilePreviewDialog(com.popwam.pop.PublicProfileUrls.profile(slug),nav::popBackStack)
                 }
-                composable("public-preview/{slug}",arguments=listOf(navArgument("slug"){type=NavType.StringType})){entry->PublicProfilePreviewDialog("https://pop.popwam.com/${entry.arguments?.getString("slug").orEmpty()}",nav::popBackStack)}
+                composable("public-preview/{slug}",arguments=listOf(navArgument("slug"){type=NavType.StringType})){entry->PublicProfilePreviewDialog(com.popwam.pop.PublicProfileUrls.profile(entry.arguments?.getString("slug").orEmpty()),nav::popBackStack)}
                 composable("profile/{id}/edit",arguments=listOf(navArgument("id"){type=NavType.StringType})){entry->ProfileEditorHubScreen(profileState,entry.arguments?.getString("id").orEmpty(),nav::popBackStack,profiles::onEvent)}
                 composable("profile/{id}/edit/{section}",arguments=listOf(navArgument("id"){type=NavType.StringType},navArgument("section"){type=NavType.StringType})){entry->val section=runCatching{ProfileEditorSection.valueOf(entry.arguments?.getString("section").orEmpty())}.getOrDefault(ProfileEditorSection.BASIC_INFORMATION);ProfileEditorSectionScreen(profileState,entry.arguments?.getString("id").orEmpty(),section,nav::popBackStack,profiles::onEvent)}
                 composable("card/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
@@ -285,7 +285,7 @@ fun FigmaMainNavigation(
                 Box(Modifier.fillMaxSize()){
                     AndroidView(factory={context->WebView(context).apply{
                         settings.javaScriptEnabled=false;settings.domStorageEnabled=false;settings.allowFileAccess=false;settings.allowContentAccess=false;settings.mixedContentMode=android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                        webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView,request:WebResourceRequest):Boolean{return request.url.scheme!="https"||request.url.host!="pop.popwam.com"};override fun onPageFinished(view:WebView?,loadedUrl:String?){loading=false}}
+                        webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView,request:WebResourceRequest):Boolean{return request.url.scheme!="https"||request.url.host!=com.popwam.pop.PublicProfileUrls.publicHost};override fun onPageFinished(view:WebView?,loadedUrl:String?){loading=false}}
                         loadUrl(url)
                     }},update={if(it.url!=url)it.loadUrl(url)},modifier=Modifier.fillMaxSize())
                     if(loading)CircularProgressIndicator(Modifier.align(Alignment.Center))

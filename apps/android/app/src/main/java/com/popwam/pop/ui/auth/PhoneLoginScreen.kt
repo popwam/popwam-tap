@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.unit.sp
@@ -46,21 +49,17 @@ fun PhoneLoginScreen(viewModel:PhoneLoginViewModel,countriesStore:PhoneCountrySt
     var legal by remember { mutableStateOf<PreAuthLegalKind?>(null) }
     var clock by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
     val context=LocalContext.current
+    val focus=LocalFocusManager.current
     LaunchedEffect(state.resendAt){while(true){clock=android.os.SystemClock.elapsedRealtime();delay(1000)}}
     LaunchedEffect(state.stage){if(state.stage==PhoneLoginStage.AUTHENTICATED){viewModel.resetAfterLogout();onAuthenticated()}}
     BackHandler(state.stage==PhoneLoginStage.OTP && !state.loading){viewModel.changeNumber()}
     val passkeyAction={viewModel.passkey { options->PasskeyCoordinator(context).authenticate(context as ComponentActivity,options) }}
     if(welcome && state.stage==PhoneLoginStage.PHONE) {
         AuthStepLayout(stringResource(R.string.p7_welcome_title),stringResource(R.string.p7_welcome_help),Icons.Default.AutoAwesome) {
-            Card(Modifier.fillMaxWidth()){Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                Icon(Icons.Default.AccountCircle,null,Modifier.size(48.dp))
-                Text(stringResource(R.string.p7_welcome_card),style=MaterialTheme.typography.titleLarge)
-                Row(horizontalArrangement=Arrangement.spacedBy(16.dp)){Icon(Icons.Default.Link,null);Icon(Icons.Default.QrCode,null);Icon(Icons.Default.Share,null)}
-            }}
             AuthPrimary(stringResource(R.string.p7_start),!state.loading){welcome=false}
             if(android.os.Build.VERSION.SDK_INT>=28)OutlinedButton(passkeyAction,Modifier.fillMaxWidth(),enabled=!state.loading){Icon(Icons.Default.Key,null);Spacer(Modifier.width(12.dp));Text(stringResource(R.string.p7_passkey_login))}
             if(state.loading)LinearProgressIndicator(Modifier.fillMaxWidth())
-            if(state.error!=null)Text(stringResource(R.string.p7_passkey_fallback))
+            state.error?.let{Text(stringResource(loginErrorResource(it)),color=MaterialTheme.colorScheme.error)}
         }
     } else {
         val otp=state.stage==PhoneLoginStage.OTP
@@ -68,10 +67,10 @@ fun PhoneLoginScreen(viewModel:PhoneLoginViewModel,countriesStore:PhoneCountrySt
             stringResource(if(otp)R.string.wa_auth_sent else R.string.wa_auth_description),if(otp)Icons.Default.Chat else Icons.Default.Phone,
             back={if(otp)viewModel.changeNumber() else welcome=true}) {
             if(!otp) {
-                Card(Modifier.fillMaxWidth()){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
+                Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)){
                     OutlinedButton({picker=true},Modifier.fillMaxWidth(),enabled=!state.loading){Text(countries.firstOrNull{it.iso2==state.country}?.let{"${it.flag} ${it.name} (${it.callingCode})"}?:stringResource(R.string.wa_auth_country))}
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){OutlinedTextField(state.phone,viewModel::phone,Modifier.fillMaxWidth(),singleLine=true,enabled=!state.loading,label={Text(stringResource(R.string.wa_auth_phone))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone),leadingIcon={Icon(Icons.Default.Phone,null)})}
-                }}
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){OutlinedTextField(state.phone,viewModel::phone,Modifier.fillMaxWidth(),singleLine=true,enabled=!state.loading,label={Text(stringResource(R.string.wa_auth_phone))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone,imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={focus.clearFocus()}),leadingIcon={Icon(Icons.Default.Phone,null)})}
+                }
                 AuthPrimary(stringResource(R.string.wa_auth_continue),!state.loading&&countries.any{it.iso2==state.country}&&state.resendSeconds(clock)==0){viewModel.request(locale)}
                 if(android.os.Build.VERSION.SDK_INT>=28)TextButton(passkeyAction,enabled=!state.loading){Text(stringResource(R.string.p7_passkey_login))}
                 Text(stringResource(R.string.wa_auth_legal),style=MaterialTheme.typography.bodySmall)
@@ -81,8 +80,8 @@ fun PhoneLoginScreen(viewModel:PhoneLoginViewModel,countriesStore:PhoneCountrySt
                     Text(state.maskedPhone,style=MaterialTheme.typography.titleMedium)
                     // One native input supports six-digit paste, accessibility and predictable backspace.
                     OutlinedTextField(state.code,viewModel::code,Modifier.fillMaxWidth(),singleLine=true,enabled=!state.loading,
-                        textStyle=MaterialTheme.typography.headlineMedium.copy(letterSpacing=8.sp),label={Text(stringResource(R.string.wa_auth_code))},
-                        placeholder={Text("— — — — — —")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword))
+                        textStyle=MaterialTheme.typography.headlineMedium.copy(letterSpacing=4.sp),label={Text(stringResource(R.string.wa_auth_code))},
+                        placeholder={Text("— — — — — —")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword,imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={focus.clearFocus()}))
                 }
                 AuthPrimary(stringResource(R.string.wa_auth_verify),!state.loading&&state.code.length==6){viewModel.verify()}
                 TextButton({viewModel.request(locale,true)},enabled=!state.loading&&state.resendSeconds(clock)==0){Text(if(state.resendSeconds(clock)>0)stringResource(R.string.wa_auth_countdown,state.resendSeconds(clock)) else stringResource(R.string.wa_auth_resend))}
@@ -90,7 +89,7 @@ fun PhoneLoginScreen(viewModel:PhoneLoginViewModel,countriesStore:PhoneCountrySt
             }
             if(!otp&&state.resendSeconds(clock)>0)Text(stringResource(R.string.wa_auth_countdown,state.resendSeconds(clock)))
             if(state.loading)LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let{Text(stringResource(if(it=="PASSKEY_FALLBACK")R.string.p7_passkey_fallback else loginErrorResource(it)),color=MaterialTheme.colorScheme.error)}
+            state.error?.let{Text(stringResource(loginErrorResource(it)),color=MaterialTheme.colorScheme.error)}
         }
     }
     run {
@@ -101,7 +100,9 @@ fun PhoneLoginScreen(viewModel:PhoneLoginViewModel,countriesStore:PhoneCountrySt
         legal?.let{kind->Dialog(onDismissRequest={legal=null},properties=DialogProperties(usePlatformDefaultWidth=false)){Surface(Modifier.fillMaxSize()){NativeLegalScreen(kind){legal=null}}}}
     }
 }
-internal fun loginErrorResource(error:String)=when(error) {
+internal fun loginErrorResource(error:String):Int {
+    if(error.startsWith("PASSKEY_"))return com.popwam.pop.ui.passkeyErrorResource(runCatching{com.popwam.pop.ui.PasskeyLoginError.valueOf(error.removePrefix("PASSKEY_"))}.getOrDefault(com.popwam.pop.ui.PasskeyLoginError.AUTHENTICATION_FAILED))
+    return when(error) {
     "PHONE_INVALID","PHONE_COUNTRY_UNAVAILABLE"->R.string.wa_auth_invalid_phone
     "OTP_INVALID"->R.string.wa_auth_invalid_code
     "OTP_EXPIRED","OTP_USED"->R.string.wa_auth_expired
@@ -110,4 +111,5 @@ internal fun loginErrorResource(error:String)=when(error) {
     "OFFLINE"->R.string.wa_auth_offline
     "OTP_DELIVERY_FAILED","OTP_PROVIDER_TIMEOUT"->R.string.wa_auth_send_failed
     else->R.string.wa_auth_unavailable
+}
 }

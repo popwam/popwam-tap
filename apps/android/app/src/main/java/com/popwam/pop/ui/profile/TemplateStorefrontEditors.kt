@@ -38,25 +38,18 @@ fun TemplateEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(Profile
     val chosen=catalog.firstOrNull{it.id==chosenId}
     val saving=state.saveState==ProfileSaveState.SAVING
     LaunchedEffect(content.summary.id){onEvent(ProfileEvent.LoadTemplates)}
-    Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxSize().imePadding().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Text(content.templateName.ifBlank{stringResource(R.string.pass6_template)},style=MaterialTheme.typography.titleMedium)
         Text(stringResource(R.string.pass6_draft_only),style=MaterialTheme.typography.bodySmall)
-        Text(stringResource(R.string.pass6_thumbnail_hint),style=MaterialTheme.typography.bodySmall)
         if(state.templatesLoading)LinearProgressIndicator(Modifier.fillMaxWidth())
         state.errorCode?.let{Pass6Error(it)}
         if(catalog.isEmpty() && !state.templatesLoading)TextButton({onEvent(ProfileEvent.LoadTemplates)}){Text(stringResource(R.string.pass6_retry))}
-        LazyVerticalGrid(GridCells.Adaptive(145.dp),Modifier.weight(1f),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        LazyVerticalGrid(GridCells.Fixed(2),Modifier.weight(1f),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             items(catalog,key={it.id}){template->
-                Card(onClick={if(template.allowed && !saving)chosenId=template.id},colors=CardDefaults.cardColors(containerColor=if(template.id==chosenId)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)) {
-                    AsyncImage(profileAssetUrl(template.previewImageUrl),templateLabel(template),Modifier.fillMaxWidth().height(160.dp))
-                    Column(Modifier.padding(10.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                        Text(templateLabel(template),style=MaterialTheme.typography.titleSmall)
-                        Text(templateFamily(template.family),style=MaterialTheme.typography.bodySmall)
-                        if(template.id==content.templateId)Text(stringResource(R.string.pass6_saved_draft),style=MaterialTheme.typography.labelSmall)
-                        if(template.id==chosenId)Text(stringResource(R.string.pass6_selected),style=MaterialTheme.typography.labelMedium)
-                        if(!template.allowed)Text(stringResource(R.string.pass6_plan_locked),style=MaterialTheme.typography.labelSmall)
-                    }
-                }
+                com.popwam.pop.ui.components.CompactTemplateCard(
+                    title=templateLabel(template),imageUrl=template.previewImageUrl,
+                    selected=template.id==chosenId,allowed=template.allowed,enabled=!saving,
+                    onSelect={chosenId=template.id;onEvent(ProfileEvent.SetDirty(true))})
             }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {

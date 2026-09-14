@@ -1,5 +1,7 @@
 # POP by POPWAM
 
+Current environment requirements and deployment exceptions: [environment contract](docs/POP_ENV_CONTRACT.md). Older setup examples below are not a substitute for this inventory.
+
 Production uses exactly two hosts: `https://pop.popwam.com` for the application, authentication, dashboard, administration and API; and `https://go.popwam.com` for the store, public cards, profiles, files, QR, NFC and vCard links.
 
 The Android app is version `0.0.12` with `applicationId` and namespace `com.popwam.pop`. Changing an already-published Android application from the former package to `com.popwam.pop` makes Google Play treat it as a new application unless `com.popwam.pop` was the package used for the original listing. Existing installs under another package are not silently upgraded.

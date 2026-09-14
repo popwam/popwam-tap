@@ -134,7 +134,7 @@ class LocalFirstRepository(
             id = profileId,
             type = "PROFILE",
             label = label,
-            canonicalUrl = "https://pop.popwam.com/$slug",
+            canonicalUrl = com.popwam.pop.PublicProfileUrls.profile(slug),
             hceCompatible = true,
         )
         return CachedShareData(

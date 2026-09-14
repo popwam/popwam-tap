@@ -39,6 +39,6 @@ object PendingDeepLinkParser {
     private fun String.safePublicProfile(): PopDestination.PublicProfile? =
         takeIf { it.matches(safeSegment) }?.let(PopDestination::PublicProfile)
 
-    const val CANONICAL_HOST = "pop.popwam.com"
-    const val LEGACY_PUBLIC_HOST = "go.popwam.com"
+    val CANONICAL_HOST get() = com.popwam.pop.PublicProfileUrls.appHost
+    val LEGACY_PUBLIC_HOST get() = com.popwam.pop.PublicProfileUrls.publicHost
 }

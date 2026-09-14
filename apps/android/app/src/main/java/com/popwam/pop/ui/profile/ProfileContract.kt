@@ -6,7 +6,7 @@ import com.google.gson.JsonPrimitive
 enum class ProfileLoadState { INITIAL_LOADING, CONTENT, EMPTY, ERROR }
 enum class ProfileBackendKind { PERSONAL, BUSINESS }
 enum class ProfileVerificationState { UNAVAILABLE, UNVERIFIED, PENDING, VERIFIED, REJECTED }
-enum class ProfileEditorSection { BASIC_INFORMATION, ABOUT, CONTACT_LINKS, TYPE_DETAILS, MEDIA, APPEARANCE, VERIFICATION, VISIBILITY, SERVICES, LOCATIONS, TEMPLATE }
+enum class ProfileEditorSection { BASIC_INFORMATION, ABOUT, CONTACT_LINKS, TYPE_DETAILS, MEDIA, VISIBILITY, SERVICES, LOCATIONS, TEMPLATE }
 enum class ProfileSaveState { IDLE, SAVING, SUCCESS, FAILURE }
 
 data class ProfileCompletion(
@@ -177,7 +177,6 @@ data class ProfileContent(
     val addressEn: String,
     val contactVisibility: Map<String, String>,
     val slug: String,
-    val theme: String,
     val templateName: String,
     val links: List<ProfileLink>,
     val services: List<ProfileService>,
@@ -212,7 +211,6 @@ data class ProfileQuota(
     val canAdd: Boolean = false,
     val allowedKinds: Set<ProfileBackendKind> = setOf(ProfileBackendKind.PERSONAL),
     val canCustomizeSlug: Boolean = false,
-    val allowedThemes: List<String> = emptyList(),
     val blocker: String? = null,
 )
 
@@ -265,7 +263,6 @@ sealed interface ProfileEditorMutation {
     data class ServiceDelete(val id:String):ProfileEditorMutation
     data class LocationUpsert(val location:ProfileLocation):ProfileEditorMutation
     data class LocationDelete(val id:String):ProfileEditorMutation
-    data class Appearance(val theme:String):ProfileEditorMutation
     data class AddModule(val key:String):ProfileEditorMutation
     data class UpdateModule(val key:String,val enabled:Boolean,val visibility:String):ProfileEditorMutation
     data class StructuredEntryUpsert(val entry:ProfileStructuredEntry):ProfileEditorMutation

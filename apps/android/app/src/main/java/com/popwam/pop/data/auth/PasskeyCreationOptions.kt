@@ -41,7 +41,7 @@ internal fun validatePasskeyCreationOptions(options:JsonObject,expectedRpId:Stri
         val verification=selection.stringAt("userVerification")
         if(verification!="required")return invalid("user_verification_required")
         val attachment=selection.stringAt("authenticatorAttachment")
-        if(attachment!=null)return invalid("authenticator_attachment_not_neutral")
+        if(attachment!=null&&attachment!="platform")return invalid("authenticator_attachment_invalid")
     }
     options.stringAt("attestation")?.let { if(it !in setOf("none","indirect","direct","enterprise"))return invalid("attestation_invalid") }
     options.arrayAt("excludeCredentials")?.let { credentials->if(credentials.any { credential->

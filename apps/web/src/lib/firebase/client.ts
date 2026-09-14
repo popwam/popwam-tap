@@ -3,30 +3,24 @@
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
 import type { Analytics } from "firebase/analytics";
 
-const requiredConfigNames = [
-  "NEXT_PUBLIC_FIREBASE_API_KEY",
-  "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
-  "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
-  "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
-  "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
-  "NEXT_PUBLIC_FIREBASE_APP_ID",
-] as const;
-
 function browserOnly() {
   return typeof window !== "undefined";
 }
 
 function firebaseConfig(): FirebaseOptions | null {
   if (!browserOnly()) return null;
-  const values = Object.fromEntries(requiredConfigNames.map((name) => [name, process.env[name]?.trim() || ""]));
-  if (Object.values(values).some((value) => !value)) return null;
+  // Next.js inlines public configuration only through literal property access.
+  // Analytics does not use Firebase Auth's redirect domain.
+  const config = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim(),
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim(),
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim(),
+  };
+  if (Object.values(config).some((value) => !value)) return null;
   return {
-    apiKey: values.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: values.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: values.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: values.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: values.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: values.NEXT_PUBLIC_FIREBASE_APP_ID,
+    ...config,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim(),
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim(),
     ...(process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?.trim() ? { measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID.trim() } : {}),
   };
 }

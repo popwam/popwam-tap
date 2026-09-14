@@ -109,7 +109,7 @@ fun ProfileViewScreen(state:ProfilesUiState,profileId:String,onBack:()->Unit,onE
 
 @Composable private fun ProfileHero(content:ProfileContent){
     val context=LocalContext.current
-    val publicUrl="https://pop.popwam.com/${content.slug}"
+    val publicUrl=com.popwam.pop.PublicProfileUrls.profile(content.slug)
     Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(8.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.45f)),elevation=CardDefaults.cardElevation(defaultElevation=4.dp)){
         Column(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
@@ -151,9 +151,8 @@ private fun approvedProfileCompletion(content:ProfileContent):Int {
         content.summary.name.isNotBlank() && (content.bio.isNotBlank() || content.summary.subtitle?.isNotBlank()==true),
         content.hasContact() || content.links.isNotEmpty(),
         content.media.isNotEmpty() || content.documents.isNotEmpty(),
-        content.theme.isNotBlank(),
+        content.templateId!=null,
         content.structuredEntries.isNotEmpty() || content.localizedAbout()?.isNotBlank()==true,
-        content.summary.verification==ProfileVerificationState.VERIFIED,
     )
     return checks.count{it}*100/checks.size
 }
@@ -164,9 +163,7 @@ private fun approvedProfileSections(content:ProfileContent):List<ApprovedProfile
         ApprovedProfileSection(ProfileEditorSection.BASIC_INFORMATION,R.string.profile_basic_information,R.string.profile_basic_information_description,R.drawable.pop_approved_section_basic,content.summary.name.isNotBlank()),
         ApprovedProfileSection(ProfileEditorSection.CONTACT_LINKS,R.string.profile_contact_links,R.string.profile_contact_links_description,R.drawable.pop_approved_section_links,content.hasContact()||content.links.isNotEmpty()),
         ApprovedProfileSection(ProfileEditorSection.MEDIA,R.string.profile_media,R.string.profile_media_description,R.drawable.pop_approved_section_media,content.media.isNotEmpty()||content.documents.isNotEmpty()),
-        ApprovedProfileSection(ProfileEditorSection.APPEARANCE,R.string.profile_appearance,R.string.profile_appearance_description,R.drawable.pop_approved_section_appearance,content.theme.isNotBlank()),
         ApprovedProfileSection(if(hasTypeDetails)ProfileEditorSection.TYPE_DETAILS else ProfileEditorSection.ABOUT,if(hasTypeDetails)R.string.profile_type_details else R.string.profile_about,R.string.profile_type_details_description,R.drawable.pop_approved_section_business,content.structuredEntries.isNotEmpty()||content.localizedAbout()?.isNotBlank()==true),
-        ApprovedProfileSection(ProfileEditorSection.VERIFICATION,R.string.profile_verification,R.string.profile_verification_description,R.drawable.pop_approved_section_verification,content.summary.verification==ProfileVerificationState.VERIFIED),
         ApprovedProfileSection(ProfileEditorSection.TEMPLATE,R.string.pass6_template,R.string.pass6_change,R.drawable.pop_approved_section_appearance,content.templateId!=null,content.templateName.takeIf{it.isNotBlank()}),
     ) + if(content.summary.backendKind==ProfileBackendKind.BUSINESS)listOf(ApprovedProfileSection(ProfileEditorSection.SERVICES,R.string.pass6_products_services,R.string.pass6_showcase_help,R.drawable.pop_approved_section_business,content.services.isNotEmpty())) else emptyList()
 }
@@ -191,9 +188,9 @@ private fun approvedProfileSections(content:ProfileContent):List<ApprovedProfile
 
 @Composable private fun ApprovedProfileSectionRow(model:ApprovedProfileSection,onClick:()->Unit){
     val direction=LocalLayoutDirection.current
-    Surface(Modifier.fillMaxWidth().clickable(onClick=onClick),shape=RoundedCornerShape(8.dp),color=MaterialTheme.colorScheme.surface,shadowElevation=3.dp,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.28f))){
+    Surface(Modifier.fillMaxWidth().clickable(onClick=onClick),shape=RoundedCornerShape(8.dp),color=MaterialTheme.colorScheme.surface,shadowElevation=0.dp){
         Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-            PopApprovedAsset(model.icon,null,Modifier.size(42.dp))
+            PopApprovedAsset(model.icon,null,Modifier.size(28.dp))
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)){
                 Text(stringResource(model.title),style=MaterialTheme.typography.titleSmall)
                 Text(model.summary ?: stringResource(model.description),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
@@ -245,6 +242,31 @@ fun ProfileEditorHubScreen(state:ProfilesUiState,profileId:String,onBack:()->Uni
 }
 
 @Composable
+fun ProfilePublishScreen(state:ProfilesUiState,profileId:String,onBack:()->Unit,onEvent:(ProfileEvent)->Unit) {
+    LaunchedEffect(profileId){onEvent(ProfileEvent.SelectProfile(profileId))}
+    val content=state.content?.takeIf{it.summary.id==profileId}
+    val busy=state.saveState==ProfileSaveState.SAVING
+    Scaffold(topBar={TopAppBar(title={Text(stringResource(R.string.profile_publish))},navigationIcon={IconButton(onBack){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.back))}})}){padding->
+        LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            if(content==null)item{if(state.refreshing)CircularProgressIndicator() else ProfileFailure(state.errorCode?:"PROFILE_CONTENT_UNAVAILABLE",onEvent)}
+            else {
+                item{Text(content.displayName,style=MaterialTheme.typography.titleLarge)}
+                item{ProfileReadinessCard(content.summary.completion)}
+                if(state.saveState==ProfileSaveState.FAILURE)state.errorCode?.let{code->item{ProfileOperationError(code,null)}}
+                item{
+                    if(content.summary.lifecycle=="PUBLISHED")Button({onEvent(ProfileEvent.OpenShare(profileId))},Modifier.fillMaxWidth()){Text(stringResource(R.string.profile_share))}
+                    else Button({onEvent(ProfileEvent.PublishProfile(if(content.summary.lifecycle=="PAUSED")"resume" else "publish"))},Modifier.fillMaxWidth().heightIn(min=48.dp),enabled=content.summary.completion.publishReady&&!busy) {
+                        if(busy)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp) else Text(stringResource(if(content.summary.lifecycle=="PAUSED")R.string.profile_resume else R.string.profile_publish))
+                    }
+                }
+                if(!content.summary.completion.publishReady)item{TextButton({onEvent(ProfileEvent.OpenEditor(profileId))}){Text(stringResource(R.string.profile_edit))}}
+                item{Text(stringResource(R.string.profile_publish_confirm_body),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            }
+        }
+    }
+}
+
+@Composable
 fun ProfileEditorSectionScreen(state:ProfilesUiState,profileId:String,section:ProfileEditorSection,onBack:()->Unit,onEvent:(ProfileEvent)->Unit){
     val content=state.content
     LaunchedEffect(profileId){onEvent(ProfileEvent.SelectProfile(profileId))}
@@ -258,8 +280,6 @@ fun ProfileEditorSectionScreen(state:ProfilesUiState,profileId:String,section:Pr
                 ProfileEditorSection.CONTACT_LINKS->ContactLinksEditor(content,state,onEvent)
                 ProfileEditorSection.TYPE_DETAILS->StructuredDetailsEditor(content,state,onEvent)
                 ProfileEditorSection.MEDIA->MediaEditor(content,state,onEvent)
-                ProfileEditorSection.APPEARANCE->AppearanceEditor(content,state,onEvent)
-                ProfileEditorSection.VERIFICATION->VerificationPanel(content)
                 ProfileEditorSection.VISIBILITY->VisibilityEditor(content,state,onEvent)
                 ProfileEditorSection.SERVICES->StorefrontEditor(content,state,onEvent)
                 ProfileEditorSection.TEMPLATE->TemplateEditor(content,state,onEvent)
@@ -319,9 +339,9 @@ fun ProfileEditorSectionScreen(state:ProfilesUiState,profileId:String,section:Pr
         Text(stringResource(R.string.profile_profession),style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Box(Modifier.fillMaxWidth()){
             OutlinedButton({focus.clearFocus();expanded=true},Modifier.fillMaxWidth(),contentPadding=PaddingValues(horizontal=16.dp,vertical=14.dp)){
-                Text(profileProfessionLabel(value),Modifier.weight(1f));Icon(Icons.Default.ArrowDropDown,null)
+                Text(if(value=="PERSONAL")stringResource(R.string.p7a_not_set) else profileProfessionLabel(value),Modifier.weight(1f));Icon(Icons.Default.ArrowDropDown,null)
             }
-            DropdownMenu(expanded,{expanded=false},Modifier.fillMaxWidth(.9f)){ProfileIdentityPolicy.professions.forEach{option->DropdownMenuItem(text={Text(profileProfessionLabel(option))},onClick={onChange(option);expanded=false})}}
+            DropdownMenu(expanded,{expanded=false},Modifier.fillMaxWidth(.9f)){ProfileIdentityPolicy.professions.forEach{option->DropdownMenuItem(text={Text(if(option=="PERSONAL")stringResource(R.string.p7a_not_set) else profileProfessionLabel(option))},onClick={onChange(option);expanded=false})}}
         }
     }
 }
@@ -401,15 +421,13 @@ fun ProfileEditorSectionScreen(state:ProfilesUiState,profileId:String,section:Pr
     }
 }
 
-@Composable private fun AppearanceEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(ProfileEvent)->Unit){var selected by rememberSaveable(content.draftRevision){mutableStateOf(content.theme)};val themes=(state.quota.allowedThemes.ifEmpty{listOf(content.theme)}).distinct();PopFormLayout(action={_->SaveButton(state){onEvent(ProfileEvent.Save(ProfileEditorMutation.Appearance(selected)))}}){_->Text(stringResource(R.string.profile_appearance_separate),color=MaterialTheme.colorScheme.onSurfaceVariant);themes.forEach{theme->Card(onClick={selected=theme;onEvent(ProfileEvent.SetDirty(true))},border=if(selected==theme)BorderStroke(2.dp,MaterialTheme.colorScheme.primary)else null){Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(44.dp).clip(CircleShape).background(if(theme.endsWith("DARK"))MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surface));Spacer(Modifier.width(12.dp));Text(theme.replace('_',' '),Modifier.weight(1f));RadioButton(selected==theme,{selected=theme;onEvent(ProfileEvent.SetDirty(true))})}}}}}
 
-@Composable private fun VisibilityEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(ProfileEvent)->Unit){var access by rememberSaveable(content.draftRevision){mutableStateOf(content.summary.visibility)};var slug by rememberSaveable(content.draftRevision){mutableStateOf(content.slug)};var validation by remember(content.draftRevision){mutableStateOf(ProfileValidationResult())};PopFormLayout(firstInvalidField=validation.firstInvalidField,action={focus->SaveButton(state){val result=if(state.quota.canCustomizeSlug)ProfileFormValidation.visibility(slug)else ProfileValidationResult();validation=result;if(result.valid)onEvent(ProfileEvent.SaveVisibility(access,slug))else result.firstInvalidField?.let(focus::focus)}}){focus->Text(stringResource(R.string.profile_visibility_help),color=MaterialTheme.colorScheme.onSurfaceVariant);listOf("PUBLIC","UNLISTED","PRIVATE").forEach{value->ListItem(modifier=Modifier.clickable{access=value;onEvent(ProfileEvent.SetDirty(true))},headlineContent={Text(stringResource(when(value){"PUBLIC"->R.string.profile_public;"UNLISTED"->R.string.profile_unlisted;else->R.string.profile_private}))},leadingContent={RadioButton(access==value,{access=value;onEvent(ProfileEvent.SetDirty(true))})})};ValidatedProfileField(ProfileFormField.SLUG,focus,slug,{slug=ProfilePolicy.normalizedSlug(it);onEvent(ProfileEvent.SetDirty(true))},R.string.profile_slug,validation,type=KeyboardType.Uri,ltr=true,enabled=state.quota.canCustomizeSlug,prefix="pop.popwam.com/");Text(stringResource(if(state.quota.canCustomizeSlug)R.string.profile_slug_server_validation else R.string.profile_slug_subscription),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);HorizontalDivider();Text(stringResource(R.string.profile_section_visibility),style=MaterialTheme.typography.titleMedium);content.modules.filter(ProfilePolicy::canEditModule).forEach{module->ListItem(headlineContent={Text(module.name)},supportingContent={Text(module.visibility)},leadingContent={Switch(module.enabled,{onEvent(ProfileEvent.Save(ProfileEditorMutation.UpdateModule(module.key,it,module.visibility)))},enabled=!module.required)},trailingContent={TextButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.UpdateModule(module.key,module.enabled,ProfilePolicy.nextModuleVisibility(module.visibility))))}){Text(module.visibility)}})}}}
+@Composable private fun VisibilityEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(ProfileEvent)->Unit){var access by rememberSaveable(content.draftRevision){mutableStateOf(content.summary.visibility)};var slug by rememberSaveable(content.draftRevision){mutableStateOf(content.slug)};var validation by remember(content.draftRevision){mutableStateOf(ProfileValidationResult())};PopFormLayout(firstInvalidField=validation.firstInvalidField,action={focus->SaveButton(state){val result=if(state.quota.canCustomizeSlug)ProfileFormValidation.visibility(slug)else ProfileValidationResult();validation=result;if(result.valid)onEvent(ProfileEvent.SaveVisibility(access,slug))else result.firstInvalidField?.let(focus::focus)}}){focus->Text(stringResource(R.string.profile_visibility_help),color=MaterialTheme.colorScheme.onSurfaceVariant);listOf("PUBLIC","UNLISTED","PRIVATE").forEach{value->ListItem(modifier=Modifier.clickable{access=value;onEvent(ProfileEvent.SetDirty(true))},headlineContent={Text(stringResource(when(value){"PUBLIC"->R.string.profile_public;"UNLISTED"->R.string.profile_unlisted;else->R.string.profile_private}))},leadingContent={RadioButton(access==value,{access=value;onEvent(ProfileEvent.SetDirty(true))})})};ValidatedProfileField(ProfileFormField.SLUG,focus,slug,{slug=ProfilePolicy.normalizedSlug(it);onEvent(ProfileEvent.SetDirty(true))},R.string.profile_slug,validation,type=KeyboardType.Uri,ltr=true,enabled=state.quota.canCustomizeSlug,prefix=com.popwam.pop.PublicProfileUrls.publicHost+"/");Text(stringResource(if(state.quota.canCustomizeSlug)R.string.profile_slug_server_validation else R.string.profile_slug_subscription),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);HorizontalDivider();Text(stringResource(R.string.profile_section_visibility),style=MaterialTheme.typography.titleMedium);content.modules.filter(ProfilePolicy::canEditModule).forEach{module->ListItem(headlineContent={Text(module.name)},supportingContent={Text(module.visibility)},leadingContent={Switch(module.enabled,{onEvent(ProfileEvent.Save(ProfileEditorMutation.UpdateModule(module.key,it,module.visibility)))},enabled=!module.required)},trailingContent={TextButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.UpdateModule(module.key,module.enabled,ProfilePolicy.nextModuleVisibility(module.visibility))))}){Text(module.visibility)}})}}}
 
 @Composable private fun ServicesEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(ProfileEvent)->Unit){var dialog by remember{mutableStateOf<ProfileService?>(null)};PopFormLayout{_->Button({dialog=ProfileService()},Modifier.fillMaxWidth()){Icon(Icons.Default.Add,null);Text(stringResource(R.string.profile_add_service))};content.services.forEach{service->ListItem(headlineContent={Text(service.name)},supportingContent={service.localizedDescription()?.let{Text(it)}},trailingContent={Row{IconButton({dialog=service}){Icon(Icons.Default.Edit,null)};IconButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceDelete(service.id)))}){Icon(Icons.Default.Delete,null,tint=MaterialTheme.colorScheme.error)}}})}};dialog?.let{ServiceDialog(it,{dialog=null},{onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceUpsert(it)));dialog=null})}}
 
 @Composable private fun LocationsEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(ProfileEvent)->Unit){var dialog by remember{mutableStateOf<ProfileLocation?>(null)};PopFormLayout{_->Button({dialog=ProfileLocation()},Modifier.fillMaxWidth()){Icon(Icons.Default.Add,null);Text(stringResource(R.string.profile_add_location))};content.locations.forEach{location->ListItem(headlineContent={Text(location.name)},supportingContent={Text(location.addressEn.ifBlank{location.addressAr})},trailingContent={Row{IconButton({dialog=location}){Icon(Icons.Default.Edit,null)};IconButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.LocationDelete(location.id)))}){Icon(Icons.Default.Delete,null,tint=MaterialTheme.colorScheme.error)}}})}};dialog?.let{LocationDialog(it,{dialog=null},{onEvent(ProfileEvent.Save(ProfileEditorMutation.LocationUpsert(it)));dialog=null})}}
 
-@Composable private fun VerificationPanel(content:ProfileContent){val verification=content.verification;PopFormLayout{_->Icon(if(verification.overallStatus=="VERIFIED")Icons.Default.Verified else Icons.Default.VerifiedUser,null,Modifier.size(56.dp),tint=if(verification.overallStatus=="VERIFIED")MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant);Text(profileVerificationStatus(verification.overallStatus),style=MaterialTheme.typography.titleLarge);Text(stringResource(R.string.profile_verification_backend_authority),color=MaterialTheme.colorScheme.onSurfaceVariant);verification.signals.forEach{signal->ListItem(headlineContent={Text(profileVerificationKind(signal.kind))},supportingContent={Column{Text(profileVerificationStatus(signal.status));signal.reasonCode?.takeIf(String::isNotBlank)?.let{Text(it,style=MaterialTheme.typography.bodySmall)}}},leadingContent={Icon(if(signal.publicBadge)Icons.Default.Verified else Icons.Default.Shield,null,tint=if(signal.publicBadge)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)})};if(!verification.submissionSupported){Text(stringResource(R.string.profile_verification_unavailable_title),style=MaterialTheme.typography.titleMedium);Text(stringResource(R.string.profile_verification_unavailable_body),color=MaterialTheme.colorScheme.onSurfaceVariant)}}}
 
 @Composable private fun StructuredDetailsEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(ProfileEvent)->Unit){
     var editing by remember{mutableStateOf<Pair<ProfileFieldCapability,ProfileStructuredEntry?>?>(null)}
@@ -527,8 +545,6 @@ internal fun buildStructuredValue(type:ProfileStructuredValueType,simple:String,
     "MEDICAL_DETAILS"->R.string.profile_module_medical_details
     else->R.string.profile_additional_details
 })
-@Composable private fun profileVerificationStatus(value:String)=stringResource(when(value){"REQUIRED"->R.string.profile_verification_required;"IN_PROGRESS"->R.string.profile_verification_in_progress;"PENDING"->R.string.profile_verification_pending;"VERIFIED"->R.string.profile_verified;"REJECTED"->R.string.profile_verification_rejected;"NEEDS_UPDATE"->R.string.profile_verification_needs_update;"EXPIRED"->R.string.profile_verification_expired;else->R.string.profile_verification_not_started})
-@Composable private fun profileVerificationKind(value:String)=stringResource(when(value){"BUSINESS"->R.string.profile_verification_business;"PROFESSIONAL"->R.string.profile_verification_professional;"MEDICAL"->R.string.profile_verification_medical;"CONTACT"->R.string.profile_verification_contact;"DOMAIN"->R.string.profile_verification_domain;else->R.string.profile_verification_identity})
 
 @Composable
 fun ProfileCreationScreen(state:ProfilesUiState,onBack:()->Unit,onEvent:(ProfileEvent)->Unit) {
@@ -573,8 +589,8 @@ private fun profileFileSizeLabel(bytes:Long)=when{bytes>=1024L*1024L->"%.1f MB".
 @Composable private fun ContactRows(c:ProfileContent){listOf(c.phone to Icons.Default.Phone,c.email to Icons.Default.Email,c.website to Icons.Default.Language,c.locationText to Icons.Default.LocationOn).filter{it.first.isNotBlank()}.forEach{(value,icon)->ListItem(headlineContent={CompositionLocalProvider(LocalLayoutDirection provides if(icon!=Icons.Default.LocationOn)LayoutDirection.Ltr else LocalLayoutDirection.current){Text(value)}},leadingContent={Icon(icon,null)})}}
 @Composable private fun ProfileReadinessCard(completion:ProfileCompletion){Card(colors=CardDefaults.cardColors(containerColor=if(completion.publishReady)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Row(verticalAlignment=Alignment.CenterVertically){Icon(if(completion.publishReady)Icons.Default.CheckCircle else Icons.Default.PendingActions,null,tint=if(completion.publishReady)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary);Spacer(Modifier.width(10.dp));Text(stringResource(if(completion.publishReady)R.string.profile_ready else R.string.profile_incomplete),style=MaterialTheme.typography.titleMedium)};if(!completion.publishReady){Text(stringResource(R.string.profile_issues_count,completion.blockingIssueCodes.size),color=MaterialTheme.colorScheme.onSurfaceVariant);completion.blockingIssueCodes.distinct().forEach{Text("• ${profileReadinessMessage(it)}",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}}}}}
 @Composable private fun ProfileEditorSectionCard(section:ProfileEditorSection,onClick:()->Unit){Card(onClick=onClick){Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically){Icon(sectionIcon(section),null,tint=MaterialTheme.colorScheme.primary);Spacer(Modifier.width(14.dp));Text(sectionTitle(section),Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);Icon(Icons.Default.ChevronRight,null)}}}
-@Composable private fun sectionTitle(section:ProfileEditorSection)=stringResource(when(section){ProfileEditorSection.BASIC_INFORMATION->R.string.profile_basic_information;ProfileEditorSection.ABOUT->R.string.profile_about;ProfileEditorSection.CONTACT_LINKS->R.string.profile_contact_links;ProfileEditorSection.TYPE_DETAILS->R.string.profile_type_details;ProfileEditorSection.MEDIA->R.string.profile_media;ProfileEditorSection.APPEARANCE->R.string.profile_appearance;ProfileEditorSection.VERIFICATION->R.string.profile_verification;ProfileEditorSection.VISIBILITY->R.string.profile_visibility;ProfileEditorSection.TEMPLATE->R.string.pass6_template;ProfileEditorSection.SERVICES->R.string.pass6_products_services;ProfileEditorSection.LOCATIONS->R.string.profile_locations})
-private fun sectionIcon(section:ProfileEditorSection)=when(section){ProfileEditorSection.BASIC_INFORMATION->Icons.Default.Badge;ProfileEditorSection.ABOUT->Icons.Default.Article;ProfileEditorSection.CONTACT_LINKS->Icons.Default.Link;ProfileEditorSection.TYPE_DETAILS->Icons.Default.DynamicForm;ProfileEditorSection.MEDIA->Icons.Default.PhotoLibrary;ProfileEditorSection.APPEARANCE->Icons.Default.Palette;ProfileEditorSection.VERIFICATION->Icons.Default.VerifiedUser;ProfileEditorSection.VISIBILITY->Icons.Default.Visibility;ProfileEditorSection.TEMPLATE->Icons.Default.Dashboard;ProfileEditorSection.SERVICES->Icons.Default.Work;ProfileEditorSection.LOCATIONS->Icons.Default.LocationOn}
+@Composable private fun sectionTitle(section:ProfileEditorSection)=stringResource(when(section){ProfileEditorSection.BASIC_INFORMATION->R.string.profile_basic_information;ProfileEditorSection.ABOUT->R.string.profile_about;ProfileEditorSection.CONTACT_LINKS->R.string.profile_contact_links;ProfileEditorSection.TYPE_DETAILS->R.string.profile_type_details;ProfileEditorSection.MEDIA->R.string.profile_media;ProfileEditorSection.VISIBILITY->R.string.profile_visibility;ProfileEditorSection.TEMPLATE->R.string.pass6_template;ProfileEditorSection.SERVICES->R.string.pass6_products_services;ProfileEditorSection.LOCATIONS->R.string.profile_locations})
+private fun sectionIcon(section:ProfileEditorSection)=when(section){ProfileEditorSection.BASIC_INFORMATION->Icons.Default.Badge;ProfileEditorSection.ABOUT->Icons.Default.Article;ProfileEditorSection.CONTACT_LINKS->Icons.Default.Link;ProfileEditorSection.TYPE_DETAILS->Icons.Default.DynamicForm;ProfileEditorSection.MEDIA->Icons.Default.PhotoLibrary;ProfileEditorSection.VISIBILITY->Icons.Default.Visibility;ProfileEditorSection.TEMPLATE->Icons.Default.Dashboard;ProfileEditorSection.SERVICES->Icons.Default.Work;ProfileEditorSection.LOCATIONS->Icons.Default.LocationOn}
 @Composable private fun ValidatedProfileField(
     field:ProfileFormField,
     focus:PopFormFocusController,
@@ -645,7 +661,7 @@ private fun List<ProfileFormField>.next(field:ProfileFormField)=indexOf(field).t
 })
 @Composable private fun SaveButton(state:ProfilesUiState,onClick:()->Unit){Button(onClick,Modifier.fillMaxWidth(),enabled=state.editorDirty&&state.saveState!=ProfileSaveState.SAVING){if(state.saveState==ProfileSaveState.SAVING)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Text(stringResource(R.string.save))};state.errorCode?.takeIf{state.saveState==ProfileSaveState.FAILURE}?.let{ProfileOperationError(it,state.debugErrorCode)}}
 
-@Composable private fun ProfileOperationError(code:String,debugCode:String?){Column(Modifier.fillMaxWidth().semantics{liveRegion=LiveRegionMode.Assertive}){Text(profileErrorMessage(code),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodyMedium);if(BuildConfig.DEBUG&&!debugCode.isNullOrBlank())Text(debugCode,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
+@Composable private fun ProfileOperationError(code:String,debugCode:String?){Column(Modifier.fillMaxWidth().semantics{liveRegion=LiveRegionMode.Assertive}){Text(profileErrorMessage(code),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodyMedium)}}
 
 @Composable internal fun profileErrorMessage(code:String)=stringResource(when(code){
     "PROFILE_CREATE_FAILED","PROFILE_CREATE_ENDPOINT_UNAVAILABLE"->R.string.profile_error_create

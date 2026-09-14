@@ -1,5 +1,8 @@
 # AUTH REBUILD — Evolution WhatsApp OTP
 
+> Current environment contract (2026-09-13): [POP_ENV_CONTRACT.md](POP_ENV_CONTRACT.md). This dated report is historical evidence; current Railway readiness and unresolved Meta/SMS, URL and signing-origin exceptions are recorded there.
+
+
 **Deployment follow-up, 2026-09-12:** the later owner-authorized [isolated TEST activation](AUTH_TEST_ENVIRONMENT_ACTIVATION.md) completed TEST-only migration/reset/seed/deployment and a TEST-targeted APK. Evolution connectivity passed from TEST; no real message/device acceptance. Production unchanged. Earlier migration/TEST/APK statements below describe the implementation phase before that activation.
 
 Date: 2026-09-12. **IMPLEMENTED / CODE VERIFIED / AWAITING TEST DEPLOYMENT / AWAITING OWNER OTP ACCEPTANCE**. Scope: Android authentication, existing POP sessions, first-user onboarding, directly required backend contracts and retirement of Firebase Phone Auth. PASS 1–6 remain preserved outside this scope. No deployment/device acceptance is implied.

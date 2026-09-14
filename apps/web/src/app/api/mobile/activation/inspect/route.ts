@@ -22,5 +22,5 @@ export async function POST(request: Request) {
     prisma.activationAttempt.create({ data: { cardId: card.id, success: true } }),
     prisma.activationClaimSession.create({ data: { sessionTokenHash: hashActivationToken(claimToken), activationTokenHash: card.activationTokenHash, cardId: card.id, userId: user.id, status: "VERIFIED", verifiedAt: new Date(), expiresAt: new Date(Date.now() + 15 * 60_000) } }),
   ]);
-  return Response.json({ ok: true, claimToken, card: { id: card.id, serialNumber: card.serialNumber, publicSlug: card.publicSlug, cardType: card.cardType, cardStatus: card.cardStatus, permanentUrl: `${(process.env.NEXT_PUBLIC_APP_URL || "https://go.popwam.com").replace(/\/$/, "")}/${card.publicSlug}` } }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ ok: true, claimToken, card: { id: card.id, serialNumber: card.serialNumber, publicSlug: card.publicSlug, cardType: card.cardType, cardStatus: card.cardStatus, permanentUrl: `${(process.env.PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL || "https://go.popwam.com").replace(/\/$/, "")}/${card.publicSlug}` } }, { headers: { "cache-control": "no-store" } });
 }

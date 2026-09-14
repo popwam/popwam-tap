@@ -3,6 +3,10 @@ package com.popwam.pop.ui.auth
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,7 +20,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
-import coil3.compose.AsyncImage
 import com.popwam.pop.R
 import com.popwam.pop.TapApplication
 import com.popwam.pop.data.auth.BiometricCoordinator
@@ -26,6 +29,7 @@ import kotlinx.coroutines.launch
 
 @Composable fun LoginOnboardingScreen(state:AuthUiState,auth:AuthViewModel) {
     val locale=currentLocale();val context=LocalContext.current
+    val focus=LocalFocusManager.current
     val store=(context.applicationContext as TapApplication).container.sessionStore
     val biometric=remember{(context as? FragmentActivity)?.let{BiometricCoordinator(it,store)}}
     val scope=rememberCoroutineScope()
@@ -47,17 +51,17 @@ import kotlinx.coroutines.launch
                 AuthPrimary(stringResource(R.string.wa_auth_agree),!state.loading&&state.setupStatus?.legalReady==true){auth.acceptLegal(locale)}
             }
             AuthSetupStage.IDENTITY->{
-                OutlinedTextField(state.accountName,auth::setAccountName,Modifier.fillMaxWidth(),singleLine=true,label={Text(stringResource(R.string.wa_auth_name))},leadingIcon={Icon(Icons.Default.Person,null)})
+                OutlinedTextField(state.accountName,auth::setAccountName,Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={focus.clearFocus()}),label={Text(stringResource(R.string.wa_auth_name))},leadingIcon={Icon(Icons.Default.Person,null)})
                 AuthPrimary(stringResource(R.string.wa_auth_continue),!state.loading&&state.accountName.isNotBlank()){auth.saveName(locale)}
             }
             AuthSetupStage.ACCOUNT_TYPE->{
                 listOf("PERSONAL","BUSINESS").forEach{kind->
                     val enabled=state.setupStatus?.accountTypes?.any{it.key==kind&&it.enabled}==true
                     val selected=state.profileKind==kind
-                    Card(Modifier.fillMaxWidth().selectable(selected,enabled=enabled,role=Role.RadioButton,onClick={auth.selectProfileKind(kind)}),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=if(selected)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)){
-                        Row(Modifier.padding(20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)){
-                            Icon(if(kind=="PERSONAL")Icons.Default.Person else Icons.Default.Business,null,Modifier.size(32.dp))
-                            Column(Modifier.weight(1f)){Text(stringResource(if(kind=="PERSONAL")R.string.wa_auth_personal else R.string.wa_auth_business),style=MaterialTheme.typography.titleLarge);Text(stringResource(if(kind=="PERSONAL")R.string.p7_personal_help else R.string.p7_business_help));if(!enabled)Text(stringResource(R.string.p7_plan_locked),style=MaterialTheme.typography.labelMedium)}
+                    Card(Modifier.fillMaxWidth().selectable(selected,enabled=enabled,role=Role.RadioButton,onClick={auth.selectProfileKind(kind)}),shape=RoundedCornerShape(12.dp),colors=CardDefaults.cardColors(containerColor=if(selected)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)){
+                        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)){
+                            Icon(if(kind=="PERSONAL")Icons.Default.Person else Icons.Default.Business,null,Modifier.size(24.dp))
+                            Column(Modifier.weight(1f)){Text(stringResource(if(kind=="PERSONAL")R.string.wa_auth_personal else R.string.wa_auth_business),style=MaterialTheme.typography.titleMedium);Text(stringResource(if(kind=="PERSONAL")R.string.p7_personal_help else R.string.p7_business_help));if(!enabled)Text(stringResource(R.string.p7_plan_locked),style=MaterialTheme.typography.labelMedium)}
                             Icon(if(!enabled)Icons.Default.Lock else if(selected)Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,null)
                         }
                     }
@@ -65,53 +69,46 @@ import kotlinx.coroutines.launch
                 AuthPrimary(stringResource(R.string.wa_auth_continue),!state.loading&&state.setupStatus?.accountTypes?.any{it.key==state.profileKind&&it.enabled}==true){auth.saveKind(locale)}
             }
             AuthSetupStage.PROFILE_BOOTSTRAP_REQUIRED->{
-                OutlinedTextField(state.profileName,auth::setProfileName,Modifier.fillMaxWidth(),singleLine=true,label={Text(stringResource(R.string.p7_profile_name))},leadingIcon={Icon(Icons.Default.Badge,null)})
+                OutlinedTextField(state.profileName,auth::setProfileName,Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={focus.clearFocus()}),label={Text(stringResource(R.string.p7_profile_name))},leadingIcon={Icon(Icons.Default.Badge,null)})
                 Text(stringResource(if(state.profileKind=="BUSINESS")R.string.wa_auth_business else R.string.wa_auth_personal),style=MaterialTheme.typography.labelLarge)
                 AuthPrimary(stringResource(R.string.p7_create),!state.loading&&state.profileName.isNotBlank()){auth.submitBootstrap(locale)}
             }
             AuthSetupStage.TEMPLATE_CHOICE->{
                 if(state.catalogUnavailable)Text(stringResource(R.string.p7_catalog_offline))
-                state.templates.forEach{template->
-                    val selected=state.templateId==template.id
-                    OutlinedCard(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp)){
-                        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                            if(template.previewImageUrl!=null)AsyncImage(template.previewImageUrl,null,Modifier.fillMaxWidth().height(160.dp))
-                            else Surface(Modifier.fillMaxWidth().height(112.dp),shape=RoundedCornerShape(14.dp),color=runCatching{androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(template.configuration.background))}.getOrDefault(MaterialTheme.colorScheme.primaryContainer)){
-                                Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Icon(Icons.Default.AccountCircle,null,Modifier.size(32.dp),tint=MaterialTheme.colorScheme.primary);repeat(2){Surface(Modifier.fillMaxWidth(if(it==0).6f else .85f).height(12.dp),shape=RoundedCornerShape(6.dp),color=MaterialTheme.colorScheme.primary.copy(alpha=.3f)){}}}
-                            }
-                            Text(if(locale=="ar")template.nameAr else template.nameEn,style=MaterialTheme.typography.titleMedium)
-                            Text(stringResource(templateFamilyResource(template.family)),style=MaterialTheme.typography.labelMedium)
-                            if(!template.allowed)Text(stringResource(R.string.p7_plan_locked))
-                            Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                                OutlinedButton({preview=template.id},enabled=template.allowed){Text(stringResource(R.string.p7_preview))}
-                                Button({auth.selectTemplate(template.id,locale)},enabled=template.allowed&&template.isActive&&!state.loading&&!selected){Text(stringResource(if(selected)R.string.p7_selected else R.string.p7_select))}
-                            }
+                state.templates.chunked(2).forEach { row ->
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                        row.forEach { template ->
+                            com.popwam.pop.ui.components.CompactTemplateCard(
+                                title=if(locale=="ar")template.nameAr else template.nameEn,
+                                imageUrl=template.previewImageUrl,selected=state.templateId==template.id,
+                                allowed=template.allowed&&template.isActive,modifier=Modifier.weight(1f),enabled=!state.loading,
+                                onSelect={auth.selectTemplate(template.id,locale)},onPreview={preview=template.id})
                         }
+                        if(row.size==1)Spacer(Modifier.weight(1f))
                     }
                 }
-                AuthPrimary(stringResource(R.string.wa_auth_continue),!state.loading){auth.continueToSecurity()}
+                AuthPrimary(stringResource(R.string.save),!state.loading){auth.continueToSecurity()}
                 TextButton({auth.continueToSecurity()},enabled=!state.loading){Text(stringResource(R.string.p7_keep_default))}
             }
             AuthSetupStage.SECURITY_SETUP->{
-                Card {Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                    Icon(Icons.Default.Key,null,Modifier.size(32.dp));Text(stringResource(R.string.p7_passkey_title),style=MaterialTheme.typography.titleLarge);Text(stringResource(R.string.p7_passkey_help))
+                Card {Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                    Icon(Icons.Default.Key,null,Modifier.size(24.dp));Text(stringResource(R.string.p7_passkey_title),style=MaterialTheme.typography.titleMedium);Text(stringResource(R.string.p7_passkey_help))
                     if(state.passkeyRegistered||state.setupStatus?.passkeyCount!=0&&state.setupStatus?.passkeyCount!=null)Text(stringResource(R.string.p7_enabled))
                     else OutlinedButton({auth.registerPasskey(context as? ComponentActivity,locale)},enabled=!state.passkeyLoading){Text(stringResource(R.string.p7_enable))}
-                    if(state.passkeyError!=null)Text(stringResource(R.string.p7_passkey_fallback))
+                    state.passkeyError?.let{Text(stringResource(passkeyErrorResource(it,creating=true)),color=MaterialTheme.colorScheme.error)}
                 }}
-                Card {Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                    Icon(Icons.Default.Fingerprint,null,Modifier.size(32.dp));Text(stringResource(R.string.p7_biometric_title),style=MaterialTheme.typography.titleLarge);Text(stringResource(R.string.p7_biometric_help))
+                Card {Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                    Icon(Icons.Default.Fingerprint,null,Modifier.size(24.dp));Text(stringResource(R.string.p7_biometric_title),style=MaterialTheme.typography.titleMedium);Text(stringResource(R.string.p7_biometric_help))
                     if(biometricEnabled)Text(stringResource(R.string.p7_enabled))
                     else if(biometric?.available()==true)OutlinedButton({biometricBusy=true;scope.launch{try{biometric.authenticate(true);biometricEnabled=true;biometricError=false}catch(_:Exception){biometricError=true}finally{biometricBusy=false}}},enabled=!biometricBusy){Text(stringResource(R.string.p7_enable))}
                     else Text(stringResource(R.string.p7_biometric_unavailable))
                     if(biometricError)Text(stringResource(R.string.p7_biometric_failed))
                 }}
                 AuthPrimary(stringResource(R.string.wa_auth_continue),!state.passkeyLoading&&!biometricBusy){auth.ready()}
-                TextButton(auth::ready,enabled=!state.passkeyLoading&&!biometricBusy){Text(stringResource(R.string.p7_not_now))}
             }
             AuthSetupStage.COMPLETION->{
-                Card(Modifier.fillMaxWidth()){Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                    Text(state.profileName,style=MaterialTheme.typography.titleLarge)
+                Card(Modifier.fillMaxWidth()){Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                    Text(state.profileName,style=MaterialTheme.typography.titleMedium)
                     Text(stringResource(if(state.profileKind=="BUSINESS")R.string.wa_auth_business else R.string.wa_auth_personal))
                     Text(state.templates.find{it.id==state.templateId}?.let{if(locale=="ar")it.nameAr else it.nameEn}?:state.setupStatus?.templateName?:stringResource(R.string.p7_default_template))
                 }}
@@ -125,4 +122,3 @@ import kotlinx.coroutines.launch
     }
     preview?.let{id->state.setupStatus?.primaryProfileId?.let{DraftTemplatePreview(it,id){preview=null}}}
 }
-private fun templateFamilyResource(family:String)=when(family){"personal"->R.string.p7_family_personal;"professional"->R.string.p7_family_professional;"business"->R.string.p7_family_business;"agency"->R.string.p7_family_agency;"brand"->R.string.p7_family_brand;"tech"->R.string.p7_family_tech;else->R.string.p7_family_storefront}

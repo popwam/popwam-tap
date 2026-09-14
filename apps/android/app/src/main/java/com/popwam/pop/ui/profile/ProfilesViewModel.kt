@@ -232,7 +232,7 @@ internal fun ProfileEditorResponse.toContent(summary:OwnedProfile,slug:String)=P
     title=about.title,bio=about.bio,bioAr=about.bioAr,bioEn=about.bioEn,descriptionAr=about.descriptionAr,descriptionEn=about.descriptionEn,
     phone=contact.phone,alternatePhone=contact.alternatePhone,email=contact.email,website=contact.website,whatsappBusiness=contact.whatsappBusiness,
     whatsappPrivate=contact.whatsappPrivate,locationText=contact.locationText,addressAr=contact.addressAr,addressEn=contact.addressEn,contactVisibility=contact.visibility,
-    slug=slug,theme=appearance.theme,templateName=appearance.templateName,templateId=appearance.templateId,templateImageUrl=appearance.previewImageUrl,storefront=storefront,imageUploadMaxBytes=imageUploadMaxBytes,
+    slug=slug,templateName=appearance.templateName,templateId=appearance.templateId,templateImageUrl=appearance.previewImageUrl,storefront=storefront,imageUploadMaxBytes=imageUploadMaxBytes,
     links=links.map { ProfileLink(it.id,it.title,it.titleAr,it.titleEn,it.type,it.url,it.visibility,it.sortOrder) },
     services=services.map { ProfileService(it.id,it.name,it.nameAr.orEmpty(),it.nameEn.orEmpty(),it.descriptionAr.orEmpty(),it.descriptionEn.orEmpty(),it.url.orEmpty(),it.visibility,it.itemType,it.imageUrl,it.price,it.currency,it.category,it.featured,it.sortOrder) },
     locations=branches.map { ProfileLocation(it.id,it.name,it.nameAr.orEmpty(),it.nameEn.orEmpty(),it.addressAr.orEmpty(),it.addressEn.orEmpty(),it.phone.orEmpty(),it.mapUrl.orEmpty(),it.visibility) },
@@ -255,7 +255,7 @@ internal fun ProfileEditorResponse.toContent(summary:OwnedProfile,slug:String)=P
 private fun ProfileQuotaDto.toProfileQuota()=ProfileQuota(
     used=used,limit=limit,remaining=remaining,canAdd=quotaAllowsAdditional,
     allowedKinds=allowedProfileKinds.mapNotNull { runCatching { ProfileBackendKind.valueOf(it) }.getOrNull() }.toSet().ifEmpty { setOf(ProfileBackendKind.PERSONAL) },
-    canCustomizeSlug=customSlugAllowed,allowedThemes=allowedThemes,blocker=blocker,
+    canCustomizeSlug=customSlugAllowed,blocker=blocker,
 )
 private fun PublishingReadinessDto?.toCompletionOrNull()=this?.let { ProfileCompletion(it.ready,it.issues.filter { issue->issue.blocking }.map { issue->issue.code }) }
 private fun com.popwam.pop.data.api.ProfileContentCompletionDto.toContentCompletion()=ProfileContentCompletion(complete,issues.map { ProfileContentIssue(it.code,it.path,it.fieldKey,it.messageKey) })
@@ -284,7 +284,6 @@ internal fun ProfileEditorMutation.toJson()=JsonObject().also { json ->
         is ProfileEditorMutation.ServiceDelete->{json.str("type","SERVICE_DELETE");json.str("id",id)}
         is ProfileEditorMutation.LocationUpsert->{json.str("type","BRANCH_UPSERT");if(location.id.isNotBlank())json.str("id",location.id);json.str("nameAr",location.nameAr);json.str("nameEn",location.nameEn);json.str("addressAr",location.addressAr);json.str("addressEn",location.addressEn);json.str("phone",location.phone);json.str("mapUrl",location.mapUrl);json.str("visibility",location.visibility)}
         is ProfileEditorMutation.LocationDelete->{json.str("type","BRANCH_DELETE");json.str("id",id)}
-        is ProfileEditorMutation.Appearance->{json.str("type","APPEARANCE_SAVE");json.str("theme",theme)}
         is ProfileEditorMutation.AddModule->{json.str("type","MODULE_ADD");json.str("key",key)}
         is ProfileEditorMutation.UpdateModule->{json.str("type","MODULE_UPDATE");json.str("key",key);json.addProperty("enabled",enabled);json.str("visibility",visibility)}
         is ProfileEditorMutation.StructuredEntryUpsert->{json.str("type","SECTION_ENTRY_UPSERT");if(entry.id.isNotBlank())json.str("id",entry.id);json.str("fieldKey",entry.fieldKey);entry.instanceKey.takeIf(String::isNotBlank)?.let{json.str("instanceKey",it)};json.add("value",entry.value.deepCopy());json.str("visibility",entry.visibility)}
@@ -545,7 +544,6 @@ private fun ProfileContent.applyMutation(mutation:ProfileEditorMutation)=when(mu
     is ProfileEditorMutation.ServiceDelete->copy(services=services.filterNot{it.id==mutation.id})
     is ProfileEditorMutation.LocationUpsert->if(mutation.location.id.isBlank())this else copy(locations=locations.filterNot{it.id==mutation.location.id}+mutation.location)
     is ProfileEditorMutation.LocationDelete->copy(locations=locations.filterNot{it.id==mutation.id})
-    is ProfileEditorMutation.Appearance->copy(theme=mutation.theme)
     is ProfileEditorMutation.AddModule->this
     is ProfileEditorMutation.UpdateModule->copy(modules=modules.map{if(it.key==mutation.key)it.copy(enabled=mutation.enabled,visibility=mutation.visibility)else it})
     is ProfileEditorMutation.StructuredEntryUpsert->if(mutation.entry.id.isBlank())this else copy(structuredEntries=structuredEntries.filterNot{it.id==mutation.entry.id}+mutation.entry)

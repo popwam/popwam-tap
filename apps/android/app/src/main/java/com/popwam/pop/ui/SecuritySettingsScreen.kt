@@ -66,7 +66,7 @@ fun SecuritySettingsScreen(
     val appearance by appearanceStore.state.collectAsState()
     var stepUp by remember{mutableStateOf<StepUpAction?>(null)}
     var confirm by remember{mutableStateOf<Pair<Int,()->Unit>?>(null)}
-    var passkeyFailure by remember{mutableStateOf(false)}
+    var passkeyFailure by remember{mutableStateOf<PasskeyLoginError?>(null)}
     var phone by rememberSaveable{mutableStateOf("")}
     var phoneChallenge by rememberSaveable{mutableStateOf("")}
     var phoneCode by rememberSaveable{mutableStateOf("")}
@@ -205,14 +205,15 @@ fun SecuritySettingsScreen(
                     if(state.securitySessions.isEmpty())item{EmptySettings()}
                 }
                 "passkeys"->{
-                    item{Button({vm.passkeyManagementEnrollmentShown();stepUp=StepUpAction("ADD_PASSKEY"){grant->
+                    item{Button({passkeyFailure=null;vm.passkeyManagementEnrollmentShown();stepUp=StepUpAction("ADD_PASSKEY"){grant->
                         runCatching{
                             val options=vm.passkeyRegistrationOptions(grant)
                             val response=PasskeyCoordinator(context).register(context,options.toString())
                             check(vm.verifyPasskeyRegistration(JsonParser.parseString(response).asJsonObject))
-                        }.onFailure{passkeyFailure=true}
+                            passkeyFailure=null
+                        }.onFailure{passkeyFailure=passkeyLoginError(it)}
                     }},Modifier.fillMaxWidth()){Icon(Icons.Default.Key,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.settings_add_passkey))}}
-                    if(passkeyFailure)item{Text(stringResource(R.string.settings_passkey_failed),color=MaterialTheme.colorScheme.error)}
+                    passkeyFailure?.let{failure->item{Text(stringResource(passkeyErrorResource(failure,creating=true)),color=MaterialTheme.colorScheme.error)}}
                     items(state.securityPasskeys,key={it.id}){passkey->Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
                         Text(passkey.name,fontWeight=FontWeight.Bold)
                         Text("${stringResource(R.string.settings_created)}: ${passkey.createdAt}",style=MaterialTheme.typography.bodySmall)
@@ -243,14 +244,12 @@ fun SecuritySettingsScreen(
                 "account"->{
                     state.securityOverview?.account?.let{account->
                         account.name?.takeIf(String::isNotBlank)?.let{item{InfoCard(stringResource(R.string.settings_account_name),it)}}
-                        account.email?.takeIf(String::isNotBlank)?.let{item{InfoCard(stringResource(R.string.settings_account_email),it,true)}}
+                        item{InfoCard(stringResource(R.string.settings_account_email),account.email?.takeIf{it.isNotBlank()&&!it.endsWith("@auth.popwam.invalid",ignoreCase=true)}?:stringResource(R.string.p7a_not_set),true)}
                         account.phone?.takeIf(String::isNotBlank)?.let{item{InfoCard(stringResource(R.string.settings_recovery_phone),it,true)}}
                         item{InfoCard(stringResource(R.string.settings_account_language),account.locale?.uppercase() ?: stringResource(R.string.settings_system))}
-                        item{InfoCard(stringResource(R.string.settings_account_status),account.status)}
                     }
                     item{OutlinedButton({navigate("profiles")},Modifier.fillMaxWidth().heightIn(min=48.dp)){Icon(Icons.Default.Person,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.settings_manage_profiles))}}
-                    item{Text(stringResource(R.string.settings_account_help),color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                    item{Card(Modifier.fillMaxWidth().heightIn(min=300.dp,max=420.dp)){PopFormLayout(action={
+                    item{Card(Modifier.fillMaxWidth().heightIn(min=180.dp,max=280.dp)){PopFormLayout(action={
                         if(phoneChallenge.isBlank())Button({stepUp=StepUpAction("CHANGE_PHONE"){grant->val result=vm.startPhoneChange(phone,currentLocale(),grant);if(result.ok){phoneChallenge=result.challengeId;accountMessage=result.maskedPhone}else error(result.error ?: "PHONE_CHANGE_FAILED")}},Modifier.fillMaxWidth(),enabled=phone.isNotBlank()){Text(stringResource(R.string.settings_send_code))}
                         else Button({scope.launch{val result=runCatching{vm.verifyPhoneChange(phoneChallenge,phoneCode)}.getOrNull();if(result?.ok==true){accountMessage=phoneChangedCopy;phone="";phoneCode="";phoneChallenge="";vm.loadSecuritySettings()}}},Modifier.fillMaxWidth(),enabled=phoneCode.length==6){Text(stringResource(R.string.step_up_verify))}
                     }){focus->
@@ -290,7 +289,7 @@ fun SecuritySettingsScreen(
 @Composable private fun SettingsGroup(title:Int,rows:List<Triple<String,Int,androidx.compose.ui.graphics.vector.ImageVector>>,navigate:(String)->Unit)=Card(Modifier.fillMaxWidth()){Column{Text(stringResource(title),Modifier.padding(16.dp),fontWeight=FontWeight.Black);rows.forEach{(route,label,icon)->Row(Modifier.fillMaxWidth().clickable{navigate(route)}.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null);Spacer(Modifier.width(12.dp));Text(stringResource(label),Modifier.weight(1f));Icon(Icons.Default.ChevronRight,null)}}}}
 @Composable private fun ChoiceSetting(title:Int,value:String,choices:List<Pair<String,Int>>,change:(String)->Unit)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text(stringResource(title),fontWeight=FontWeight.Bold);choices.forEach{(key,label)->Row(Modifier.fillMaxWidth().clickable{change(key)}.padding(vertical=9.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(value==key,{change(key)});Text(stringResource(label))}}}}
 @Composable private fun ToggleSetting(label:Int,checked:Boolean,change:(Boolean)->Unit)=Card(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().clickable{change(!checked)}.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Text(stringResource(label),Modifier.weight(1f));Switch(checked,change)}}
-@Composable private fun InfoCard(label:String,value:String,ltr:Boolean=false)=Card(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(label,fontWeight=FontWeight.Bold);Spacer(Modifier.width(12.dp));if(ltr)CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){Text(value,color=MaterialTheme.colorScheme.onSurfaceVariant)}else Text(value,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
+@Composable private fun InfoCard(label:String,value:String,ltr:Boolean=false){Column(Modifier.fillMaxWidth().padding(vertical=8.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){Text(label,style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant);if(ltr)CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){Text(value,style=MaterialTheme.typography.bodyLarge)}else Text(value,style=MaterialTheme.typography.bodyLarge);HorizontalDivider(Modifier.padding(top=8.dp),color=MaterialTheme.colorScheme.outlineVariant)}}
 @Composable private fun QuotaCard(label:String,used:String,limit:String,remaining:String,overridden:Boolean)=Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(label,fontWeight=FontWeight.Black);Text("$used / $limit");Text("${stringResource(R.string.settings_remaining)}: $remaining",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);if(overridden)Text(stringResource(R.string.settings_custom_override),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}}
 private fun formatQuotaBytes(raw:String):String{val bytes=raw.toLongOrNull()?.coerceAtLeast(0)?:0L;val gib=1024L*1024L*1024L;val mib=1024L*1024L;return if(bytes>=gib&&bytes%gib==0L)"${bytes/gib} GB" else "${bytes/mib} MB"}
 @Composable private fun SecuritySummary(label:Int,value:String,click:()->Unit)=Card(Modifier.fillMaxWidth().clickable(onClick=click)){Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically){Text(stringResource(label),Modifier.weight(1f),fontWeight=FontWeight.Bold);Text(value);Icon(Icons.Default.ChevronRight,null)}}

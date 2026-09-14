@@ -4,6 +4,12 @@ import {getApplicationOrigin,PRODUCTION_APP_URL} from "@popwam/shared";
 import {describe,expect,it} from "vitest";
 
 describe("OAuth application origin",()=>{
+  it("honors only the explicitly isolated TEST origin in a production build",()=>{
+    const origin="https://popwam-auth-test-test.up.railway.app";
+    expect(getApplicationOrigin({NODE_ENV:"production",APP_URL:origin,RAILWAY_ENVIRONMENT_ID:"ff94b952-4772-4675-905d-b36def679071"})).toBe(origin);
+    expect(getApplicationOrigin({NODE_ENV:"production",APP_URL:origin})).toBe(PRODUCTION_APP_URL);
+    expect(getApplicationOrigin({NODE_ENV:"production",APP_URL:"https://unreviewed.invalid",RAILWAY_ENVIRONMENT_ID:"ff94b952-4772-4675-905d-b36def679071"})).toBe(PRODUCTION_APP_URL);
+  });
   it("uses APP_URL as the canonical production origin",()=>{
     expect(getApplicationOrigin({NODE_ENV:"production",APP_URL:PRODUCTION_APP_URL})).toBe(PRODUCTION_APP_URL);
   });

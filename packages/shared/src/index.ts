@@ -59,6 +59,10 @@ export function getApplicationOrigin(env:NodeJS.ProcessEnv=process.env) {
   const candidate=env.APP_URL||env.NEXTAUTH_URL||env.NEXT_PUBLIC_WEB_APP_URL||fallback;
   try {
     const origin=new URL(candidate).origin;
+    // NODE_ENV describes build mode, not the Railway deployment environment.
+    // Only the explicitly isolated TEST deployment may use this additional origin.
+    if (production && env.RAILWAY_ENVIRONMENT_ID === "ff94b952-4772-4675-905d-b36def679071"
+      && origin === "https://popwam-auth-test-test.up.railway.app") return origin;
     return production&&origin!==PRODUCTION_APP_URL?PRODUCTION_APP_URL:origin;
   } catch {
     return fallback;

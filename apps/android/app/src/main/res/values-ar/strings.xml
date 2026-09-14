@@ -359,7 +359,6 @@
     <string name="settings_legal">الشروط وسياسة الخصوصية</string>
     <string name="settings_device_authority_help">سجلات الأجهزة وصفية. تظل جلسات الويب وعائلات تحديث أندرويد الفعلية هي السلطة.</string>
     <string name="settings_fcm_help">تنظيف رموز الدفع مستقل وبأفضل جهد؛ ولا يمنح أو يحافظ على وصول POP.</string>
-    <string name="settings_account_help">يستخدم تغيير الهاتف وحذف الحساب أساس الويب وواجهة API المحمي، ولا يثق في Firebase كتصريح POP.</string>
     <string name="settings_remove_confirm">هل تريد إزالة مفتاح المرور هذا؟</string>
     <string name="settings_passkey_failed">لم يكتمل إعداد مفتاح المرور. تظل جلسة POP قابلة للاستخدام.</string>
     <string name="settings_report_lost">الإبلاغ عن فقدان المنتج</string>
@@ -529,12 +528,11 @@
     <string name="home_status_archived">مؤرشف</string>
     <string name="add">إضافة</string><string name="remove">إزالة</string><string name="profiles_title">الملفات الشخصية</string><string name="profile_add">إضافة ملف شخصي</string><string name="profile_active">الملف النشط</string><string name="profile_switch">تبديل</string><string name="profile_primary">أساسي</string><string name="profile_preview">معاينة الملف</string><string name="profile_edit">تعديل الملف</string><string name="profile_share">مشاركة</string><string name="profile_qr">QR</string><string name="profile_nfc">لمس</string><string name="profile_about">نبذة</string><string name="profile_contact">التواصل</string><string name="profile_links">التواصل والروابط</string><string name="profile_services">الخدمات</string><string name="profile_locations">المواقع</string><string name="profile_media">الوسائط</string><string name="profile_verified">موثّق</string><string name="profile_public">عام</string><string name="profile_unlisted">غير مدرج</string><string name="profile_private">خاص</string>
     <string name="profile_offline_cached">يتم عرض بيانات محفوظة مؤقتاً</string><string name="profile_limit_reached">تم استخدام %1$d من %2$d. تم بلوغ حد الخطة الحالية.</string><string name="profile_error_title">الملفات الشخصية غير متاحة</string><string name="profile_empty_title">أنشئ ملفك الأول</string><string name="profile_empty_body">يحافظ كل ملف على هوية وجمهور وسياق مشاركة POP مستقل.</string><string name="profile_ready">جاهز للنشر</string><string name="profile_incomplete">الملف يحتاج إلى إكمال</string><string name="profile_issues_count">تبقى %1$d عناصر مطلوبة</string>
-    <string name="profile_basic_information">المعلومات الأساسية</string><string name="profile_contact_links">التواصل والروابط</string><string name="profile_appearance">المظهر</string><string name="profile_verification">التوثيق</string><string name="profile_visibility">الظهور ورابط الملف</string><string name="profile_delete">حذف الملف</string><string name="profile_delete_confirm_title">أرشفة هذا الملف؟</string><string name="profile_delete_confirm_body">سيُزال الملف من قائمتك النشطة، ولن يتم حذف حساب POP.</string>
+    <string name="profile_basic_information">المعلومات الأساسية</string><string name="profile_contact_links">التواصل والروابط</string><string name="profile_visibility">الظهور ورابط الملف</string><string name="profile_delete">حذف الملف</string><string name="profile_delete_confirm_title">أرشفة هذا الملف؟</string><string name="profile_delete_confirm_body">سيُزال الملف من قائمتك النشطة، ولن يتم حذف حساب POP.</string>
     <string name="profile_display_name">اسم العرض</string><string name="profile_display_label">تسمية الملف الخاصة</string><string name="profile_name_ar">الاسم بالعربية</string><string name="profile_name_en">الاسم بالإنجليزية</string><string name="profile_title_ar">المسمى بالعربية</string><string name="profile_title_en">المسمى بالإنجليزية</string><string name="profile_org_ar">اسم المؤسسة بالعربية</string><string name="profile_org_en">اسم المؤسسة بالإنجليزية</string><string name="profile_headline">العنوان التعريفي</string><string name="profile_bio">نبذة قصيرة</string><string name="profile_about_ar">النبذة بالعربية</string><string name="profile_about_en">النبذة بالإنجليزية</string><string name="profile_description_ar">الوصف بالعربية</string><string name="profile_description_en">الوصف بالإنجليزية</string>
     <string name="profile_phone">الهاتف</string><string name="profile_email">البريد الإلكتروني</string><string name="profile_website">الموقع الإلكتروني</string><string name="profile_whatsapp">واتساب</string><string name="profile_location">الموقع</string><string name="profile_address">العنوان</string><string name="profile_map_url">رابط الخريطة</string><string name="profile_add_link">إضافة رابط</string><string name="profile_edit_link">تعديل الرابط</string><string name="profile_link_title">عنوان الرابط</string><string name="profile_link_url">الرابط</string><string name="profile_link_type">نوع الرابط</string>
-    <string name="profile_media_help">ارفع صور الملف المدعومة فقط. تتحقق خدمة وسائط POP الحالية من الملفات وتعالجها.</string><string name="profile_upload">رفع وسائط</string><string name="profile_appearance_separate">مظهر الملف العام منفصل عن مظهر التطبيق الفاتح أو الداكن.</string><string name="profile_visibility_help">الملفات الخاصة غير قابلة للمشاركة العامة، والملفات غير المدرجة تتطلب الرابط الدقيق.</string><string name="profile_slug">رابط الملف</string><string name="profile_slug_server_validation">يتحقق POP من التوفر والأسماء المحجوزة عند الحفظ.</string><string name="profile_add_service">إضافة خدمة</string><string name="profile_add_location">إضافة موقع</string><string name="profile_service">الخدمة</string><string name="profile_name">اسم الملف</string><string name="profile_description">الوصف</string>
-    <string name="profile_slug_subscription">يبقى رابطك التلقائي نشطاً. تتوفر الروابط المخصصة عندما تدعمها خطة الاشتراك.</string>
-    <string name="profile_verification_unavailable_title">التوثيق غير متاح بعد</string><string name="profile_verification_unavailable_body">لا توجد لهذا الملف آلية توثيق في الخادم. لا يتم محاكاة أي حالة أو موافقة.</string><string name="profile_verification_backend_authority">عند توفر التوثيق ستأتي حالته ومتطلباته من POP.</string><string name="profile_type_personal">شخصي</string><string name="profile_type_business">تجاري</string><string name="profile_create_continue">إنشاء الملف والمتابعة</string><string name="profile_unsaved_title">تجاهل التعديلات غير المحفوظة؟</string><string name="profile_unsaved_body">ستفقد تغييرات هذا القسم غير المحفوظة.</string><string name="profile_discard">تجاهل</string>
+    <string name="profile_media_help">ارفع صور الملف المدعومة فقط. تتحقق خدمة وسائط POP الحالية من الملفات وتعالجها.</string><string name="profile_upload">رفع وسائط</string><string name="profile_visibility_help">الملفات الخاصة غير قابلة للمشاركة العامة، والملفات غير المدرجة تتطلب الرابط الدقيق.</string><string name="profile_slug">رابط الملف</string><string name="profile_slug_server_validation">يتحقق POP من التوفر والأسماء المحجوزة عند الحفظ.</string><string name="profile_add_service">إضافة خدمة</string><string name="profile_add_location">إضافة موقع</string><string name="profile_service">الخدمة</string><string name="profile_name">اسم الملف</string><string name="profile_description">الوصف</string>
+    <string name="profile_slug_subscription">يبقى رابطك التلقائي نشطاً. تتوفر الروابط المخصصة عندما تدعمها خطة الاشتراك.</string><string name="profile_type_personal">شخصي</string><string name="profile_type_business">تجاري</string><string name="profile_create_continue">إنشاء الملف والمتابعة</string><string name="profile_unsaved_title">تجاهل التعديلات غير المحفوظة؟</string><string name="profile_unsaved_body">ستفقد تغييرات هذا القسم غير المحفوظة.</string><string name="profile_discard">تجاهل</string>
     <string name="profile_publish">نشر الملف</string><string name="profile_pause">إيقاف الملف العام مؤقتاً</string><string name="profile_resume">استئناف الملف العام</string>
     <string name="profile_publish_confirm_title">نشر هذا الملف؟</string><string name="profile_publish_confirm_body">راجع المعاينة والظهور أولاً. سيجعل النشر الحقول العامة المعتمدة متاحة عبر رابط الملف.</string>
     <string name="profile_add_sections">إضافة قسم إلى الملف</string>
@@ -594,14 +592,6 @@
     <string name="profile_closes_at">يغلق الساعة (HH:MM)</string>
     <string name="profile_monday">الاثنين</string><string name="profile_tuesday">الثلاثاء</string><string name="profile_wednesday">الأربعاء</string><string name="profile_thursday">الخميس</string><string name="profile_friday">الجمعة</string><string name="profile_saturday">السبت</string><string name="profile_sunday">الأحد</string>
     <string name="move_up">نقل لأعلى</string><string name="move_down">نقل لأسفل</string>
-    <string name="profile_verification_not_started">لم يبدأ التحقق</string>
-    <string name="profile_verification_required">التحقق مطلوب</string>
-    <string name="profile_verification_in_progress">التحقق قيد التنفيذ</string>
-    <string name="profile_verification_pending">التحقق قيد المراجعة</string>
-    <string name="profile_verification_rejected">تم رفض التحقق</string>
-    <string name="profile_verification_needs_update">يحتاج التحقق إلى تحديث</string>
-    <string name="profile_verification_expired">انتهت صلاحية التحقق</string>
-    <string name="profile_verification_identity">الهوية</string><string name="profile_verification_business">النشاط التجاري</string><string name="profile_verification_professional">المؤهل المهني</string><string name="profile_verification_medical">المؤهل الطبي</string><string name="profile_verification_contact">بيانات الاتصال</string><string name="profile_verification_domain">النطاق</string>
     <string name="profile_first_name">الاسم الأول</string>
     <string name="profile_last_name">اسم العائلة</string>
     <string name="profile_profession">المهنة</string>
@@ -686,9 +676,7 @@
     <string name="profile_basic_information_description">الاسم، النبذة، والتفاصيل الأساسية</string>
     <string name="profile_contact_links_description">معلومات الاتصال وروابط التواصل الاجتماعي</string>
     <string name="profile_media_description">الصور والفيديوهات والوثائق</string>
-    <string name="profile_appearance_description">خصّص مظهر ملفك</string>
     <string name="profile_type_details_description">عملك، خدماتك، وخبرتك</string>
-    <string name="profile_verification_description">تحقق من هويتك أو عملك</string>
     <string name="share_hce_guidance">قرّب الهاتف من هاتف يدعم NFC</string>
     <string name="home_search_person">شخص</string>
     <string name="home_search_business">نشاط تجاري</string>
@@ -699,4 +687,12 @@
     <string name="profile_preview_close">إغلاق المعاينة</string>
     <string name="profile_preview_action">معاينة</string>
     <string name="profile_touch_countdown">قرّب الجهاز · %1$d ث</string>
+    <string name="p7a_not_set">غير محدد</string>
+    <string name="p7a_passkey_cancelled">تم إلغاء إعداد مفتاح المرور.</string>
+    <string name="p7a_passkey_unsupported">مفاتيح المرور غير مدعومة على هذا الجهاز أو لدى موفّر بيانات الاعتماد.</string>
+    <string name="p7a_passkey_missing">لم يتم العثور على مفتاح مرور POP محفوظ على هذا الجهاز.</string>
+    <string name="p7a_passkey_reauthenticate">سجّل الدخول مجددًا قبل تغيير مفاتيح المرور.</string>
+    <string name="p7a_passkey_unavailable">مفاتيح المرور غير متاحة مؤقتًا. استخدم تسجيل الدخول عبر واتساب.</string>
+    <string name="p7a_passkey_setup_failed">تعذر إنشاء مفتاح المرور. تحقق من قفل الشاشة وموفّر بيانات الاعتماد ثم حاول مجددًا.</string>
+    <string name="p7a_passkey_login_failed">فشل تسجيل الدخول بمفتاح المرور. حاول مجددًا أو استخدم واتساب.</string>
 </resources>

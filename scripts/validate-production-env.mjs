@@ -1,18 +1,21 @@
 const errors = [];
+// Current Production does not activate Evolution Auth. This explicit preflight
+// is for the future authorized auth release; it is not a new runtime flag.
+const futureAuth = process.argv.includes("--future-auth");
 const value = name => process.env[name]?.trim() || "";
 const required = name => { if (!value(name)) errors.push(`${name} is required`); };
 const httpsUrl = (name, expectedHost) => {
   try {
     const url = new URL(value(name));
-    if (url.protocol !== "https:" || (expectedHost && url.hostname !== expectedHost)) errors.push(`${name} must use https://${expectedHost || "..."}`);
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || /[\[\]()]/.test(value(name)) || (expectedHost && (url.host !== expectedHost || url.pathname !== "/"))) errors.push(`${name} must use its canonical HTTPS origin`);
   } catch { errors.push(`${name} must be a valid HTTPS URL`); }
 };
 const exactUrl = (name, expected) => {
   try {
     const actual = new URL(value(name));
     const wanted = new URL(expected);
-    if (actual.origin !== wanted.origin || actual.pathname.replace(/\/$/, "") !== wanted.pathname.replace(/\/$/, "") || actual.search || actual.hash) errors.push(`${name} must be exactly ${expected}`);
-  } catch { errors.push(`${name} must be exactly ${expected}`); }
+    if (actual.origin !== wanted.origin || actual.pathname.replace(/\/$/, "") !== wanted.pathname.replace(/\/$/, "") || actual.username || actual.password || actual.search || actual.hash) errors.push(`${name} must use its canonical URL`);
+  } catch { errors.push(`${name} must use its canonical URL`); }
 };
 const strongSecret = name => {
   const secret = value(name);
@@ -20,10 +23,13 @@ const strongSecret = name => {
 };
 
 required("DATABASE_URL");
-try {
-  const database = new URL(value("DATABASE_URL"));
-  if (!/^postgres(ql)?:$/.test(database.protocol)) errors.push("DATABASE_URL must be PostgreSQL");
-} catch { errors.push("DATABASE_URL must be a valid PostgreSQL URL"); }
+required("DIRECT_DATABASE_URL");
+for (const name of ["DATABASE_URL", "DIRECT_DATABASE_URL"]) {
+  try {
+    const database = new URL(value(name));
+    if (!/^postgres(ql)?:$/.test(database.protocol)) errors.push(`${name} must be PostgreSQL`);
+  } catch { errors.push(`${name} must be a valid PostgreSQL URL`); }
+}
 
 for (const name of ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "MOBILE_ENROLLMENT_SECRET", "OTP_PEPPER", "ACTIVATION_SCRATCH_PEPPER", "ACTIVATION_RATE_LIMIT_PEPPER"]) strongSecret(name);
 const secretNames = ["NEXTAUTH_SECRET", "MOBILE_TOKEN_SECRET", "MOBILE_ENROLLMENT_SECRET", "OTP_PEPPER", "ACTIVATION_SCRATCH_PEPPER", "ACTIVATION_RATE_LIMIT_PEPPER"];
@@ -46,42 +52,47 @@ if (value("PUBLIC_HOST") !== "go.popwam.com") errors.push("PUBLIC_HOST must be g
 if (value("PASSKEY_RP_ID") !== "pop.popwam.com") errors.push("PASSKEY_RP_ID must be pop.popwam.com");
 exactUrl("PASSKEY_ORIGIN", "https://pop.popwam.com");
 const passkeyAndroidOrigins = value("PASSKEY_ANDROID_ORIGINS").split(",").map(origin => origin.trim()).filter(Boolean);
-if (!passkeyAndroidOrigins.length || passkeyAndroidOrigins.some(origin => !/^android:apk-key-hash:[A-Za-z0-9_-]{20,}$/.test(origin))) {
+if (!passkeyAndroidOrigins.length || passkeyAndroidOrigins.some(origin => !/^android:apk-key-hash:[A-Za-z0-9_-]{43}$/.test(origin))) {
   errors.push("PASSKEY_ANDROID_ORIGINS must contain reviewed android:apk-key-hash origins");
 }
 
-const firebaseWebConfig = ["NEXT_PUBLIC_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET", "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", "NEXT_PUBLIC_FIREBASE_APP_ID"];
+const firebaseWebConfig = ["NEXT_PUBLIC_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_APP_ID"];
 const firebaseAdminConfig = ["FCM_PROJECT_ID", "FCM_CLIENT_EMAIL", "FCM_PRIVATE_KEY"];
-for (const name of firebaseAdminConfig) required(name);
+if (firebaseAdminConfig.some(name => value(name))) for (const name of firebaseAdminConfig) required(name);
 const firebasePrivateKey = value("FCM_PRIVATE_KEY").replace(/\\n/g, "\n");
 if (firebasePrivateKey && !/^-----BEGIN (?:RSA )?PRIVATE KEY-----\n[\s\S]+\n-----END (?:RSA )?PRIVATE KEY-----$/.test(firebasePrivateKey)) {
   errors.push("FCM_PRIVATE_KEY must be a PEM private key; Railway literal \\\\n line breaks are supported");
 }
 if (firebaseWebConfig.some(name => value(name))) for (const name of firebaseWebConfig) required(name);
-if (value("FCM_ENABLED") && !["true", "false"].includes(value("FCM_ENABLED").toLowerCase())) errors.push("FCM_ENABLED must be true or false");
-if (value("FCM_ENABLED").toLowerCase() === "true") for (const name of firebaseAdminConfig) required(name);
-
-const booleanValue = name => ["true", "false"].includes(value(name).toLowerCase());
-for (const name of ["STAGING", "OTP_TEST_MODE", "OTP_EXPOSE_IN_RESPONSE"]) if (value(name) && !booleanValue(name)) errors.push(`${name} must be true or false`);
-const staging = value("STAGING").toLowerCase() === "true";
-const otpTestMode = value("OTP_TEST_MODE").toLowerCase() === "true";
-const otpExpose = value("OTP_EXPOSE_IN_RESPONSE").toLowerCase() === "true";
-if (otpTestMode) {
-  if (!staging) errors.push("OTP_TEST_MODE=true is forbidden on live production; set it only on an explicitly marked STAGING deployment");
-  const phones = value("OTP_TEST_PHONES").split(",").map(phone => phone.trim()).filter(Boolean);
-  if (!phones.length || phones.some(phone => !/^\+[1-9]\d{7,14}$/.test(phone))) errors.push("OTP_TEST_PHONES must be a non-empty comma-separated list of normalized E.164 phone numbers");
-  if (value("OTP_TEST_CODE") && !/^\d{6}$/.test(value("OTP_TEST_CODE"))) errors.push("OTP_TEST_CODE must be exactly 6 digits when provided");
+// This validator is exclusively for live Production, never the isolated TEST service.
+for (const name of ["STAGING", "OTP_TEST_MODE", "OTP_EXPOSE_IN_RESPONSE"]) {
+  if (value(name) && value(name).toLowerCase() !== "false") errors.push(`${name} must be absent or false in Production`);
 }
-if (otpExpose && !otpTestMode) errors.push("OTP_EXPOSE_IN_RESPONSE=true requires OTP_TEST_MODE=true");
-if (otpExpose && !staging) errors.push("OTP_EXPOSE_IN_RESPONSE=true is forbidden on live production");
-
-for (const name of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) required(name);
-httpsUrl("R2_ENDPOINT");
-// This is the R2/CDN delivery origin used by getPublicUrl(), not the public-site host.
-httpsUrl("R2_PUBLIC_BASE_URL", "media.popwam.com");
-
-const googleId = value("GOOGLE_CLIENT_ID"); const googleSecret = value("GOOGLE_CLIENT_SECRET");
-if (Boolean(googleId) !== Boolean(googleSecret)) errors.push("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must either both be set or both be empty");
+for (const name of ["OTP_TEST_CODE", "OTP_TEST_PHONES"]) if (value(name)) errors.push(`${name} must be absent in Production`);
+const evolutionNames = ["EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_INSTANCE"];
+if (futureAuth || evolutionNames.some(name => value(name))) {
+  for (const name of evolutionNames) required(name);
+  httpsUrl("EVOLUTION_API_URL");
+  try { const url = new URL(value("EVOLUTION_API_URL")); if (url.username || url.password || url.search || url.hash) errors.push("EVOLUTION_API_URL contains forbidden URL components"); } catch {}
+  if (!/^[A-Za-z0-9_.-]{1,120}$/.test(value("EVOLUTION_INSTANCE"))) errors.push("EVOLUTION_INSTANCE has invalid syntax");
+}
+for (const [name, min, max] of [["OTP_TTL_SECONDS", 60, 900], ["OTP_RESEND_COOLDOWN_SECONDS", 30, 300], ["OTP_MAX_ATTEMPTS", 1, 10]]) {
+  if (value(name) && (!Number.isInteger(Number(value(name))) || Number(value(name)) < min || Number(value(name)) > max)) errors.push(`${name} is outside its allowed integer range`);
+}
+if (futureAuth && passkeyAndroidOrigins.includes("android:apk-key-hash:2wLB6Ar-rc3goPV-Syud8oWJd5Ipu78bFhJ-gRQc5TA")) errors.push("PASSKEY_ANDROID_ORIGINS contains the TEST debug signing origin; release review required");
+const storageConfig = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME", "R2_PUBLIC_BASE_URL"];
+if (storageConfig.some(name => value(name)) || value("R2_PRIVATE_BUCKET_NAME")) {
+  for (const name of storageConfig) required(name);
+  httpsUrl("R2_ENDPOINT");
+  // This is the R2/CDN delivery origin used by getPublicUrl(), not the public-site host.
+  httpsUrl("R2_PUBLIC_BASE_URL", "media.popwam.com");
+}
+for (const [flag, names] of [
+  ["TIKTOK_ENABLED", ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_REDIRECT_URI"]],
+  ["GOOGLE_CONNECTED_ENABLED", ["GOOGLE_CONNECTED_CLIENT_ID", "GOOGLE_CONNECTED_CLIENT_SECRET", "GOOGLE_CONNECTED_REDIRECT_URI"]],
+  ["LINKEDIN_ENABLED", ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET", "LINKEDIN_REDIRECT_URI"]],
+  ["GITHUB_ENABLED", ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "GITHUB_REDIRECT_URI"]],
+]) if (value(flag).toLowerCase() === "true") for (const name of [...names, "INTEGRATION_TOKEN_ENCRYPTION_KEY"]) required(name);
 
 const googleWalletKeys = ["GOOGLE_WALLET_ISSUER_ID", "GOOGLE_WALLET_CLASS_SUFFIX", "GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL", "GOOGLE_WALLET_PRIVATE_KEY"];
 if (googleWalletKeys.some(name => value(name))) for (const name of googleWalletKeys) required(name);

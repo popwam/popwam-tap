@@ -5,7 +5,7 @@ import java.net.URI
 /** Allows only approved public POP share URLs. No query, fragment, token or
  * activation secret can be written to a physical tag or exposed by HCE. */
 object PermanentUrlPolicy {
-    private val approvedHosts = setOf("go.popwam.com", "pop.popwam.com")
+    private val approvedHosts = setOf(com.popwam.pop.PublicProfileUrls.publicHost, com.popwam.pop.PublicProfileUrls.appHost)
 
     fun isValid(value: String): Boolean = runCatching {
         val uri = URI(value)

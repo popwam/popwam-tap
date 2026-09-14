@@ -1,5 +1,8 @@
 # PASS 7 — Clean onboarding, first profile, passkey, biometric and APK cleanup
 
+> Current environment contract (2026-09-13): [POP_ENV_CONTRACT.md](POP_ENV_CONTRACT.md). This dated report is historical evidence; current Railway readiness and unresolved Meta/SMS, URL and signing-origin exceptions are recorded there.
+
+
 Date: 2026-09-13. Repository: `E:\saas\popwam-tap`.
 
 **IMPLEMENTED / CODE VERIFIED / AWAITING OWNER PHYSICAL ACCEPTANCE.** This is code, JVM, backend, build, APK and TEST-service verification. No physical visual or authenticator acceptance is claimed. The owner's earlier WhatsApp OTP physical acceptance is accepted as passed; the Evolution OTP architecture was preserved.

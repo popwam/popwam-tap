@@ -74,9 +74,11 @@ data class AuthUiState(
     val passkeyLoading:Boolean=false, val passkeyError:PasskeyLoginError?=null,
     val passkeyRegistered:Boolean=false,
 )
-enum class PasskeyLoginError { CANCELLED, UNAVAILABLE, NO_CREDENTIAL, NETWORK, STEP_UP_REQUIRED, AUTHENTICATION_FAILED, SERVER_UNAVAILABLE }
+enum class PasskeyLoginError { CANCELLED, UNAVAILABLE, UNSUPPORTED, NO_CREDENTIAL, NETWORK, STEP_UP_REQUIRED, AUTHENTICATION_FAILED, SERVER_UNAVAILABLE }
 internal fun passkeyPlatformSupported(sdkInt:Int)=sdkInt>=28
 internal fun passkeyLoginError(error:Throwable)=when {
+    error::class.simpleName?.contains("Unsupported",true)==true ||
+        (error as? androidx.credentials.exceptions.publickeycredential.CreatePublicKeyCredentialDomException)?.domError?.javaClass?.simpleName=="NotSupportedError" -> PasskeyLoginError.UNSUPPORTED
     error::class.simpleName?.contains("Cancellation",true)==true -> PasskeyLoginError.CANCELLED
     error::class.simpleName?.contains("NoCredential",true)==true -> PasskeyLoginError.NO_CREDENTIAL
     error is java.io.IOException -> PasskeyLoginError.NETWORK
@@ -84,6 +86,15 @@ internal fun passkeyLoginError(error:Throwable)=when {
     error is PasskeyOptionsHttpException && error.safeCode==PASSKEY_OPTIONS_FAILED -> PasskeyLoginError.SERVER_UNAVAILABLE
     error is HttpException -> PasskeyLoginError.AUTHENTICATION_FAILED
     else -> PasskeyLoginError.UNAVAILABLE
+}
+internal fun passkeyErrorResource(error:PasskeyLoginError,creating:Boolean=false)=when(error) {
+    PasskeyLoginError.CANCELLED->com.popwam.pop.R.string.p7a_passkey_cancelled
+    PasskeyLoginError.UNSUPPORTED->com.popwam.pop.R.string.p7a_passkey_unsupported
+    PasskeyLoginError.NO_CREDENTIAL->com.popwam.pop.R.string.p7a_passkey_missing
+    PasskeyLoginError.STEP_UP_REQUIRED->com.popwam.pop.R.string.p7a_passkey_reauthenticate
+    PasskeyLoginError.NETWORK->com.popwam.pop.R.string.wa_auth_offline
+    PasskeyLoginError.UNAVAILABLE,PasskeyLoginError.SERVER_UNAVAILABLE->com.popwam.pop.R.string.p7a_passkey_unavailable
+    else->if(creating)com.popwam.pop.R.string.p7a_passkey_setup_failed else com.popwam.pop.R.string.p7a_passkey_login_failed
 }
 class AuthViewModel(private val sessions:SessionRepository,private val setup:AuthSetupRepository,private val analytics:PopAnalytics):ViewModel() {
     private val _state=MutableStateFlow(AuthUiState(authenticated=sessions.authenticated,setupStage=if(sessions.needsOnboarding)AuthSetupStage.AUTHENTICATED_CHECKING else AuthSetupStage.PUBLIC))

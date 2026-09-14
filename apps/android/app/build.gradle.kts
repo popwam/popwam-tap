@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.net.URI
 
 plugins {
     id("com.android.application")
@@ -21,6 +22,7 @@ android {
     compileSdk = 36
     defaultConfig {
         applicationId = "com.popwam.pop"
+        manifestPlaceholders["appLinkHost"] = URI(apiBaseUrl).host
         minSdk = 26
         targetSdk = 36
         versionCode = 12

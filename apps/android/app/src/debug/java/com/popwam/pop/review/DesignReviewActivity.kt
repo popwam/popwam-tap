@@ -86,7 +86,7 @@ private enum class ReviewScreen(val label: String) {
     PROFILE_CREATE("Create Profile"),
     PROFILE_BASIC("Basic Info"), PROFILE_ABOUT("About"), PROFILE_CONTACT("Contact & Links"), PROFILE_TYPE_DETAILS("Type Details"), PROFILE_MEDIA("Media"),
     PROFILE_VISIBILITY("Visibility"),
-    PROFILE_APPEARANCE("Appearance"), PROFILE_VERIFICATION("Verification"), PROFILE_LOADING("Profiles Loading"), PROFILE_ERROR("Profiles Error"),
+    PROFILE_LOADING("Profiles Loading"), PROFILE_ERROR("Profiles Error"),
     SHARE_CENTER("Share Center"), SHARE_QR_READY("QR Ready"), SHARE_PRIVATE("Share Private"),
     SHARE_NFC_UNAVAILABLE("NFC Unavailable"), SHARE_NFC_READY("NFC Ready"), SHARE_NFC_WRITING("NFC Writing"), SHARE_NFC_SUCCESS("NFC Success"), SHARE_NFC_ERROR("NFC Error"), SHARE_HCE_READY("HCE Ready"),
     MENU("Menu"), MENU_ACCOUNT("Menu Account"), MENU_SECURITY("Menu Security"), MENU_DEVICES("Menu Devices"),
@@ -164,8 +164,6 @@ private fun DesignReviewGallery(initialScreen:String?=null,initialLanguage:Strin
                     ReviewScreen.PROFILE_TYPE_DETAILS -> ProfileEditorSectionScreen(profileReviewState(language,ProfileBackendKind.PERSONAL),"review-primary",ProfileEditorSection.TYPE_DETAILS,{}, {})
                     ReviewScreen.PROFILE_MEDIA -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.MEDIA,{}, {})
                     ReviewScreen.PROFILE_VISIBILITY -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.VISIBILITY,{}, {})
-                    ReviewScreen.PROFILE_APPEARANCE -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.APPEARANCE,{}, {})
-                    ReviewScreen.PROFILE_VERIFICATION -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.VERIFICATION,{}, {})
                     ReviewScreen.PROFILE_LOADING -> ProfileListScreen(ProfilesUiState(), {})
                     ReviewScreen.PROFILE_ERROR -> ProfileListScreen(ProfilesUiState(loadState=ProfileLoadState.ERROR,errorCode="REVIEW"), {})
                     ReviewScreen.SHARE_CENTER -> ShareReviewScreen(shareReviewState(language))
@@ -204,7 +202,7 @@ private fun profileReviewState(language:String,category:ProfileBackendKind=Profi
     val kind=if(category in setOf(ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS,ProfileBackendKind.BUSINESS))ProfileBackendKind.BUSINESS else ProfileBackendKind.PERSONAL
     val summary=OwnedProfile("review-primary",name,if(language=="ar")"مصممة منتجات" else "Product designer",null,kind,category.name.lowercase(),"PUBLISHED","PUBLIC",true,ProfileVerificationState.UNAVAILABLE,ProfileCompletion(true))
     val content=ProfileContent(
-        summary,4,if(language=="ar")"ar" else "en",name,name,if(language=="ar")name else "سارة أحمد",if(language=="ar")"Sarah Ahmed" else name,"مصممة منتجات","Product designer","استوديو سارة","Sarah Studio","Designing useful things","", "نبذة تعريفية واضحة وقابلة للقراءة.","A clear and readable profile introduction.","","", "+201001234567","","sarah@example.com","https://popwam.com","+201001234567","","Cairo","القاهرة","Cairo",mapOf("phone" to "PUBLIC","email" to "PUBLIC"),"sarah-a1b2c3d4","ELEGANT_LIGHT","Elegant",
+        summary,4,if(language=="ar")"ar" else "en",name,name,if(language=="ar")name else "سارة أحمد",if(language=="ar")"Sarah Ahmed" else name,"مصممة منتجات","Product designer","استوديو سارة","Sarah Studio","Designing useful things","", "نبذة تعريفية واضحة وقابلة للقراءة.","A clear and readable profile introduction.","","", "+201001234567","","sarah@example.com","https://popwam.com","+201001234567","","Cairo","القاهرة","Cairo",mapOf("phone" to "PUBLIC","email" to "PUBLIC"),"sarah-a1b2c3d4","Elegant",
         links=listOf(ProfileLink("link-1","Portfolio","","Portfolio","WEBSITE","https://example.com","PUBLIC",0)),
         services=listOf(ProfileService("service-1","Product strategy","","Product strategy","","Research and product strategy","","PUBLIC")),
         locations=listOf(ProfileLocation("branch-1","Downtown","","Downtown","","Cairo","+201001234567","https://maps.google.com","PUBLIC")),

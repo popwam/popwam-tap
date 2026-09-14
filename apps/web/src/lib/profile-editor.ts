@@ -2,7 +2,6 @@ import {
   DestinationType,
   OrgRole,
   Prisma,
-  ProfileTheme,
   ProfileModuleVisibility,
   ProfessionType,
   prisma,
@@ -57,7 +56,6 @@ type EditorLocale = "ar" | "en";
 
 export type ProfileEditorAction =
   | { type: "TEMPLATE_SELECT"; templateId?: unknown }
-  | { type: "APPEARANCE_SAVE"; theme?: unknown }
   | { type: "IDENTITY_SAVE"; displayLabel?: unknown; displayName?: unknown; firstName?: unknown; lastName?: unknown; profession?: unknown; customProfession?: unknown; displayNameAr?: unknown; displayNameEn?: unknown; jobTitleAr?: unknown; jobTitleEn?: unknown; company?: unknown; industryAr?: unknown; industryEn?: unknown; organizationNameAr?: unknown; organizationNameEn?: unknown; primaryLanguage?: unknown }
   | { type: "ABOUT_SAVE"; title?: unknown; bio?: unknown; bioAr?: unknown; bioEn?: unknown; descriptionAr?: unknown; descriptionEn?: unknown }
   | { type: "CONTACT_SAVE"; phone?: unknown; alternatePhone?: unknown; email?: unknown; website?: unknown; whatsappBusiness?: unknown; whatsappPrivate?: unknown; locationText?: unknown; addressAr?: unknown; addressEn?: unknown; countryIso2?: unknown; visibility?: unknown }
@@ -80,9 +78,6 @@ export type ProfileEditorAction =
   | { type: "SECTION_ENTRY_REORDER"; fieldKey?: unknown; ids?: unknown };
 
 const CORE_TEMPLATE_FALLBACK_MODULES = new Set(["IDENTITY", "ABOUT", "CONTACT", "LINKS"]);
-const profileThemes = new Set<ProfileTheme>([
-  "CLASSIC_DARK", "CLASSIC_LIGHT", "ELEGANT_DARK", "ELEGANT_LIGHT", "BUSINESS_DARK", "BUSINESS_LIGHT",
-]);
 type ProfileCapabilityContext = {
   profileKind?: string | null;
   type?: string | null;
@@ -536,16 +531,6 @@ export async function mutateProfileEditor(userId: string, profileId: string, exp
     let auditMetadata: Prisma.InputJsonObject | undefined;
 
     switch (action.type) {
-      case "APPEARANCE_SAVE": {
-        const theme = String(action.theme || "") as ProfileTheme;
-        if (!profileThemes.has(theme)) throw new Error("PROFILE_THEME_INVALID");
-        const allowedThemes = Array.isArray(effective.availableThemes) ? effective.availableThemes.filter((item): item is string => typeof item === "string") : [];
-        if (theme !== profile.theme && (!effective.allowThemes || (allowedThemes.length > 0 && !allowedThemes.includes(theme)))) throw new Error("PROFILE_THEME_PLAN_REQUIRED");
-        await tx.profile.update({ where: { id: profileId }, data: { theme } });
-        auditOperation = "profile.appearance.changed";
-        auditMetadata = { theme };
-        break;
-      }
       case "TEMPLATE_SELECT": {
         const templateId = requiredId(action.templateId);
         const template = await tx.profileTemplate.findFirst({

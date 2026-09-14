@@ -109,7 +109,7 @@ fun ShareCenterScreen(
         ) {
             item { ApprovedShareTopBar(onBack) }
             item { ApprovedShareProfileCard(state) { state.payload?.let { payload -> runCatching { SharePlatform.copy(context,payload);viewModel.linkCopied() }.onFailure { viewModel.qrFailed() } } } }
-            if (!state.shareable) item { UnshareableCard(state) { activeProfile?.id?.let { navigate("profile/$it/edit/VISIBILITY") } } }
+            if (!state.shareable) item { UnshareableCard(state) { activeProfile?.id?.let { navigate(if(state.availability==ShareAvailability.PRIVATE)"profile/$it/edit/VISIBILITY" else "profile-publish/$it") } } }
             if (state.availability == ShareAvailability.UNLISTED) item { StatusNotice(R.string.share_unlisted_notice, Icons.Default.VisibilityOff) }
             item {
                 Text(stringResource(R.string.share_how), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -349,7 +349,7 @@ private fun UnshareableCard(state: ShareUiState, editVisibility: () -> Unit) {
                 ShareAvailability.PAUSED -> R.string.share_profile_paused
                 else -> R.string.share_publish_required
             }), color = MaterialTheme.colorScheme.onErrorContainer)
-            OutlinedButton(editVisibility) { Text(stringResource(R.string.profile_section_visibility)) }
+            Button(editVisibility,Modifier.fillMaxWidth().heightIn(min=48.dp)) { Text(stringResource(when(state.availability){ShareAvailability.PRIVATE->R.string.profile_section_visibility;ShareAvailability.PAUSED->R.string.profile_resume;else->R.string.profile_publish})) }
         }
     }
 }

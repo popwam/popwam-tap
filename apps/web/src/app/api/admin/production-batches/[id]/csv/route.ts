@@ -18,7 +18,7 @@ async function adminUser() {
 }
 
 function csvResponse(batch: ExportBatch, allowScratch: boolean) {
-  const app = (process.env.NEXT_PUBLIC_APP_URL || "https://pop.popwam.com").replace(/\/$/, "");
+  const app = (process.env.PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL || "https://go.popwam.com").replace(/\/$/, "");
   const header = ["serialNumber", "batchCode", "permanentUrl", "activationIdentifierUrl", "scratchCode", "activationPolicy", "assignmentStatus"];
   const rows = batch.tags.map(tag => {
     const scratch = allowScratch && tag.scratchSecretExportCiphertext
