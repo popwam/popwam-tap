@@ -29,7 +29,6 @@ function enrollmentDigest(namespace: string, value: string) {
   return createHmac("sha256", enrollmentSecret()).update(`${namespace}:${value}`).digest("base64url");
 }
 
-export const mobilePhoneHash = (phoneE164: string) => enrollmentDigest("phone", phoneE164);
 export const mobileEnrollmentTokenHash = (token: string) => enrollmentDigest("token", token);
 export const mobileDeviceChallengeHash = (challenge: string) => enrollmentDigest("device", challenge);
 export const mobileCompletionKeyHash = (key: string) => enrollmentDigest("completion", key);

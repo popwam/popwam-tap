@@ -61,6 +61,7 @@ class LaunchViewModel(
     fun selectLanguage(languageTag: String, applyLanguage: (String) -> Unit) = viewModelScope.launch {
         coordinator.selectLanguage(languageTag)
         applyLanguage(languageTag)
+        localization.selectLanguage(languageTag)
     }
 
     fun selectBaseTheme(mode: ThemeMode) = viewModelScope.launch {

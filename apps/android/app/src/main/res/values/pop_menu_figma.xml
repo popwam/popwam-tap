@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_account_information">Account Information</string>
+    <string name="menu_passcode_fingerprint">Passcode and fingerprint</string>
+    <string name="menu_full_settings">Full settings</string>
+    <string name="menu_account_setup">Account Setup</string>
+    <string name="menu_pop_complete">Your POP is %1$d%% complete</string>
+    <string name="menu_complete_profile_discovery">Complete your profile to get discovered more.</string>
+</resources>

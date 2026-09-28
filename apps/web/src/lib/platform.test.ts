@@ -5,7 +5,6 @@ import { decideTagResolution } from "./tag-resolution";
 import { countsTowardLinkLimit, mergeEntitlements, quotaRemaining, storageWithinLimit } from "./plans";
 import { buildPlatformUrl, platformOpenTarget } from "./link-platforms";
 import { normalizeEmail, isUniqueConstraintError, runAtomicUserCreation } from "./user-validation";
-import { resolveProfileFieldUrl, visibleProfileFields } from "./profile-fields";
 import { activationTokenMatches, createActivationCode, createOpaqueToken, hashActivationToken, isActivationToken, MAX_BATCH_QUANTITY, normalizeBatchPrefix, openActivationCode, sealActivationCode } from "./card-tokens";
 import { normalizePhone } from "./phone";
 import { createVCard, escapeVCard, safeVCardFilename } from "./vcard";
@@ -64,8 +63,6 @@ describe("short links and single destination NFC", () => {
 });
 
 describe("custom fields, uploads and icons", () => {
-  it("renders only visible fields in order", () => expect(visibleProfileFields([{ id:"hidden",isVisible:false,sortOrder:0 },{ id:"second",isVisible:true,sortOrder:2 },{ id:"first",isVisible:true,sortOrder:1 }]).map(x => x.id)).toEqual(["first","second"]));
-  it("makes actionable fields clickable", () => { expect(resolveProfileFieldUrl({ type:"PHONE",value:"+37360000000",actionUrl:null })).toBe("tel:+37360000000"); expect(resolveProfileFieldUrl({ type:"TEXT",value:"hello",actionUrl:null })).toBeNull(); });
   it("rejects executable and oversized uploads", () => { expect(validateFileUpload({ filename:"bad.exe",contentType:"application/pdf",size:100 }).valid).toBe(false); expect(validateImageUpload({ filename:"large.jpg",contentType:"image/jpeg",size:99*1024*1024 }).valid).toBe(false); });
   it("rejects extension and MIME mismatches", () => { expect(validateFileUpload({ filename:"document.jpg",contentType:"application/pdf",size:100 }).valid).toBe(false); expect(validateImageUpload({ filename:"avatar.pdf",contentType:"image/jpeg",size:100 }).valid).toBe(false); });
   it("has a default icon for every known type", () => { for (const value of Object.values(defaultIconKeys)) expect(value).toMatch(/^[a-z]+$/); expect(defaultIconKeys.FILE).toBe("file"); });

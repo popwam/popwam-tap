@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_pop_style">POP Style</string>
+    <string name="settings_text_size">Text size</string>
+    <string name="settings_text_small">Small</string>
+    <string name="settings_text_default">Default</string>
+    <string name="settings_text_large">Large</string>
+    <string name="settings_text_weight">Text weight</string>
+    <string name="settings_text_regular">Regular</string>
+    <string name="settings_text_medium">Medium</string>
+    <string name="settings_text_semibold">SemiBold</string>
+</resources>

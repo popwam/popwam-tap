@@ -19,7 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -64,22 +64,22 @@ fun FriendsScreen(state: MainUiState, vm: MainViewModel, initialTab: String = "f
     when (state.friendsStage) {
         FriendsStage.LOADING -> FriendsLoading()
         FriendsStage.POLICY_UNAVAILABLE -> FriendsGate(
-            title = stringResource(R.string.friends_policy_title),
-            help = stringResource(R.string.friends_policy_unavailable),
+            title = popStringResource(R.string.friends_policy_title),
+            help = popStringResource(R.string.friends_policy_unavailable),
             read = { openWeb(context, "community-guidelines") },
             retry = { vm.loadFriends(locale) },
         )
         FriendsStage.POLICY_REQUIRED -> FriendsGate(
-            title = stringResource(R.string.friends_policy_title),
-            help = stringResource(R.string.friends_policy_help),
+            title = popStringResource(R.string.friends_policy_title),
+            help = popStringResource(R.string.friends_policy_help),
             read = { openWeb(context, "community-guidelines") },
             accept = { vm.acceptFriendsPolicy(locale) },
         )
         FriendsStage.SOCIAL_PROFILE_REQUIRED -> SocialProfileGate(state, vm, locale)
         FriendsStage.PRIVACY_REQUIRED -> FirstFriendsPrivacyGate(state, vm, locale)
         FriendsStage.ERROR -> FriendsGate(
-            title = stringResource(R.string.friends_title),
-            help = stringResource(R.string.friends_action_failed),
+            title = popStringResource(R.string.friends_title),
+            help = popStringResource(R.string.friends_action_failed),
             retry = { vm.loadFriends(locale) },
         )
         FriendsStage.READY -> Column(Modifier.fillMaxSize()) {
@@ -145,38 +145,38 @@ fun FriendsScreen(state: MainUiState, vm: MainViewModel, initialTab: String = "f
         AlertDialog(
             onDismissRequest = { blockPerson = null },
             icon = { Icon(Icons.Default.Block, null) },
-            title = { Text(stringResource(R.string.friends_block_title)) },
-            text = { Text(stringResource(R.string.friends_block_confirm)) },
+            title = { Text(popStringResource(R.string.friends_block_title)) },
+            text = { Text(popStringResource(R.string.friends_block_confirm)) },
             confirmButton = { TextButton({
                 vm.blockUser(person, locale)
                 blockPerson = null
-            }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.friends_block)) } },
-            dismissButton = { TextButton({ blockPerson = null }) { Text(stringResource(R.string.cancel)) } },
+            }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(popStringResource(R.string.friends_block)) } },
+            dismissButton = { TextButton({ blockPerson = null }) { Text(popStringResource(R.string.cancel)) } },
         )
     }
     removePerson?.let { person ->
         AlertDialog(
             onDismissRequest = { removePerson = null },
-            title = { Text(stringResource(R.string.friends_remove_title)) },
-            text = { Text(stringResource(R.string.friends_remove_confirm)) },
+            title = { Text(popStringResource(R.string.friends_remove_title)) },
+            text = { Text(popStringResource(R.string.friends_remove_confirm)) },
             confirmButton = { TextButton({
                 vm.removeFriend(person, locale)
                 removePerson = null
-            }) { Text(stringResource(R.string.friends_remove)) } },
-            dismissButton = { TextButton({ removePerson = null }) { Text(stringResource(R.string.cancel)) } },
+            }) { Text(popStringResource(R.string.friends_remove)) } },
+            dismissButton = { TextButton({ removePerson = null }) { Text(popStringResource(R.string.cancel)) } },
         )
     }
     reportedPerson?.let { person ->
         AlertDialog(
             onDismissRequest = { reportedPerson = null },
             icon = { Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) },
-            title = { Text(stringResource(R.string.friends_report_received)) },
-            text = { Text(stringResource(R.string.friends_report_received_help)) },
+            title = { Text(popStringResource(R.string.friends_report_received)) },
+            text = { Text(popStringResource(R.string.friends_report_received_help)) },
             confirmButton = { TextButton({
                 reportedPerson = null
                 blockPerson = person
-            }) { Text(stringResource(R.string.friends_block_user)) } },
-            dismissButton = { TextButton({ reportedPerson = null }) { Text(stringResource(R.string.close)) } },
+            }) { Text(popStringResource(R.string.friends_block_user)) } },
+            dismissButton = { TextButton({ reportedPerson = null }) { Text(popStringResource(R.string.close)) } },
         )
     }
 }
@@ -185,11 +185,11 @@ fun FriendsScreen(state: MainUiState, vm: MainViewModel, initialTab: String = "f
 private fun FriendsHeader(count: Int, refresh: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.friends_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
-            Text(stringResource(R.string.friends_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(popStringResource(R.string.friends_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+            Text(popStringResource(R.string.friends_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (count > 0) Badge { Text(count.toString()) }
-        IconButton(refresh, Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Refresh, stringResource(R.string.retry)) }
+        IconButton(refresh, Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Refresh, popStringResource(R.string.retry)) }
     }
 }
 
@@ -206,7 +206,7 @@ private fun FriendsTabs(selected: FriendsTab, change: (FriendsTab) -> Unit) {
             FriendsTab.PRIVACY to R.string.friends_tab_privacy,
             FriendsTab.BLOCKED to R.string.friends_tab_blocked,
         ).forEach { (tab, label) ->
-            FilterChip(selected = selected == tab, onClick = { change(tab) }, label = { Text(stringResource(label)) })
+            FilterChip(selected = selected == tab, onClick = { change(tab) }, label = { Text(popStringResource(label)) })
         }
     }
 }
@@ -217,13 +217,13 @@ private fun FriendsList(state: MainUiState, actions: (FriendDto) -> Unit) {
     val visible = state.friends.filter { "${it.profile.name} ${it.profile.title.orEmpty()}".contains(filter.trim(), ignoreCase = true) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (state.friends.isNotEmpty()) item {
-            OutlinedTextField(filter, { filter = it.take(64) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.friends_search_current)) }, singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) })
+            OutlinedTextField(filter, { filter = it.take(64) }, Modifier.fillMaxWidth(), label = { Text(popStringResource(R.string.friends_search_current)) }, singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) })
         }
         if (visible.isEmpty()) item { FriendsEmpty(if(state.friends.isEmpty())R.string.friends_empty else R.string.friends_no_results, if(state.friends.isEmpty())R.string.friends_empty_help else null, Icons.Default.People) }
         items(visible, key = { it.key }) { friend ->
             FriendCard(FriendIdentityDto(friend.key, friend.profile), trailing = {
-                if (friend.favorite) Icon(Icons.Default.Star, stringResource(R.string.friends_favorite), tint = Color(0xFFD4AF37))
-                IconButton({ actions(friend) }, Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.MoreVert, stringResource(R.string.friends_actions)) }
+                if (friend.favorite) Icon(Icons.Default.Star, popStringResource(R.string.friends_favorite), tint = Color(0xFFD4AF37))
+                IconButton({ actions(friend) }, Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.MoreVert, popStringResource(R.string.friends_actions)) }
             })
         }
     }
@@ -264,12 +264,12 @@ private fun FriendSearch(
                 query,
                 { query = it.take(64) },
                 Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.friends_search_hint)) },
+                label = { Text(popStringResource(R.string.friends_search_hint)) },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { vm.searchFriends(query, locale) }),
-                trailingIcon = { IconButton({ vm.searchFriends(query, locale) }) { Icon(Icons.Default.ArrowForward, stringResource(R.string.friends_search)) } },
+                trailingIcon = { IconButton({ vm.searchFriends(query, locale) }) { Icon(Icons.Default.ArrowForward, popStringResource(R.string.friends_search)) } },
             )
         }
         if (state.friendSearchResults.isEmpty() && query.isNotBlank()) item { FriendsEmpty(R.string.friends_no_results, null, Icons.Default.SearchOff) }
@@ -289,9 +289,9 @@ private fun FriendsPrivacy(state: MainUiState, vm: MainViewModel, locale: String
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { FriendToggle(R.string.friends_allow_requests, settings.preference.allowFriendRequests) { vm.updateFriendsSettings(locale, allowRequests = it) } }
         item { FriendToggle(R.string.friends_discoverable, settings.preference.discoverableByProfileSearch) { vm.updateFriendsSettings(locale, discoverable = it) } }
-        item { Text(stringResource(R.string.friends_privacy_help), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+        item { Text(popStringResource(R.string.friends_privacy_help), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
         item { SocialProfilePicker(settings.profiles, selected) { selected = it } }
-        item { Button({ vm.updateFriendsSettings(locale, socialProfileSlug = selected) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = selected.isNotBlank() && !state.loading) { Text(stringResource(R.string.save)) } }
+        item { Button({ vm.updateFriendsSettings(locale, socialProfileSlug = selected) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = selected.isNotBlank() && !state.loading) { Text(popStringResource(R.string.save)) } }
     }
 }
 
@@ -302,8 +302,8 @@ private fun BlockedList(blocks: List<BlockedUserDto>, unblock: (BlockedUserDto) 
         items(blocks, key = { it.id }) { item ->
             Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), tonalElevation = 1.dp) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    item.person?.let { FriendIdentity(it, Modifier.weight(1f)) } ?: Text(stringResource(R.string.friends_unavailable), Modifier.weight(1f))
-                    TextButton({ unblock(item) }, Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.friends_unblock)) }
+                    item.person?.let { FriendIdentity(it, Modifier.weight(1f)) } ?: Text(popStringResource(R.string.friends_unavailable), Modifier.weight(1f))
+                    TextButton({ unblock(item) }, Modifier.heightIn(min = 48.dp)) { Text(popStringResource(R.string.friends_unblock)) }
                 }
             }
         }
@@ -318,9 +318,9 @@ private fun FriendsGate(title: String, help: String, read: (() -> Unit)? = null,
                 Icon(Icons.Default.Groups, null, Modifier.size(44.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
                 Text(help, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                read?.let { OutlinedButton(it, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.friends_read_policy)) } }
-                accept?.let { Button(it, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.friends_accept_policy)) } }
-                retry?.let { Button(it, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.retry)) } }
+                read?.let { OutlinedButton(it, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(popStringResource(R.string.friends_read_policy)) } }
+                accept?.let { Button(it, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(popStringResource(R.string.friends_accept_policy)) } }
+                retry?.let { Button(it, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(popStringResource(R.string.retry)) } }
             }
         }
     }
@@ -333,12 +333,12 @@ private fun SocialProfileGate(state: MainUiState, vm: MainViewModel, locale: Str
     Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalElevation = 2.dp) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(stringResource(R.string.friends_choose_profile), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                Text(stringResource(R.string.friends_choose_profile_help), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (settings.profiles.isEmpty()) Text(stringResource(R.string.friends_publish_profile_first), color = MaterialTheme.colorScheme.error)
+                Text(popStringResource(R.string.friends_choose_profile), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                Text(popStringResource(R.string.friends_choose_profile_help), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (settings.profiles.isEmpty()) Text(popStringResource(R.string.friends_publish_profile_first), color = MaterialTheme.colorScheme.error)
                 else {
                     SocialProfilePicker(settings.profiles, selected) { selected = it }
-                    Button({ vm.updateFriendsSettings(locale, socialProfileSlug = selected) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = selected.isNotBlank() && !state.loading) { Text(stringResource(R.string.continue_label)) }
+                    Button({ vm.updateFriendsSettings(locale, socialProfileSlug = selected) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = selected.isNotBlank() && !state.loading) { Text(popStringResource(R.string.continue_label)) }
                 }
             }
         }
@@ -353,15 +353,15 @@ private fun FirstFriendsPrivacyGate(state: MainUiState, vm: MainViewModel, local
     Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalElevation = 2.dp) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(stringResource(R.string.friends_tab_privacy), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                Text(stringResource(R.string.friends_privacy_help), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(popStringResource(R.string.friends_tab_privacy), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                Text(popStringResource(R.string.friends_privacy_help), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FriendToggle(R.string.friends_allow_requests, allowRequests) { allowRequests = it }
                 FriendToggle(R.string.friends_discoverable, discoverable) { discoverable = it }
                 Button(
                     { vm.updateFriendsSettings(locale, allowRequests = allowRequests, discoverable = discoverable) },
                     Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     enabled = !state.loading,
-                ) { Text(stringResource(R.string.continue_label)) }
+                ) { Text(popStringResource(R.string.continue_label)) }
             }
         }
     }
@@ -377,7 +377,7 @@ private fun SocialProfilePicker(profiles: List<com.popwam.pop.data.api.FriendsSo
             {},
             Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
             readOnly = true,
-            label = { Text(stringResource(R.string.friends_social_profile)) },
+            label = { Text(popStringResource(R.string.friends_social_profile)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
         )
         ExposedDropdownMenu(expanded, { expanded = false }) {
@@ -393,7 +393,7 @@ private fun SocialProfilePicker(profiles: List<com.popwam.pop.data.api.FriendsSo
 private fun FriendToggle(label: Int, checked: Boolean, change: (Boolean) -> Unit) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), tonalElevation = 1.dp) {
         Row(Modifier.fillMaxWidth().clickable { change(!checked) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(label), Modifier.weight(1f))
+            Text(popStringResource(label), Modifier.weight(1f))
             Switch(checked, change)
         }
     }
@@ -428,12 +428,12 @@ private fun RequestCard(request: FriendRequestDto, loading: Boolean, primary: ()
     FriendCard(request.person) {
         Column(horizontalAlignment = Alignment.End) {
             Row {
-                Button(primary, enabled = !loading) { Text(stringResource(if (request.direction == "INCOMING") R.string.friends_accept else R.string.friends_cancel)) }
-                if (request.direction == "INCOMING") TextButton(decline, enabled = !loading) { Text(stringResource(R.string.friends_decline)) }
+                Button(primary, enabled = !loading) { Text(popStringResource(if (request.direction == "INCOMING") R.string.friends_accept else R.string.friends_cancel)) }
+                if (request.direction == "INCOMING") TextButton(decline, enabled = !loading) { Text(popStringResource(R.string.friends_decline)) }
             }
             Row {
-                TextButton(report) { Text(stringResource(R.string.friends_report)) }
-                TextButton(block, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.friends_block)) }
+                TextButton(report) { Text(popStringResource(R.string.friends_report)) }
+                TextButton(block, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(popStringResource(R.string.friends_block)) }
             }
         }
     }
@@ -445,17 +445,17 @@ private fun SearchCard(result: FriendSearchResultDto, loading: Boolean, request:
     FriendCard(FriendIdentityDto(result.key, result.profile)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             when (FriendsPolicy.publicRelationshipState(result.relationshipState)) {
-                "NONE" -> Button(request, enabled = !loading) { Text(stringResource(R.string.friends_add)) }
-                "FRIENDS" -> Text(stringResource(R.string.friends_state_friends), style = MaterialTheme.typography.labelLarge)
-                "OUTGOING_PENDING" -> Text(stringResource(R.string.friends_state_requested), style = MaterialTheme.typography.labelLarge)
-                "INCOMING_PENDING" -> Text(stringResource(R.string.friends_state_incoming), style = MaterialTheme.typography.labelLarge)
-                else -> Text(stringResource(R.string.friends_unavailable), style = MaterialTheme.typography.labelLarge)
+                "NONE" -> Button(request, enabled = !loading) { Text(popStringResource(R.string.friends_add)) }
+                "FRIENDS" -> Text(popStringResource(R.string.friends_state_friends), style = MaterialTheme.typography.labelLarge)
+                "OUTGOING_PENDING" -> Text(popStringResource(R.string.friends_state_requested), style = MaterialTheme.typography.labelLarge)
+                "INCOMING_PENDING" -> Text(popStringResource(R.string.friends_state_incoming), style = MaterialTheme.typography.labelLarge)
+                else -> Text(popStringResource(R.string.friends_unavailable), style = MaterialTheme.typography.labelLarge)
             }
             Box {
-                IconButton({ menu = true }, Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.MoreVert, stringResource(R.string.friends_actions)) }
+                IconButton({ menu = true }, Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.MoreVert, popStringResource(R.string.friends_actions)) }
                 DropdownMenu(menu, { menu = false }) {
-                    DropdownMenuItem({ Text(stringResource(R.string.friends_report)) }, { menu = false; report() }, leadingIcon = { Icon(Icons.Default.Report, null) })
-                    DropdownMenuItem({ Text(stringResource(R.string.friends_block)) }, { menu = false; block() }, leadingIcon = { Icon(Icons.Default.Block, null) })
+                    DropdownMenuItem({ Text(popStringResource(R.string.friends_report)) }, { menu = false; report() }, leadingIcon = { Icon(Icons.Default.Report, null) })
+                    DropdownMenuItem({ Text(popStringResource(R.string.friends_block)) }, { menu = false; block() }, leadingIcon = { Icon(Icons.Default.Block, null) })
                 }
             }
         }
@@ -467,7 +467,7 @@ private fun FriendSheetAction(label: Int, icon: androidx.compose.ui.graphics.vec
     TextButton(action, Modifier.fillMaxWidth().heightIn(min = 52.dp), colors = ButtonDefaults.textButtonColors(contentColor = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)) {
         Icon(icon, null)
         Spacer(Modifier.width(12.dp))
-        Text(stringResource(label), Modifier.weight(1f))
+        Text(popStringResource(label), Modifier.weight(1f))
     }
 }
 
@@ -479,27 +479,27 @@ private fun ReportSheet(person: FriendIdentityDto, loading: Boolean, close: () -
     var expanded by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = close) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(stringResource(R.string.friends_report_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+            Text(popStringResource(R.string.friends_report_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
             Text(person.profile.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ExposedDropdownMenuBox(expanded, { expanded = !expanded }) {
                 OutlinedTextField(
-                    stringResource(reportCategoryLabel(category)),
+                    popStringResource(reportCategoryLabel(category)),
                     {},
                     Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                     readOnly = true,
-                    label = { Text(stringResource(R.string.friends_report_reason)) },
+                    label = { Text(popStringResource(R.string.friends_report_reason)) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                 )
                 ExposedDropdownMenu(expanded, { expanded = false }) {
-                    FriendsPolicy.reportCategories.forEach { value -> DropdownMenuItem({ Text(stringResource(reportCategoryLabel(value))) }, {
+                    FriendsPolicy.reportCategories.forEach { value -> DropdownMenuItem({ Text(popStringResource(reportCategoryLabel(value))) }, {
                         category = value
                         expanded = false
                     }) }
                 }
             }
-            OutlinedTextField(details, { details = it.take(500) }, Modifier.fillMaxWidth().heightIn(min = 120.dp), label = { Text(stringResource(R.string.friends_report_details)) })
-            Button({ submit(category, details) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !loading && FriendsPolicy.validReport(category, details)) { Text(stringResource(R.string.friends_submit_report)) }
-            TextButton(close, Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
+            OutlinedTextField(details, { details = it.take(500) }, Modifier.fillMaxWidth().heightIn(min = 120.dp), label = { Text(popStringResource(R.string.friends_report_details)) })
+            Button({ submit(category, details) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !loading && FriendsPolicy.validReport(category, details)) { Text(popStringResource(R.string.friends_submit_report)) }
+            TextButton(close, Modifier.fillMaxWidth()) { Text(popStringResource(R.string.cancel)) }
             Spacer(Modifier.height(18.dp))
         }
     }
@@ -520,8 +520,8 @@ private fun FriendsEmpty(title: Int, help: Int?, icon: androidx.compose.ui.graph
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), tonalElevation = 1.dp) {
         Column(Modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(icon, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(title), fontWeight = FontWeight.Bold)
-            help?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(popStringResource(title), fontWeight = FontWeight.Bold)
+            help?.let { Text(popStringResource(it), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }

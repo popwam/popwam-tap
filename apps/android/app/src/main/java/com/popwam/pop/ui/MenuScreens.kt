@@ -1,30 +1,43 @@
 package com.popwam.pop.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.popwam.pop.R
 import com.popwam.pop.ui.components.PopApprovedAsset
-import com.popwam.pop.ui.components.PopApprovedAvatar
+
+private val MenuInk = Color(0xFF111817)
+private val MenuMuted = Color(0xFF52605E)
+private val MenuAccent = Color(0xFF0EA5A4)
+private val MenuAvatarBackground = Color(0xFFF3F4F6)
+private val MenuProgressTrack = Color(0xFFEEF3F2)
+private val MenuLogoutBackground = Color(0xFFFEF2F2)
+private val MenuLogoutInk = Color(0xFF991B1B)
 
 data class MenuProfileContext(
     val name: String,
@@ -34,20 +47,19 @@ data class MenuProfileContext(
     val verified: Boolean = false,
     val publicUrl: String? = null,
     val completionPercent: Int? = null,
+    // Optional display fields used by the approved Menu account card.
+    // Kept at the end so existing callers remain source-compatible.
+    val phoneNumber: String? = null,
+    val address: String? = null,
 )
 
 internal enum class MenuDestination(val route: String) {
-    PROFILES("profiles"),
     ACCOUNT("settings/account"),
     SECURITY("settings/security"),
+    DEVICE_SECURITY("settings/device-security"),
     DEVICES("settings/devices"),
     LANGUAGE("settings/language"),
-    APPEARANCE("settings/appearance"),
-    PRIVACY("settings/privacy"),
-    NOTIFICATIONS("settings/notifications"),
-    HELP("settings/help"),
-    ABOUT("settings/about"),
-    LEGAL("settings/legal"),
+    FULL_SETTINGS("settings"),
 }
 
 @Composable
@@ -57,123 +69,304 @@ fun PopMenuScreen(
     logout: () -> Unit,
 ) {
     var confirmLogout by rememberSaveable { mutableStateOf(false) }
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+
+    androidx.compose.foundation.lazy.LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 28.dp),
     ) {
-        item { MenuProfileCard(profile, navigate) }
         item {
-            MenuGroup(
-                title = stringResource(R.string.settings_account_group),
-                rows = listOf(
-                    MenuRowModel(R.drawable.pop_approved_menu_profiles, R.string.profiles_title, MenuDestination.PROFILES.route),
-                    MenuRowModel(R.drawable.pop_approved_menu_account, R.string.settings_account, MenuDestination.ACCOUNT.route),
-                    MenuRowModel(R.drawable.pop_approved_menu_security, R.string.settings_login_security, MenuDestination.SECURITY.route),
-                    MenuRowModel(R.drawable.pop_approved_menu_devices, R.string.settings_saved_devices, MenuDestination.DEVICES.route),
-                ),
-                navigate = navigate,
+            MenuProfileCard(
+                profile = profile,
+                onAccountSetup = { navigate(MenuDestination.ACCOUNT.route) },
             )
         }
-        item {
-            MenuGroup(
-                title = stringResource(R.string.settings_preferences_group),
-                rows = listOf(
-                    MenuRowModel(R.drawable.pop_approved_menu_language, R.string.settings_language_region, MenuDestination.LANGUAGE.route),
-                    MenuRowModel(R.drawable.pop_approved_menu_appearance, R.string.settings_appearance, MenuDestination.APPEARANCE.route),
-                    MenuRowModel(R.drawable.pop_approved_menu_privacy, R.string.settings_privacy, MenuDestination.PRIVACY.route),
-                    MenuRowModel(R.drawable.pop_approved_menu_notifications, R.string.settings_notifications, MenuDestination.NOTIFICATIONS.route),
-                ),
-                navigate = navigate,
-            )
-        }
-        item {
-            MenuGroup(
-                title = stringResource(R.string.settings_support_group),
-                rows = listOf(
-                    MenuRowModel(R.drawable.pop_approved_menu_help, R.string.settings_help_center, MenuDestination.HELP.route),
-                    MenuRowModel(R.drawable.pop_approved_menu_about, R.string.about_app, MenuDestination.ABOUT.route),
-                    MenuRowModel(R.drawable.pop_approved_menu_legal, R.string.settings_legal, MenuDestination.LEGAL.route),
-                ),
-                navigate = navigate,
-            )
-        }
-        item {
-            Surface(Modifier.fillMaxWidth().heightIn(min=54.dp).clickable{confirmLogout=true},shape=RoundedCornerShape(8.dp),color=MaterialTheme.colorScheme.errorContainer.copy(alpha=.55f),shadowElevation=2.dp){
-                Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=13.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center){
-                    PopApprovedAsset(R.drawable.pop_approved_menu_logout,null,Modifier.size(24.dp),MaterialTheme.colorScheme.error)
-                    Spacer(Modifier.width(10.dp))
-                    Text(stringResource(R.string.logout),fontWeight=FontWeight.SemiBold,color=MaterialTheme.colorScheme.error)
-                }
+
+        // Figma: profile card bottom 276, first row begins 329.
+        item { Spacer(Modifier.height(52.dp)) }
+
+        val rows = listOf(
+            MenuRowModel(
+                icon = R.drawable.pop_figma_menu_account_info,
+                label = R.string.menu_account_information,
+                route = MenuDestination.ACCOUNT.route,
+            ),
+            MenuRowModel(
+                icon = R.drawable.pop_figma_menu_login_security,
+                label = R.string.settings_login_security,
+                route = MenuDestination.SECURITY.route,
+            ),
+            MenuRowModel(
+                icon = R.drawable.pop_figma_menu_passcode_fingerprint,
+                label = R.string.menu_passcode_fingerprint,
+                route = MenuDestination.DEVICE_SECURITY.route,
+            ),
+            MenuRowModel(
+                icon = R.drawable.pop_figma_menu_saved_devices,
+                label = R.string.settings_saved_devices,
+                route = MenuDestination.DEVICES.route,
+            ),
+            MenuRowModel(
+                icon = R.drawable.pop_figma_menu_language_region,
+                label = R.string.settings_language_region,
+                route = MenuDestination.LANGUAGE.route,
+            ),
+            MenuRowModel(
+                icon = R.drawable.pop_figma_menu_full_settings,
+                label = R.string.menu_full_settings,
+                route = MenuDestination.FULL_SETTINGS.route,
+            ),
+        )
+
+        rows.forEachIndexed { index, row ->
+            item(key = row.route) {
+                ApprovedMenuRow(row = row, navigate = navigate)
+            }
+            if (index != rows.lastIndex) {
+                item { Spacer(Modifier.height(10.dp)) }
             }
         }
+
+        item { Spacer(Modifier.height(10.dp)) }
+        item {
+            ApprovedLogoutButton { confirmLogout = true }
+        }
     }
+
     if (confirmLogout) {
         AlertDialog(
             onDismissRequest = { confirmLogout = false },
-            title = { Text(stringResource(R.string.settings_logout_confirm_title), fontWeight = FontWeight.Bold) },
-            text = { Text(stringResource(R.string.settings_logout_confirm_body)) },
+            title = {
+                Text(
+                    popStringResource(R.string.settings_logout_confirm_title),
+                    fontWeight = FontWeight.Bold,
+                )
+            },
+            text = { Text(popStringResource(R.string.settings_logout_confirm_body)) },
             confirmButton = {
-                TextButton(onClick = { confirmLogout = false; logout() }) {
-                    Text(stringResource(R.string.logout), color = MaterialTheme.colorScheme.error)
+                TextButton(
+                    onClick = {
+                        confirmLogout = false
+                        logout()
+                    },
+                ) {
+                    Text(popStringResource(R.string.logout), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text(stringResource(R.string.cancel)) } },
-        )
-    }
-}
-
-private data class MenuRowModel(val icon: Int, val label: Int, val route: String)
-
-@Composable
-private fun MenuProfileCard(profile: MenuProfileContext?, navigate: (String) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { navigate(MenuDestination.PROFILES.route) },
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.45f)),
-        elevation = CardDefaults.cardElevation(defaultElevation=4.dp),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
-                PopApprovedAvatar(profile?.avatarUrl,profile?.name,76.dp)
-                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)){
-                    Text(profile?.name ?: stringResource(R.string.no_active_profile),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
-                    Text(profile?.type ?: profile?.subtitle ?: stringResource(R.string.settings_manage_profiles),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary,maxLines=2,overflow=TextOverflow.Ellipsis)
-                    profile?.subtitle?.takeIf{it.isNotBlank()&&it!=profile.type}?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)}
-                    Text(stringResource(if(profile?.verified==true)R.string.profile_verified else R.string.profile_unverified),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = false }) {
+                    Text(popStringResource(R.string.cancel))
                 }
-            }
-            profile?.publicUrl?.takeIf(String::isNotBlank)?.let{url->androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr){Text(url,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)}}
-            profile?.completionPercent?.let{percent->Column(verticalArrangement=Arrangement.spacedBy(6.dp)){Text(stringResource(R.string.profile_completion_percent,percent),style=MaterialTheme.typography.bodySmall);LinearProgressIndicator({percent/100f},Modifier.fillMaxWidth().height(4.dp),trackColor=MaterialTheme.colorScheme.surfaceVariant)}}
-        }
+            },
+        )
     }
 }
 
+private data class MenuRowModel(
+    @DrawableRes val icon: Int,
+    @StringRes val label: Int,
+    val route: String,
+)
+
 @Composable
-private fun MenuGroup(title: String, rows: List<MenuRowModel>, navigate: (String) -> Unit) {
-    val direction=LocalLayoutDirection.current
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            title,
-            modifier = Modifier.padding(horizontal = 4.dp),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.3f)),elevation=CardDefaults.cardElevation(defaultElevation=3.dp)) {
-            Column {
-                rows.forEachIndexed { index, row ->
+private fun MenuProfileCard(
+    profile: MenuProfileContext?,
+    onAccountSetup: () -> Unit,
+) {
+    val context = LocalContext.current
+    val completion = (profile?.completionPercent ?: 0).coerceIn(0, 100)
+    val secondaryLine = profile?.phoneNumber
+        ?.takeIf(String::isNotBlank)
+        ?: profile?.subtitle?.takeIf(String::isNotBlank)
+        ?: profile?.type?.takeIf(String::isNotBlank)
+    val address = profile?.address?.takeIf(String::isNotBlank)
+    val url = profile?.publicUrl?.takeIf(String::isNotBlank)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 237.dp),
+        shape = RoundedCornerShape(7.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 4.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Spacer(Modifier.height(47.dp))
+
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val compact = maxWidth < 350.dp
+
+                if (!compact) {
                     Row(
-                        Modifier.fillMaxWidth().clickable { navigate(row.route) }.heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 77.dp)
+                            .padding(start = 2.dp, end = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        PopApprovedAsset(row.icon,null,Modifier.size(24.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Text(stringResource(row.label), Modifier.weight(1f), fontWeight = FontWeight.Medium)
-                        PopApprovedAsset(R.drawable.pop_approved_chevron,null,Modifier.size(29.dp).graphicsLayer(scaleX=if(direction==androidx.compose.ui.unit.LayoutDirection.Ltr)-1f else 1f),MaterialTheme.colorScheme.onSurfaceVariant)
+                        MenuAvatar(profile = profile, size = 77.dp)
+                        Spacer(Modifier.width(10.dp))
+                        MenuIdentityText(
+                            profile = profile,
+                            secondaryLine = secondaryLine,
+                            address = address,
+                            url = url,
+                            context = context,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        AccountSetupButton(onClick = onAccountSetup)
                     }
-                    if (index != rows.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 14.dp),color=MaterialTheme.colorScheme.outline.copy(alpha=.35f))
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            MenuAvatar(profile = profile, size = 70.dp)
+                            Spacer(Modifier.width(10.dp))
+                            MenuIdentityText(
+                                profile = profile,
+                                secondaryLine = secondaryLine,
+                                address = address,
+                                url = url,
+                                context = context,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        AccountSetupButton(
+                            onClick = onAccountSetup,
+                            modifier = Modifier.align(Alignment.End),
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(if (secondaryLine == null && address == null && url == null) 20.dp else 18.dp))
+
+            Column(
+                modifier = Modifier.padding(horizontal = 45.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Text(
+                    text = popStringResource(R.string.menu_pop_complete, completion),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = popStringResource(R.string.menu_complete_profile_discovery),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { completion / 100f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(99.dp)),
+                    color = MenuAccent,
+                    trackColor = MenuProgressTrack,
+                )
+            }
+
+            Spacer(Modifier.height(30.dp))
+        }
+    }
+}
+
+@Composable
+private fun MenuIdentityText(
+    profile: MenuProfileContext?,
+    secondaryLine: String?,
+    address: String?,
+    url: String?,
+    context: Context,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = profile?.name?.takeIf(String::isNotBlank)
+                ?: popStringResource(R.string.no_active_profile),
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        secondaryLine?.let {
+            Text(
+                text = it,
+                color = MenuAccent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        address?.let {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PopApprovedAsset(
+                    drawable = R.drawable.pop_figma_menu_location,
+                    contentDescription = null,
+                    modifier = Modifier.size(13.dp),
+                )
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        url?.let {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = it,
+                        modifier = Modifier.weight(1f, fill = false),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    PopApprovedAsset(
+                        drawable = R.drawable.pop_figma_menu_copy,
+                        contentDescription = popStringResource(R.string.share_copy),
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("POP profile", it))
+                            },
+                    )
                 }
             }
         }
@@ -181,6 +374,159 @@ private fun MenuGroup(title: String, rows: List<MenuRowModel>, navigate: (String
 }
 
 @Composable
-fun MenuReviewScreen(profile: MenuProfileContext? = MenuProfileContext("Sarah Ahmed", "Personal profile")) {
-    PopMenuScreen(profile = profile, navigate = {}, logout = {})
+private fun MenuAvatar(
+    profile: MenuProfileContext?,
+    size: androidx.compose.ui.unit.Dp,
+) {
+    val shape = RoundedCornerShape(22.dp)
+    Surface(
+        modifier = Modifier.size(size),
+        shape = shape,
+        color = MenuAvatarBackground,
+        border = BorderStroke(1.dp, Color.White),
+    ) {
+        if (!profile?.avatarUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = profile?.avatarUrl,
+                contentDescription = profile?.name,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(shape),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                PopApprovedAsset(
+                    drawable = R.drawable.pop_figma_menu_avatar_person,
+                    contentDescription = profile?.name,
+                    modifier = Modifier.size(size * 0.68f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountSetupButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .width(114.dp)
+            .height(30.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(5.5.dp),
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PopApprovedAsset(
+                drawable = R.drawable.pop_figma_menu_account_setup,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.width(7.dp))
+            Text(
+                text = popStringResource(R.string.menu_account_setup),
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ApprovedMenuRow(
+    row: MenuRowModel,
+    navigate: (String) -> Unit,
+) {
+    val direction = LocalLayoutDirection.current
+
+    Surface(
+        modifier = Modifier
+            .padding(horizontal = 4.5.dp)
+            .fillMaxWidth()
+            .heightIn(min=46.dp)
+            .clickable { navigate(row.route) },
+        shape = RoundedCornerShape(15.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 24.dp, end = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PopApprovedAsset(
+                drawable = row.icon,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.width(28.dp))
+            Text(
+                text = popStringResource(row.label),
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            PopApprovedAsset(
+                drawable = R.drawable.pop_approved_chevron,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer(
+                        scaleX = if (direction == LayoutDirection.Ltr) -1f else 1f,
+                    ),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ApprovedLogoutButton(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .padding(horizontal = 4.5.dp)
+            .fillMaxWidth()
+            .height(54.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(15.dp),
+        color = MenuLogoutBackground,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = popStringResource(R.string.logout),
+                color = MenuLogoutInk,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.width(18.dp))
+            PopApprovedAsset(
+                drawable = R.drawable.pop_figma_menu_logout,
+                contentDescription = null,
+                modifier = Modifier.size(30.dp),
+            )
+        }
+    }
 }

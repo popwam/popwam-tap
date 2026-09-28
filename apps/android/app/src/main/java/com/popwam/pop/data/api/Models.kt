@@ -18,13 +18,20 @@ data class LocalizationLocaleDto(
     val name:String="English",
     val nativeName:String="English",
     val rtl:Boolean=false,
-    val translations:Map<String,String> = emptyMap(),
+    val revision:Int=0,
 )
 data class LocalizationBootstrapResponse(
     val ok:Boolean=false,
     val defaultLocale:String="en",
     val translationVersion:Int=0,
     val availableLocales:List<LocalizationLocaleDto> = emptyList(),
+    val error:String?=null,
+)
+data class LocalizationPackResponse(
+    val ok:Boolean=false,
+    val code:String="",
+    val revision:Int=0,
+    val translations:Map<String,String> = emptyMap(),
     val error:String?=null,
 )
 data class PlatformPhoneCountryDto(
@@ -242,6 +249,7 @@ data class SettingsPreferencesResponse(
     val ok:Boolean=false,
     val theme:String="SYSTEM",
     val language:String="SYSTEM",
+    val locale:String?=null,
     val font:String="DEFAULT",
     val privacy:SettingsPrivacyDto=SettingsPrivacyDto(),
     val error:String?=null,

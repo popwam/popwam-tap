@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -36,13 +36,13 @@ import com.popwam.pop.R
             else Icon(Icons.Default.Person,null,Modifier.size(32.dp),tint=MaterialTheme.colorScheme.primary)
             if(selected||!allowed)Surface(Modifier.align(Alignment.TopEnd).padding(8.dp),shape=RoundedCornerShape(8.dp),color=MaterialTheme.colorScheme.surface) {
                 Icon(if(allowed)Icons.Default.CheckCircle else Icons.Default.Lock,
-                    stringResource(if(allowed)R.string.p7_selected else R.string.p7_plan_locked),Modifier.padding(4.dp).size(20.dp),tint=MaterialTheme.colorScheme.primary)
+                    popStringResource(if(allowed)R.string.p7_selected else R.string.p7_plan_locked),Modifier.padding(4.dp).size(20.dp),tint=MaterialTheme.colorScheme.primary)
             }
         }
         Column(Modifier.padding(horizontal=10.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
             Text(title,style=MaterialTheme.typography.titleSmall,maxLines=2,overflow=TextOverflow.Ellipsis)
-            if(!allowed)Text(stringResource(R.string.p7_plan_locked),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.error)
-            if(onPreview!=null)TextButton(onPreview,Modifier.fillMaxWidth(),enabled=allowed&&enabled,contentPadding=PaddingValues(0.dp)){Text(stringResource(R.string.p7_preview))}
+            if(!allowed)Text(popStringResource(R.string.p7_plan_locked),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.error)
+            if(onPreview!=null)TextButton(onPreview,Modifier.fillMaxWidth(),enabled=allowed&&enabled,contentPadding=PaddingValues(0.dp)){Text(popStringResource(R.string.p7_preview))}
         }
     }
 }

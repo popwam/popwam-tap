@@ -144,10 +144,6 @@ export async function readDraftObject(key: string) {
   };
 }
 
-export async function promoteDraftImage(key: string, publicKey: string, contentType: string) {
-  const object = await readDraftObject(key);
-  return uploadPublicImage(object.bytes, { key: publicKey, contentType, cacheControl: "public, max-age=31536000, immutable" });
-}
 
 export async function deleteDraftObject(key: string) {
   const bucket = env("R2_PRIVATE_BUCKET_NAME");

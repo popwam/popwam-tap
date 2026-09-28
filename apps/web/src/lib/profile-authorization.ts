@@ -1,4 +1,4 @@
-import { OrgRole, ProfileLifecycle, ProfileModuleVisibility, prisma } from "@popwam/db";
+import { ProfileLifecycle, ProfileModuleVisibility } from "@popwam/db";
 
 type PublicProfileState = { isPublic: boolean; profileKind: unknown; lifecycle: ProfileLifecycle };
 type ModuleState = { enabled: boolean; visibility: ProfileModuleVisibility };
@@ -12,18 +12,4 @@ export function isPublicProfileReadable(profile: PublicProfileState) {
 
 export function isPublicModuleReadable(module: ModuleState) {
   return module.enabled && module.visibility === "PUBLIC";
-}
-
-export async function canManageProfile(userId: string, profileId: string) {
-  const profile = await prisma.profile.findUnique({
-    where: { id: profileId },
-    select: {
-      userId: true,
-      organization: { select: { memberships: { where: { userId }, select: { role: true } } } },
-    },
-  });
-  if (!profile) return false;
-  if (profile.userId === userId) return true;
-  const role = profile.organization?.memberships[0]?.role;
-  return role === OrgRole.OWNER || role === OrgRole.ORG_ADMIN;
 }

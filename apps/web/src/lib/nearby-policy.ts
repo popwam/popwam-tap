@@ -1,7 +1,6 @@
 export const NEARBY_CONFIG_KEY = "nearby.runtime.v1";
 export const NEARBY_CELL_VERSION = 1;
 export const NEARBY_SESSION_TOKEN_BYTES = 32;
-export const NEARBY_HARD_DELETE_AFTER_MS = 24 * 60 * 60_000;
 
 export const nearbyRolloutStates = ["DISABLED", "INTERNAL", "LIMITED", "ENABLED"] as const;
 export type NearbyRolloutState = typeof nearbyRolloutStates[number];

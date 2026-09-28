@@ -13,6 +13,8 @@ import com.popwam.mobile.foundation.platform.DeviceBindingOptions
 import com.popwam.mobile.foundation.platform.DeviceBindingProof
 import com.popwam.mobile.foundation.platform.DeviceBindingProvider
 import com.popwam.mobile.foundation.platform.DeviceBindingResult
+import com.popwam.pop.R
+import com.popwam.pop.data.localization.DynamicLocalizationRuntime
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyStore
@@ -102,10 +104,10 @@ class AndroidDeviceBindingProvider(private val activity:FragmentActivity):Device
             }
         })
         val info=BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Authorize POP")
-            .setSubtitle("Unlock this device credential")
+            .setTitle(DynamicLocalizationRuntime.resolve(activity,R.string.p7_biometric_title))
+            .setSubtitle(DynamicLocalizationRuntime.resolve(activity,R.string.p7_biometric_help))
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-            .setNegativeButtonText("Cancel")
+            .setNegativeButtonText(DynamicLocalizationRuntime.resolve(activity,R.string.cancel))
             .setConfirmationRequired(true)
             .build()
         prompt.authenticate(info,BiometricPrompt.CryptoObject(signature))

@@ -14,12 +14,6 @@ async function acceptedFriendship(userId:string,friendId:string){const pair=cano
 
 export async function requestFriend(_data:FormData){await requireUser();throw new Error("FRIENDS_API_REQUIRED");}
 
-export async function respondFriend(_data:FormData){await requireUser();throw new Error("FRIENDS_API_REQUIRED");}
-
-export async function updateFriendship(_data:FormData){await requireUser();throw new Error("FRIENDS_API_REQUIRED");}
-
-export async function updateFriendPrivacy(_data:FormData){await requireUser();throw new Error("FRIENDS_API_REQUIRED");}
-
 export async function startChat(data:FormData){const user=await requireUser();const username=cleanUsername(text(data,"username"));if(!usernameValid(username))throw new Error("USERNAME_INVALID");const friend=await prisma.user.findUnique({where:{username},select:{id:true}});if(!friend||!(await acceptedFriendship(user.id,friend.id)))throw new Error("CHAT_REQUIRES_FRIEND");const directKey=directChatKey(user.id,friend.id);const chat=await prisma.chat.upsert({where:{directKey},create:{directKey,members:{create:[{userId:user.id},{userId:friend.id}]}},update:{}});redirect(`/dashboard/chats/${chat.id}`);}
 
 export async function sendMessage(data:FormData){const user=await requireUser();const chatId=text(data,"chatId");const body=text(data,"body").slice(0,4000);const attachmentFileId=text(data,"attachmentFileId")||null;const membership=await prisma.chatMember.findUnique({where:{chatId_userId:{chatId,userId:user.id}},include:{chat:{select:{members:{select:{userId:true}}}}}});const otherId=membership?.chat.members.find(member=>member.userId!==user.id)?.userId;if(!membership||!otherId||!(await acceptedFriendship(user.id,otherId)))throw new Error("CHAT_ACCESS_DENIED");if(attachmentFileId&&!await prisma.uploadedFile.findFirst({where:{id:attachmentFileId,uploaderUserId:user.id}}))throw new Error("ATTACHMENT_ACCESS_DENIED");if(!body&&!attachmentFileId)throw new Error("MESSAGE_EMPTY");await prisma.$transaction([prisma.message.create({data:{chatId,senderId:user.id,body:body||null,attachmentFileId}}),prisma.chat.update({where:{id:chatId},data:{updatedAt:new Date()}}),prisma.chatMember.update({where:{chatId_userId:{chatId,userId:user.id}},data:{lastReadAt:new Date()}})]);revalidatePath(`/dashboard/chats/${chatId}`);revalidatePath("/dashboard/chats");}

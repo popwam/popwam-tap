@@ -8,7 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -40,12 +40,12 @@ fun DraftTemplatePreview(profileId:String,templateId:String,dismiss:()->Unit) {
     Dialog(dismiss,DialogProperties(usePlatformDefaultWidth=false)) {
         Surface(Modifier.fillMaxSize()) { Column {
             Row(Modifier.fillMaxWidth().padding(12.dp),horizontalArrangement=Arrangement.SpaceBetween) {
-                Text(stringResource(R.string.pass6_draft_preview),style=MaterialTheme.typography.titleMedium)
-                TextButton(dismiss){Text(stringResource(R.string.pass6_close))}
+                Text(popStringResource(R.string.pass6_draft_preview),style=MaterialTheme.typography.titleMedium)
+                TextButton(dismiss){Text(popStringResource(R.string.pass6_close))}
             }
-            Text(stringResource(R.string.pass6_draft_only),Modifier.padding(horizontal=16.dp))
+            Text(popStringResource(R.string.pass6_draft_only),Modifier.padding(horizontal=16.dp))
             if(loading)LinearProgressIndicator(Modifier.fillMaxWidth())
-            if(failed)Text(stringResource(R.string.pass6_preview_failed),Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error)
+            if(failed)Text(popStringResource(R.string.pass6_preview_failed),Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error)
             AndroidView(modifier=Modifier.fillMaxWidth().weight(1f),factory={ctx->WebView(ctx).apply {
                 webView=this
                 settings.javaScriptEnabled=true // Required by the trusted Next renderer's streamed HTML.

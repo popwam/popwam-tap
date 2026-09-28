@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -55,46 +55,46 @@ fun PhoneLoginScreen(viewModel:PhoneLoginViewModel,countriesStore:PhoneCountrySt
     BackHandler(state.stage==PhoneLoginStage.OTP && !state.loading){viewModel.changeNumber()}
     val passkeyAction={viewModel.passkey { options->PasskeyCoordinator(context).authenticate(context as ComponentActivity,options) }}
     if(welcome && state.stage==PhoneLoginStage.PHONE) {
-        AuthStepLayout(stringResource(R.string.p7_welcome_title),stringResource(R.string.p7_welcome_help),Icons.Default.AutoAwesome) {
-            AuthPrimary(stringResource(R.string.p7_start),!state.loading){welcome=false}
-            if(android.os.Build.VERSION.SDK_INT>=28)OutlinedButton(passkeyAction,Modifier.fillMaxWidth(),enabled=!state.loading){Icon(Icons.Default.Key,null);Spacer(Modifier.width(12.dp));Text(stringResource(R.string.p7_passkey_login))}
+        AuthStepLayout(popStringResource(R.string.p7_welcome_title),popStringResource(R.string.p7_welcome_help),Icons.Default.AutoAwesome) {
+            AuthPrimary(popStringResource(R.string.p7_start),!state.loading){welcome=false}
+            if(android.os.Build.VERSION.SDK_INT>=28)OutlinedButton(passkeyAction,Modifier.fillMaxWidth(),enabled=!state.loading){Icon(Icons.Default.Key,null);Spacer(Modifier.width(12.dp));Text(popStringResource(R.string.p7_passkey_login))}
             if(state.loading)LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let{Text(stringResource(loginErrorResource(it)),color=MaterialTheme.colorScheme.error)}
+            state.error?.let{Text(popStringResource(loginErrorResource(it)),color=MaterialTheme.colorScheme.error)}
         }
     } else {
         val otp=state.stage==PhoneLoginStage.OTP
-        AuthStepLayout(stringResource(if(otp)R.string.wa_auth_code_title else R.string.p7_phone_title),
-            stringResource(if(otp)R.string.wa_auth_sent else R.string.wa_auth_description),if(otp)Icons.Default.Chat else Icons.Default.Phone,
+        AuthStepLayout(popStringResource(if(otp)R.string.wa_auth_code_title else R.string.p7_phone_title),
+            popStringResource(if(otp)R.string.wa_auth_sent else R.string.wa_auth_description),if(otp)Icons.Default.Chat else Icons.Default.Phone,
             back={if(otp)viewModel.changeNumber() else welcome=true}) {
             if(!otp) {
                 Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                    OutlinedButton({picker=true},Modifier.fillMaxWidth(),enabled=!state.loading){Text(countries.firstOrNull{it.iso2==state.country}?.let{"${it.flag} ${it.name} (${it.callingCode})"}?:stringResource(R.string.wa_auth_country))}
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){OutlinedTextField(state.phone,viewModel::phone,Modifier.fillMaxWidth(),singleLine=true,enabled=!state.loading,label={Text(stringResource(R.string.wa_auth_phone))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone,imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={focus.clearFocus()}),leadingIcon={Icon(Icons.Default.Phone,null)})}
+                    OutlinedButton({picker=true},Modifier.fillMaxWidth(),enabled=!state.loading){Text(countries.firstOrNull{it.iso2==state.country}?.let{"${it.flag} ${it.name} (${it.callingCode})"}?:popStringResource(R.string.wa_auth_country))}
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){OutlinedTextField(state.phone,viewModel::phone,Modifier.fillMaxWidth(),singleLine=true,enabled=!state.loading,label={Text(popStringResource(R.string.wa_auth_phone))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone,imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={focus.clearFocus()}),leadingIcon={Icon(Icons.Default.Phone,null)})}
                 }
-                AuthPrimary(stringResource(R.string.wa_auth_continue),!state.loading&&countries.any{it.iso2==state.country}&&state.resendSeconds(clock)==0){viewModel.request(locale)}
-                if(android.os.Build.VERSION.SDK_INT>=28)TextButton(passkeyAction,enabled=!state.loading){Text(stringResource(R.string.p7_passkey_login))}
-                Text(stringResource(R.string.wa_auth_legal),style=MaterialTheme.typography.bodySmall)
-                Row{TextButton({legal=PreAuthLegalKind.TERMS}){Text(stringResource(R.string.terms))};TextButton({legal=PreAuthLegalKind.PRIVACY}){Text(stringResource(R.string.privacy))}}
+                AuthPrimary(popStringResource(R.string.wa_auth_continue),!state.loading&&countries.any{it.iso2==state.country}&&state.resendSeconds(clock)==0){viewModel.request(locale)}
+                if(android.os.Build.VERSION.SDK_INT>=28)TextButton(passkeyAction,enabled=!state.loading){Text(popStringResource(R.string.p7_passkey_login))}
+                Text(popStringResource(R.string.wa_auth_legal),style=MaterialTheme.typography.bodySmall)
+                Row{TextButton({legal=PreAuthLegalKind.TERMS}){Text(popStringResource(R.string.terms))};TextButton({legal=PreAuthLegalKind.PRIVACY}){Text(popStringResource(R.string.privacy))}}
             } else {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){
                     Text(state.maskedPhone,style=MaterialTheme.typography.titleMedium)
                     // One native input supports six-digit paste, accessibility and predictable backspace.
                     OutlinedTextField(state.code,viewModel::code,Modifier.fillMaxWidth(),singleLine=true,enabled=!state.loading,
-                        textStyle=MaterialTheme.typography.headlineMedium.copy(letterSpacing=4.sp),label={Text(stringResource(R.string.wa_auth_code))},
+                        textStyle=MaterialTheme.typography.headlineMedium.copy(letterSpacing=4.sp),label={Text(popStringResource(R.string.wa_auth_code))},
                         placeholder={Text("— — — — — —")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword,imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={focus.clearFocus()}))
                 }
-                AuthPrimary(stringResource(R.string.wa_auth_verify),!state.loading&&state.code.length==6){viewModel.verify()}
-                TextButton({viewModel.request(locale,true)},enabled=!state.loading&&state.resendSeconds(clock)==0){Text(if(state.resendSeconds(clock)>0)stringResource(R.string.wa_auth_countdown,state.resendSeconds(clock)) else stringResource(R.string.wa_auth_resend))}
-                TextButton(viewModel::changeNumber,enabled=!state.loading){Text(stringResource(R.string.wa_auth_change))}
+                AuthPrimary(popStringResource(R.string.wa_auth_verify),!state.loading&&state.code.length==6){viewModel.verify()}
+                TextButton({viewModel.request(locale,true)},enabled=!state.loading&&state.resendSeconds(clock)==0){Text(if(state.resendSeconds(clock)>0)popStringResource(R.string.wa_auth_countdown,state.resendSeconds(clock)) else popStringResource(R.string.wa_auth_resend))}
+                TextButton(viewModel::changeNumber,enabled=!state.loading){Text(popStringResource(R.string.wa_auth_change))}
             }
-            if(!otp&&state.resendSeconds(clock)>0)Text(stringResource(R.string.wa_auth_countdown,state.resendSeconds(clock)))
+            if(!otp&&state.resendSeconds(clock)>0)Text(popStringResource(R.string.wa_auth_countdown,state.resendSeconds(clock)))
             if(state.loading)LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let{Text(stringResource(loginErrorResource(it)),color=MaterialTheme.colorScheme.error)}
+            state.error?.let{Text(popStringResource(loginErrorResource(it)),color=MaterialTheme.colorScheme.error)}
         }
     }
     run {
-        if(picker)AlertDialog(onDismissRequest={picker=false},confirmButton={TextButton({picker=false}){Text(stringResource(R.string.wa_auth_close))}},title={Text(stringResource(R.string.wa_auth_country))},text={Column {
-            OutlinedTextField(query,{query=it},label={Text(stringResource(R.string.wa_auth_search))},singleLine=true)
+        if(picker)AlertDialog(onDismissRequest={picker=false},confirmButton={TextButton({picker=false}){Text(popStringResource(R.string.wa_auth_close))}},title={Text(popStringResource(R.string.wa_auth_country))},text={Column {
+            OutlinedTextField(query,{query=it},label={Text(popStringResource(R.string.wa_auth_search))},singleLine=true)
             LazyColumn(Modifier.heightIn(max=360.dp)){items(PhoneIdentity.search(countries,query),key={it.iso2}){country->TextButton({viewModel.country(country.iso2);PhoneIdentity.saveCountry(context,country.iso2);picker=false}){Text("${country.flag} ${country.name} (${country.callingCode})")}}}
         }})
         legal?.let{kind->Dialog(onDismissRequest={legal=null},properties=DialogProperties(usePlatformDefaultWidth=false)){Surface(Modifier.fillMaxSize()){NativeLegalScreen(kind){legal=null}}}}

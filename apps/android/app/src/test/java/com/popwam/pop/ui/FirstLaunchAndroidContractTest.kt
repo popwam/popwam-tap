@@ -63,11 +63,14 @@ class FirstLaunchAndroidContractTest {
         assertTrue(app.contains("viewModel.request(locale)"))
     }
 
-    @Test fun `French is declared alongside Arabic and English`() {
-        val locales=source("src/main/res/xml/locales_config.xml")
-        assertTrue(locales.contains("android:name=\"ar\""))
-        assertTrue(locales.contains("android:name=\"en\""))
-        assertTrue(locales.contains("android:name=\"fr\""))
+    @Test fun `selectable languages come from database metadata`() {
+        val authority=source("src/main/java/com/popwam/pop/data/localization/LocalizationAuthorityStore.kt")
+        val launch=source("src/main/java/com/popwam/pop/ui/launch/LaunchExperience.kt")
+        assertFalse(File("src/main/res/xml/locales_config.xml").exists())
+        assertTrue(authority.contains("response.availableLocales"))
+        assertFalse(authority.contains("BUNDLED_FALLBACK_CAPABILITIES"))
+        assertTrue(launch.contains("localization.availableLocales.map"))
+        assertFalse(launch.contains("listOf(\"en\",\"ar\")"))
     }
 
     @Test fun `session and local state restore do not trigger localization network`() {

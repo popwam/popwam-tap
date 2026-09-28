@@ -5,10 +5,10 @@ import { ExternalLink, Plus } from "lucide-react";
 import { createPlatformDestination } from "@/app/catalog-actions";
 import { buildPlatformUrl, platformOpenTarget } from "@/lib/link-platforms";
 
-type Platform = { id:string;nameAr:string;nameEn:string;slug:string;inputType:string;placeholder:string;urlTemplate:string|null;validationPattern:string|null;androidAppUrl:string|null;iosAppUrl:string|null;webFallback:string|null;helpAr:string|null;helpEn:string|null;allowCustomLabel:boolean };
+export type PlatformLinkCapturePlatform = { id:string;nameAr:string;nameEn:string;slug:string;inputType:string;placeholder:string;urlTemplate:string|null;validationPattern:string|null;androidAppUrl:string|null;iosAppUrl:string|null;webFallback:string|null;helpAr:string|null;helpEn:string|null;allowCustomLabel:boolean };
 type Card = { id:string;name:string };
 
-export function PlatformLinkCapture({ platforms, cards, locale }: { platforms:Platform[];cards:Card[];locale:"ar"|"en" }) {
+export function PlatformLinkCapture({ platforms, cards, locale }: { platforms:PlatformLinkCapturePlatform[];cards:Card[];locale:"ar"|"en" }) {
   const [platformId, setPlatformId] = useState(platforms[0]?.id || "");
   const [value, setValue] = useState("");
   const platform = platforms.find(item => item.id === platformId);

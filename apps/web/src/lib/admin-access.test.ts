@@ -33,11 +33,6 @@ describe("administrator authentication", () => {
   it("allows the SUPER_ADMIN role through the same current-database authorization policy",()=>{
     expect(decideAdminAccess({role:"SUPER_ADMIN",status:"ACTIVE"})).toBe("ALLOWED");
   });
-  it("keeps credentials fields off the normal user login and links to the admin portal", () => {
-    const login = source("apps/web/src/components/login-form.tsx");
-    expect(login).not.toContain('type="password"');
-    expect(login).toContain('href="/admin/login"');
-  });
   it("keeps admin login public without a role-based middleware redirect loop", () => {
     const middleware = source("apps/web/src/middleware.ts");
     expect(middleware).toContain('path === "/admin/login"');

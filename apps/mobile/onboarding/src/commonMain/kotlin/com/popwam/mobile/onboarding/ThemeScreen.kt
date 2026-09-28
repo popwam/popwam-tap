@@ -55,8 +55,41 @@ import com.popwam.mobile.onboarding.generated.resources.theme_style
 import com.popwam.mobile.onboarding.generated.resources.theme_subtitle
 import com.popwam.mobile.onboarding.generated.resources.theme_system
 import com.popwam.mobile.onboarding.generated.resources.theme_title
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+
+data class ThemeScreenCopy(
+    val logoDescription:String,
+    val title:String,
+    val subtitle:String,
+    val styleAction:String,
+    val continueAction:String,
+    val selectedDescription:String,
+    val modeLabels:Map<ThemeMode,String>,
+    val paletteLabels:Map<IdentityPalette,String>,
+)
+
+@Composable
+private fun englishThemeScreenCopy()=ThemeScreenCopy(
+    logoDescription=stringResource(Res.string.pop_logo_description),
+    title=stringResource(Res.string.theme_title),
+    subtitle=stringResource(Res.string.theme_subtitle),
+    styleAction=stringResource(Res.string.theme_style),
+    continueAction=stringResource(Res.string.theme_continue),
+    selectedDescription=stringResource(Res.string.palette_selected,"%s"),
+    modeLabels=mapOf(
+        ThemeMode.SYSTEM to stringResource(Res.string.theme_system),
+        ThemeMode.LIGHT to stringResource(Res.string.theme_light),
+        ThemeMode.DARK to stringResource(Res.string.theme_dark),
+    ),
+    paletteLabels=mapOf(
+        IdentityPalette.MINT to stringResource(Res.string.palette_mint),
+        IdentityPalette.PULSE to stringResource(Res.string.palette_pulse),
+        IdentityPalette.VIOLET to stringResource(Res.string.palette_violet),
+        IdentityPalette.CORAL to stringResource(Res.string.palette_coral),
+        IdentityPalette.SOLAR to stringResource(Res.string.palette_solar),
+        IdentityPalette.GRAPHITE to stringResource(Res.string.palette_graphite),
+    ),
+)
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -69,29 +102,30 @@ fun ThemeScreen(
     onOpenGallery: () -> Unit,
     onSelectStyle: (IdentityPalette) -> Unit,
     onDismissGallery: () -> Unit,
+    copy:ThemeScreenCopy?=null,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalPopSemanticColors.current
+    val resolvedCopy=copy ?: englishThemeScreenCopy()
     ReferenceFrame(modifier.background(colors.backgroundPrimary)) {
         PopMarkVector(
             color = colors.brandPrimary,
-            contentDescription = stringResource(Res.string.pop_logo_description),
+            contentDescription = resolvedCopy.logoDescription,
             modifier = Modifier.offset(107.dp, 144.dp).size(180.dp, 218.dp),
         )
         Column(
             Modifier.offset(27.dp, 390.dp).size(342.dp, 72.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(stringResource(Res.string.theme_title), color = colors.textPrimary, fontSize = 28.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-            Text(stringResource(Res.string.theme_subtitle), color = colors.textSecondary, fontSize = 15.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Text(resolvedCopy.title, color = colors.textPrimary, fontSize = 28.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Text(resolvedCopy.subtitle, color = colors.textSecondary, fontSize = 15.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
         Row(
             Modifier.offset(63.1306.dp, 516.dp).size(267.7388.dp, 63.9474.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ThemeMode.entries.forEach { mode ->
-                val choice = modeChoice(mode)
-                val label = stringResource(choice.label)
+                val label=resolvedCopy.modeLabels[mode]?:mode.name
                 val active = selectedMode == mode
                 Box(
                     contentAlignment = Alignment.Center,
@@ -114,7 +148,7 @@ fun ThemeScreen(
             }
         }
         Text(
-            text = stringResource(Res.string.theme_style),
+            text = resolvedCopy.styleAction,
             color = colors.primaryAction,
             fontSize = 15.sp,
             lineHeight = 40.sp,
@@ -127,7 +161,7 @@ fun ThemeScreen(
                 .clickable(onClick = onOpenGallery),
         )
         PrimaryAction(
-            text = stringResource(Res.string.theme_continue),
+            text = resolvedCopy.continueAction,
             onClick = onContinue,
             modifier = Modifier.offset(74.dp, 744.dp).size(246.3158.dp, 63.9474.dp),
         )
@@ -137,6 +171,7 @@ fun ThemeScreen(
             selectedStyle = selectedStyle,
             onSelectStyle = onSelectStyle,
             onDismiss = onDismissGallery,
+            copy=resolvedCopy,
         )
     }
 }
@@ -147,6 +182,7 @@ private fun ThemeGallery(
     selectedStyle: IdentityPalette,
     onSelectStyle: (IdentityPalette) -> Unit,
     onDismiss: () -> Unit,
+    copy:ThemeScreenCopy,
 ) {
     val colors = LocalPopSemanticColors.current
     ModalBottomSheet(
@@ -162,8 +198,8 @@ private fun ThemeGallery(
             galleryOrder.forEach { style ->
                 val palette = PopIdentityStyle.valueOf(style.name)
                 val active = selectedStyle == style
-                val label = stringResource(paletteLabel(style))
-                val description = if (active) stringResource(Res.string.palette_selected, label) else label
+                val label=copy.paletteLabels[style]?:style.name
+                val description=if(active)copy.selectedDescription.replace("%s",label) else label
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -207,14 +243,6 @@ private fun ThemeModeVector(mode: ThemeMode, color: Color, modifier: Modifier) {
     }
 }
 
-private data class ModeChoice(val label: StringResource)
-
-private fun modeChoice(mode: ThemeMode): ModeChoice = when (mode) {
-    ThemeMode.SYSTEM -> ModeChoice(Res.string.theme_system)
-    ThemeMode.LIGHT -> ModeChoice(Res.string.theme_light)
-    ThemeMode.DARK -> ModeChoice(Res.string.theme_dark)
-}
-
 private val galleryOrder = listOf(
     IdentityPalette.MINT,
     IdentityPalette.PULSE,
@@ -223,12 +251,3 @@ private val galleryOrder = listOf(
     IdentityPalette.SOLAR,
     IdentityPalette.GRAPHITE,
 )
-
-private fun paletteLabel(style: IdentityPalette): StringResource = when (style) {
-    IdentityPalette.MINT -> Res.string.palette_mint
-    IdentityPalette.PULSE -> Res.string.palette_pulse
-    IdentityPalette.VIOLET -> Res.string.palette_violet
-    IdentityPalette.CORAL -> Res.string.palette_coral
-    IdentityPalette.SOLAR -> Res.string.palette_solar
-    IdentityPalette.GRAPHITE -> Res.string.palette_graphite
-}

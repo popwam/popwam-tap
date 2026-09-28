@@ -27,31 +27,42 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.popwam.mobile.designsystem.LocalPopSemanticColors
 import com.popwam.mobile.onboarding.generated.resources.Res
-import com.popwam.mobile.onboarding.generated.resources.language_arabic
-import com.popwam.mobile.onboarding.generated.resources.language_english
-import com.popwam.mobile.onboarding.generated.resources.language_french
 import com.popwam.mobile.onboarding.generated.resources.language_selected
 import com.popwam.mobile.onboarding.generated.resources.language_title_ar
 import com.popwam.mobile.onboarding.generated.resources.language_title_en
 import com.popwam.mobile.onboarding.generated.resources.pop_logo_description
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+
+data class LanguageChoice(val tag:String,val label:String)
+data class LanguageScreenCopy(
+    val logoDescription:String,
+    val titlePrimary:String,
+    val titleSecondary:String,
+    val selectedDescription:String,
+)
+@Composable
+private fun defaultLanguageScreenCopy()=LanguageScreenCopy(
+    logoDescription=stringResource(Res.string.pop_logo_description),
+    titlePrimary=stringResource(Res.string.language_title_en),
+    titleSecondary=stringResource(Res.string.language_title_ar),
+    selectedDescription=stringResource(Res.string.language_selected,"%s"),
+)
 
 @Composable
 fun LanguageScreen(
-    availableLanguageTags: List<String>,
+    availableLanguages: List<LanguageChoice>,
     selectedLanguageTag: String?,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    copy:LanguageScreenCopy?=null,
 ) {
     val colors = LocalPopSemanticColors.current
-    // The approved first-launch choice is deliberately two languages only.
-    val supported = listOf("en", "ar").filter { it in availableLanguageTags }
-        .ifEmpty { listOf("en", "ar") }
+    val resolvedCopy=copy ?: defaultLanguageScreenCopy()
+    val supported=availableLanguages.distinctBy { it.tag }
     ReferenceFrame(modifier.background(colors.backgroundPrimary)) {
         PopMarkVector(
             color = colors.brandPrimary,
-            contentDescription = stringResource(Res.string.pop_logo_description),
+            contentDescription = resolvedCopy.logoDescription,
             modifier = Modifier.offset(102.dp, 248.dp).size(190.dp, 218.dp),
         )
         Column(
@@ -60,7 +71,7 @@ fun LanguageScreen(
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Text(
-                stringResource(Res.string.language_title_en),
+                resolvedCopy.titlePrimary,
                 color = colors.textPrimary,
                 fontSize = 28.sp,
                 lineHeight = 33.sp,
@@ -69,7 +80,7 @@ fun LanguageScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                stringResource(Res.string.language_title_ar),
+                resolvedCopy.titleSecondary,
                 color = colors.textPrimary,
                 fontSize = 28.sp,
                 lineHeight = 33.sp,
@@ -81,14 +92,13 @@ fun LanguageScreen(
         Column(
             modifier = Modifier
                 .offset(74.dp, 664.dp)
-                .size(246.3158.dp, (64 * supported.size + 22 * (supported.size - 1)).dp),
+                .size(246.3158.dp, maxOf(0, 64 * supported.size + 22 * (supported.size - 1)).dp),
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
             supported.forEach { language ->
-                val label = languageLabel(language)
-                val labelText = stringResource(label)
-                val isSelected = selectedLanguageTag?.substringBefore('-') == language
-                val selectedDescription = if (isSelected) stringResource(Res.string.language_selected, labelText) else null
+                val labelText=language.label
+                val isSelected=selectedLanguageTag?.lowercase()==language.tag.lowercase()
+                val selectedDescription=if(isSelected)resolvedCopy.selectedDescription.replace("%s",labelText) else null
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -104,7 +114,7 @@ fun LanguageScreen(
                             selected = isSelected
                             selectedDescription?.let { stateDescription = it }
                         }
-                        .clickable { onSelect(language) }
+                        .clickable { onSelect(language.tag) }
                         .padding(horizontal = 8.dp),
                 ) {
                     Text(
@@ -120,10 +130,4 @@ fun LanguageScreen(
             }
         }
     }
-}
-
-private fun languageLabel(language: String): StringResource = when (language) {
-    "ar" -> Res.string.language_arabic
-    "fr" -> Res.string.language_french
-    else -> Res.string.language_english
 }

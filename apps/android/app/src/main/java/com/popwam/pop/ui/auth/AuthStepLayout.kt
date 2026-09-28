@@ -14,25 +14,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.popwam.pop.R
+import com.popwam.pop.ui.LocalePolicy
 import com.popwam.pop.ui.currentLocale
 import com.popwam.pop.ui.components.PopOfficialLogo
 
 /** Shared visual rhythm. Each screen owns a single task and scrolls above the IME. */
 @Composable fun AuthStepLayout(title:String,helper:String,icon:ImageVector,step:Int=0,total:Int=6,back:(()->Unit)?=null,content:@Composable ColumnScope.()->Unit) {
     val colors=MaterialTheme.colorScheme
-    CompositionLocalProvider(LocalLayoutDirection provides if(currentLocale()=="ar")LayoutDirection.Rtl else LayoutDirection.Ltr) {
+    CompositionLocalProvider(LocalLayoutDirection provides if(LocalePolicy.isRtl(currentLocale()))LayoutDirection.Rtl else LayoutDirection.Ltr) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(colors.primaryContainer.copy(alpha=.35f),colors.surface)))
                 .safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-                    if(back!=null)IconButton(back){Icon(Icons.AutoMirrored.Filled.ArrowBack,stringResource(R.string.p7_back))}
+                    if(back!=null)IconButton(back){Icon(Icons.AutoMirrored.Filled.ArrowBack,popStringResource(R.string.p7_back))}
                     PopOfficialLogo(Modifier.width(72.dp).height(40.dp))
                 }
-                if(step>0){Text(stringResource(R.string.p7_progress,step,total),style=MaterialTheme.typography.labelMedium);LinearProgressIndicator(progress={step.toFloat()/total},modifier=Modifier.fillMaxWidth())}
+                if(step>0){Text(popStringResource(R.string.p7_progress,step,total),style=MaterialTheme.typography.labelMedium);LinearProgressIndicator(progress={step.toFloat()/total},modifier=Modifier.fillMaxWidth())}
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     Icon(icon,null,Modifier.size(24.dp),tint=colors.primary)
                     Text(title,style=MaterialTheme.typography.headlineSmall)

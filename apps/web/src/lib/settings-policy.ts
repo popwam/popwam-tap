@@ -6,9 +6,9 @@ export const notificationCategories = ["generalEnabled", "securityEnabled", "pro
 export function parseSettingsPatch(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>;
-  const allowed = new Set(["theme", "language", "font", "shareActivityIdentity"]);
+  const allowed = new Set(["theme", "language", "locale", "font", "shareActivityIdentity"]);
   if (Object.keys(input).some(key => !allowed.has(key))) return null;
-  const output: { theme?: typeof themePreferences[number]; language?: typeof languagePreferences[number]; font?: typeof fontPreferences[number]; shareActivityIdentity?: boolean } = {};
+  const output: { theme?: typeof themePreferences[number]; language?: typeof languagePreferences[number]; locale?: string; font?: typeof fontPreferences[number]; shareActivityIdentity?: boolean } = {};
   if ("theme" in input) {
     if (typeof input.theme !== "string" || !themePreferences.includes(input.theme as never)) return null;
     output.theme = input.theme as typeof themePreferences[number];
@@ -16,6 +16,12 @@ export function parseSettingsPatch(value: unknown) {
   if ("language" in input) {
     if (typeof input.language !== "string" || !languagePreferences.includes(input.language as never)) return null;
     output.language = input.language as typeof languagePreferences[number];
+  }
+  if ("locale" in input) {
+    if (typeof input.locale !== "string") return null;
+    const locale = input.locale.trim().toLowerCase();
+    if (!/^[a-z]{2}(?:-[a-z0-9]{2,8})?$/.test(locale)) return null;
+    output.locale = locale;
   }
   if ("font" in input) {
     if (typeof input.font !== "string" || !fontPreferences.includes(input.font as never)) return null;

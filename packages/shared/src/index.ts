@@ -1,7 +1,5 @@
-export const APP_NAME = "POP by POPWAM";
 export const DEFAULT_PUBLIC_APP_URL = "http://localhost:3000";
 export const PRODUCTION_APP_URL = "https://pop.popwam.com";
-export const PRODUCTION_PUBLIC_URL = "https://go.popwam.com";
 
 export const DESTINATION_TYPES = [
   "PROFILE", "WHATSAPP_BUSINESS", "WHATSAPP_PRIVATE", "PHONE", "EMAIL", "WEBSITE", "VCF",

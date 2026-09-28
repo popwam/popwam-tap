@@ -3,8 +3,6 @@ import { DestinationType, Prisma, prisma } from "@popwam/db";
 export const LIMIT_KEYS = ["maxProfiles", "maxVirtualCards", "maxLinks", "maxCustomFields", "maxTags", "maxCards", "maxUploads", "maxFiles", "maxStorageBytes"] as const;
 export const FEATURE_KEYS = ["allowCustomSlug", "customSlugAllowed", "allowThemes", "allowCustomTheme", "allowAnalytics", "analyticsAllowed", "allowFileUploads", "allowCustomIcons", "allowBusinessCards", "allowWalletPasses", "allowCustomLinks", "allowInstallableProfiles"] as const;
 export const CATALOG_KEYS = ["availableProfileTypes", "availableThemes"] as const;
-export type LimitKey = (typeof LIMIT_KEYS)[number];
-export type FeatureKey = (typeof FEATURE_KEYS)[number];
 export const PLATFORM_DEFAULT_PLAN_SLUG = "free";
 
 const CORE_CONTACT_DESTINATION_TYPE_LIST: DestinationType[] = ["PROFILE", "PHONE", "EMAIL", "WEBSITE", "WHATSAPP_BUSINESS", "WHATSAPP_PRIVATE", "VCF"];

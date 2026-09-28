@@ -27,7 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -62,22 +62,22 @@ fun QrScanner(onValue: (String) -> Unit) {
                 key(front) { CameraPreview(scanner, torch, front, onValue) }
                 ScanOverlay(Modifier.align(Alignment.Center))
                 Row(Modifier.align(Alignment.BottomCenter).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FilledTonalIconButton({ torch = !torch }, enabled = !front) { Icon(Icons.Default.FlashlightOn, stringResource(R.string.flash)) }
-                    FilledTonalIconButton({ front = !front; torch = false }) { Icon(Icons.Default.Cameraswitch, stringResource(R.string.switch_camera)) }
-                    FilledTonalIconButton({ imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Icon(Icons.Default.Image, stringResource(R.string.choose_image)) }
+                    FilledTonalIconButton({ torch = !torch }, enabled = !front) { Icon(Icons.Default.FlashlightOn, popStringResource(R.string.flash)) }
+                    FilledTonalIconButton({ front = !front; torch = false }) { Icon(Icons.Default.Cameraswitch, popStringResource(R.string.switch_camera)) }
+                    FilledTonalIconButton({ imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Icon(Icons.Default.Image, popStringResource(R.string.choose_image)) }
                 }
             }
         } else {
             Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .75f), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(if (denied) R.string.camera_denied else R.string.camera_permission_required))
-                    Button({ request.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.scan_camera)) }
-                    if (denied) OutlinedButton({ context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text(stringResource(R.string.open_settings)) }
-                    OutlinedButton({ imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Icon(Icons.Default.Image, null); Text(stringResource(R.string.choose_image)) }
+                    Text(popStringResource(if (denied) R.string.camera_denied else R.string.camera_permission_required))
+                    Button({ request.launch(Manifest.permission.CAMERA) }) { Text(popStringResource(R.string.scan_camera)) }
+                    if (denied) OutlinedButton({ context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text(popStringResource(R.string.open_settings)) }
+                    OutlinedButton({ imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Icon(Icons.Default.Image, null); Text(popStringResource(R.string.choose_image)) }
                 }
             }
         }
-        if (error) Text(stringResource(R.string.qr_not_found), color = MaterialTheme.colorScheme.error)
+        if (error) Text(popStringResource(R.string.qr_not_found), color = MaterialTheme.colorScheme.error)
     }
 }
 

@@ -45,6 +45,7 @@ import com.popwam.pop.ui.currentLocale
 import com.popwam.pop.ui.auth.PhoneLoginFactory
 import com.popwam.pop.ui.auth.PhoneLoginViewModel
 import com.popwam.pop.ui.auth.PhoneLoginScreen
+import com.popwam.pop.data.localization.PopLocalizationProvider
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.popwam.mobile.onboarding.LaunchCoordinator
@@ -110,10 +111,13 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val launchState by launchViewModel.state.collectAsStateWithLifecycle()
             val localization by app.container.localization.state.collectAsStateWithLifecycle()
+            androidx.compose.runtime.LaunchedEffect(app.container.localization) {
+                app.container.localization.refresh()
+            }
             androidx.compose.runtime.LaunchedEffect(launchState.persisted.selectedBaseTheme, launchState.persisted.selectedPopStyle) {
                 appearanceStore.synchronize(launchState.persisted.selectedBaseTheme.name, launchState.persisted.selectedPopStyle.name)
             }
-            LaunchExperience(launchViewModel,localization,popFontFamilies(),systemSplashExited) {
+            PopLocalizationProvider { LaunchExperience(launchViewModel,localization,popFontFamilies(),systemSplashExited) {
                 val auth: AuthViewModel = viewModel(factory = AuthFactory(app.container.sessions, app.container.authSetup, app.container.analytics))
                 val authState by auth.state.collectAsStateWithLifecycle()
                 val biometricLocked by app.container.sessionStore.locked.collectAsStateWithLifecycle()
@@ -151,7 +155,7 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
                 }
-            }
+            } }
         }
     }
 

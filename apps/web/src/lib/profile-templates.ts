@@ -46,7 +46,6 @@ export const APPROVED_PROFILE_TEMPLATES = [
   template(17,"store-techzone","تك زون","TechZone","storefront","BUSINESS","business",{background:"#f3f6fb",panel:"#ffffff",text:"#172235",muted:"#667389",accent:"#1766ff"},{linkLayout:"grid",coverStyle:"minimal"}),
 ] as const satisfies readonly ApprovedProfileTemplate[];
 
-export const APPROVED_TEMPLATE_SLUGS = new Set<string>(APPROVED_PROFILE_TEMPLATES.map(item => item.slug));
 export function approvedTemplateBySlug(slug?: string | null) { return APPROVED_PROFILE_TEMPLATES.find(item => item.slug === slug) || null; }
 export function resolveApprovedTemplate(input: { slug?: string | null; profileKind?: string | null }) {
   const selected = approvedTemplateBySlug(input.slug);

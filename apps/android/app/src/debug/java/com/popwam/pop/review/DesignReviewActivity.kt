@@ -48,23 +48,18 @@ import com.popwam.mobile.foundation.overlay.OverlayPresentation
 import com.popwam.mobile.foundation.overlay.OverlayState
 import com.popwam.mobile.foundation.platform.BiometricCapability
 import com.popwam.mobile.onboarding.LanguageScreen
+import com.popwam.mobile.onboarding.LanguageChoice
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import com.popwam.pop.ui.components.PopBrandedLoading
 import com.popwam.mobile.onboarding.ThemeScreen
 import com.popwam.pop.ui.theme.popFontFamilies
 import com.popwam.pop.TapApplication
 import com.popwam.pop.ui.currentLocale
-import com.popwam.pop.ui.MenuReviewScreen
-import com.popwam.pop.ui.MenuSettingsReviewScreen
-import com.popwam.pop.ui.MenuProfileContext
-import com.popwam.pop.ui.PopBottomNavigationReviewScreen
 import com.popwam.pop.ui.home.HomeLoadState
-import com.popwam.pop.ui.home.HomePrimaryTab
 import com.popwam.pop.ui.home.HomeProfile
 import com.popwam.pop.ui.home.HomeScreen
 import com.popwam.pop.ui.home.HomeUiState
 import com.popwam.pop.ui.profile.*
-import com.popwam.pop.ui.share.*
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
@@ -81,16 +76,12 @@ class DesignReviewActivity : AppCompatActivity() {
 
 private enum class ReviewScreen(val label: String) {
     SPLASH("Splash"), LANGUAGE("Language"), THEME("Theme"), THEME_GALLERY("Theme Gallery"),
-    ROOT_HOME("Root Home + Nav"), HOME_LOADED("Home Loaded"), HOME_LOADING("Home Loading"), HOME_EMPTY("Home Empty"), HOME_ERROR("Home Error"),
+    HOME_LOADED("Home Loaded"), HOME_LOADING("Home Loading"), HOME_EMPTY("Home Empty"), HOME_ERROR("Home Error"),
     PROFILE_LIST("Profile List"), PROFILE_PERSONAL("Personal Profile"), PROFILE_BUSINESS("Business Profile"),
     PROFILE_CREATE("Create Profile"),
     PROFILE_BASIC("Basic Info"), PROFILE_ABOUT("About"), PROFILE_CONTACT("Contact & Links"), PROFILE_TYPE_DETAILS("Type Details"), PROFILE_MEDIA("Media"),
     PROFILE_VISIBILITY("Visibility"),
     PROFILE_LOADING("Profiles Loading"), PROFILE_ERROR("Profiles Error"),
-    SHARE_CENTER("Share Center"), SHARE_QR_READY("QR Ready"), SHARE_PRIVATE("Share Private"),
-    SHARE_NFC_UNAVAILABLE("NFC Unavailable"), SHARE_NFC_READY("NFC Ready"), SHARE_NFC_WRITING("NFC Writing"), SHARE_NFC_SUCCESS("NFC Success"), SHARE_NFC_ERROR("NFC Error"), SHARE_HCE_READY("HCE Ready"),
-    MENU("Menu"), MENU_ACCOUNT("Menu Account"), MENU_SECURITY("Menu Security"), MENU_DEVICES("Menu Devices"),
-    MENU_LANGUAGE("Menu Language"), MENU_APPEARANCE("Menu Appearance"), MENU_PRIVACY("Menu Privacy"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,15 +104,8 @@ private fun DesignReviewGallery(initialScreen:String?=null,initialLanguage:Strin
         if(focused){
             when(screen){
                 ReviewScreen.SPLASH->PopBrandedLoading()
-                ReviewScreen.ROOT_HOME->PopBottomNavigationReviewScreen{HomeScreen(homeReviewState(language),{})}
-                ReviewScreen.HOME_LOADING->PopBottomNavigationReviewScreen{HomeScreen(HomeUiState(),{})}
-                ReviewScreen.PROFILE_PERSONAL->PopBottomNavigationReviewScreen(HomePrimaryTab.PROFILE){
-                    ProfileViewScreen(profileReviewState(language,ProfileBackendKind.PERSONAL),"review-primary",{}, {},topLevel=true)
-                }
-                ReviewScreen.SHARE_CENTER->ShareReviewScreen(shareReviewState(language))
-                ReviewScreen.MENU->PopBottomNavigationReviewScreen(HomePrimaryTab.MENU){
-                    MenuReviewScreen(MenuProfileContext(if(language=="ar")"سارة أحمد" else "Sarah Ahmed",if(language=="ar")"مصممة منتجات" else "Product designer",type=if(language=="ar")"شخصي" else "Personal",publicUrl="https://pop.popwam.com/sarah-a1b2c3d4",completionPercent=67))
-                }
+                ReviewScreen.HOME_LOADING->HomeScreen(HomeUiState(),{})
+                ReviewScreen.PROFILE_PERSONAL->ProfileViewScreen(profileReviewState(language,ProfileBackendKind.PERSONAL),"review-primary",{}, {},topLevel=true)
                 else->Unit
             }
             return@Phase3OnboardingTheme
@@ -146,10 +130,9 @@ private fun DesignReviewGallery(initialScreen:String?=null,initialLanguage:Strin
                         }
                         PopBrandedLoading(reducedMotion = false)
                     }
-                    ReviewScreen.LANGUAGE -> LanguageScreen(listOf("en", "ar"), language, {})
+                    ReviewScreen.LANGUAGE -> LanguageScreen(listOf(LanguageChoice("en","English"),LanguageChoice("ar","Arabic")),language,{})
                     ReviewScreen.THEME -> ThemeScreen(mode, palette, false, { mode = it }, {}, {}, { palette = it }, {})
                     ReviewScreen.THEME_GALLERY -> ThemeScreen(mode, palette, true, { mode = it }, {}, {}, { palette = it }, {})
-                    ReviewScreen.ROOT_HOME -> PopBottomNavigationReviewScreen { HomeScreen(homeReviewState(language), {}) }
                     ReviewScreen.HOME_LOADED -> HomeScreen(homeReviewState(language), {})
                     ReviewScreen.HOME_LOADING -> HomeScreen(HomeUiState(), {})
                     ReviewScreen.HOME_EMPTY -> HomeScreen(HomeUiState(loadState = HomeLoadState.EMPTY), {})
@@ -166,36 +149,11 @@ private fun DesignReviewGallery(initialScreen:String?=null,initialLanguage:Strin
                     ReviewScreen.PROFILE_VISIBILITY -> ProfileEditorSectionScreen(profileReviewState(language),"review-primary",ProfileEditorSection.VISIBILITY,{}, {})
                     ReviewScreen.PROFILE_LOADING -> ProfileListScreen(ProfilesUiState(), {})
                     ReviewScreen.PROFILE_ERROR -> ProfileListScreen(ProfilesUiState(loadState=ProfileLoadState.ERROR,errorCode="REVIEW"), {})
-                    ReviewScreen.SHARE_CENTER -> ShareReviewScreen(shareReviewState(language))
-                    ReviewScreen.SHARE_QR_READY -> ShareReviewScreen(shareReviewState(language),ShareInitialPanel.QR)
-                    ReviewScreen.SHARE_PRIVATE -> ShareReviewScreen(shareReviewState(language).copy(availability=ShareAvailability.PRIVATE,payload=null),ShareInitialPanel.QR)
-                    ReviewScreen.SHARE_NFC_UNAVAILABLE -> ShareReviewScreen(shareReviewState(language).copy(nfc=ShareNfcState(NfcAvailability.UNAVAILABLE)),ShareInitialPanel.NFC)
-                    ReviewScreen.SHARE_NFC_READY -> ShareReviewScreen(shareReviewState(language).copy(nfc=ShareNfcState(NfcAvailability.READY,NfcOperation.WRITE,NfcStage.WAITING_FOR_TAG)),ShareInitialPanel.NFC)
-                    ReviewScreen.SHARE_NFC_WRITING -> ShareReviewScreen(shareReviewState(language).copy(nfc=ShareNfcState(NfcAvailability.READY,NfcOperation.WRITE,NfcStage.WRITING)),ShareInitialPanel.NFC)
-                    ReviewScreen.SHARE_NFC_SUCCESS -> ShareReviewScreen(shareReviewState(language).copy(nfc=ShareNfcState(NfcAvailability.READY,NfcOperation.WRITE,NfcStage.SUCCESS)),ShareInitialPanel.NFC)
-                    ReviewScreen.SHARE_NFC_ERROR -> ShareReviewScreen(shareReviewState(language).copy(nfc=ShareNfcState(NfcAvailability.READY,NfcOperation.WRITE,NfcStage.ERROR,"TAG_TOO_SMALL")),ShareInitialPanel.NFC)
-                    ReviewScreen.SHARE_HCE_READY -> ShareReviewScreen(shareReviewState(language).copy(hce=ShareHceState(HceAvailability.READY,true,true)),ShareInitialPanel.HCE)
-                    ReviewScreen.MENU -> MenuReviewScreen()
-                    ReviewScreen.MENU_ACCOUNT -> MenuSettingsReviewScreen("account")
-                    ReviewScreen.MENU_SECURITY -> MenuSettingsReviewScreen("security")
-                    ReviewScreen.MENU_DEVICES -> MenuSettingsReviewScreen("devices")
-                    ReviewScreen.MENU_LANGUAGE -> MenuSettingsReviewScreen("language")
-                    ReviewScreen.MENU_APPEARANCE -> MenuSettingsReviewScreen("appearance")
-                    ReviewScreen.MENU_PRIVACY -> MenuSettingsReviewScreen("privacy")
                 }
             }
         }
     }
 }
-
-private fun shareReviewState(language:String)=ShareUiState(
-    loadState=ShareLoadState.READY,
-    activeProfile=ActiveShareProfile("review-primary",if(language=="ar")"سارة أحمد" else "Sarah Ahmed",ShareProfileAccess.PUBLIC,"PUBLISHED"),
-    availability=ShareAvailability.PUBLIC,
-    payload=CanonicalSharePayload("review-primary",if(language=="ar")"سارة أحمد" else "Sarah Ahmed","https://pop.popwam.com/sarah-a1b2c3d4"),
-    nfc=ShareNfcState(NfcAvailability.READY),
-    hce=ShareHceState(HceAvailability.READY,false,false),
-)
 
 private fun profileReviewState(language:String,category:ProfileBackendKind=ProfileBackendKind.PERSONAL):ProfilesUiState {
     val name=if(category==ProfileBackendKind.BUSINESS) "Sarah Studio" else "Sarah Ahmed"

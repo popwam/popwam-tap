@@ -18,7 +18,6 @@ export default async function BatchPage({
   const batch = await prisma.cardBatch.findUnique({
     where: { id },
     include: {
-      supplier: true,
       inventoryItem: true,
       productionBatch: { include: { tags: { include: { card: true }, orderBy: { createdAt: "asc" } } } },
       cards: { orderBy: { serialNumber: "asc" } },
@@ -60,10 +59,9 @@ export default async function BatchPage({
         <p className="mb-5 rounded-xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
           Scratch secrets are available only through the one-time production CSV. Download it only within the controlled packaging workflow; this page and consumer APIs never reveal them.
         </p>}
-      <div className="mb-5 grid gap-3 sm:grid-cols-5">
+      <div className="mb-5 grid gap-3 sm:grid-cols-4">
         {[
           ["Batch", batch.productionBatch?.batchCode || batch.name],
-          ["Supplier", batch.supplier?.name || "—"],
           ["Stock product", batch.inventoryItem?.sku || "—"],
           ["Produced", batch.quantity],
           ["Status", batch.productionBatch?.status || "LEGACY"],

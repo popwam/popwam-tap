@@ -17,6 +17,7 @@ class SessionRepositoryPasskeyTest {
     }
     private class Api(var passkey:AuthResponse):AuthApi {
         override suspend fun localizationBootstrap()=LocalizationBootstrapResponse(ok=true,availableLocales=listOf(LocalizationLocaleDto()))
+        override suspend fun localizationPack(code:String)=LocalizationPackResponse(ok=true,code=code)
         override suspend fun platformBootstrap()=PlatformBootstrapResponse(ok=true)
         var logoutCalls=0
         var verifiedCode:String?=null

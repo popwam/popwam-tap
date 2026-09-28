@@ -118,25 +118,6 @@ export async function acceptLegalDocument(
   );
 }
 
-export async function missingRequiredLegalDocuments(
-  userId: string,
-  locale: string,
-) {
-  const documents = await resolvedAccountLegalDocuments(userId, locale);
-  const accepted = await prisma.userLegalConsent.findMany({
-    where: {
-      userId,
-      revokedAt: null,
-      legalDocumentId: { in: documents.map((document) => document.id) },
-    },
-    select: { legalDocumentId: true },
-  });
-  const acceptedIds = new Set(
-    accepted.map((consent) => consent.legalDocumentId),
-  );
-  return documents.filter((document) => !acceptedIds.has(document.id));
-}
-
 /** Accepts exactly the current, active required documents for the authenticated
  * POP user. Callers cannot submit arbitrary historical document identifiers. */
 export async function acceptActiveRequiredLegalDocuments(

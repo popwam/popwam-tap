@@ -63,11 +63,9 @@ export async function saveLocalizationRuntime(data: FormData) {
           .trim()
           .slice(0, 80) || locale.nativeName,
       rtl:
-        locale.code === "en" ? false : data.get(`rtl_${locale.code}`) === "on",
-      enabled:
-        locale.code === "en" || data.get(`enabled_${locale.code}`) === "on",
-      published:
-        locale.code === "en" || data.get(`published_${locale.code}`) === "on",
+        data.get(`rtl_${locale.code}`) === "on",
+      enabled: data.get(`enabled_${locale.code}`) === "on",
+      published: data.get(`published_${locale.code}`) === "on",
       displayOrder: Number(
         data.get(`order_${locale.code}`) || locale.displayOrder || 0,
       ),

@@ -55,7 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,11 +64,13 @@ import androidx.core.os.LocaleListCompat
 import com.popwam.pop.R
 import com.popwam.pop.TapApplication
 import com.popwam.pop.data.api.PublishedLegalDocumentDto
+import com.popwam.pop.data.localization.DynamicLocalizationRuntime
 import kotlinx.coroutines.launch
 
 enum class PreAuthLegalKind { TERMS, PRIVACY }
 fun applyPopLanguage(language: String) {
-    if (language !in LocalePolicy.availableLocales()) return
+    if (!LocalePolicy.canRender(language)) return
+    DynamicLocalizationRuntime.select(language)
     AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language))
 }
 
@@ -98,9 +100,9 @@ fun NativeLegalScreen(kind: PreAuthLegalKind, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(title), fontWeight = FontWeight.Black) },
+                title = { Text(popStringResource(title), fontWeight = FontWeight.Black) },
                 navigationIcon = {
-                    IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, popStringResource(R.string.back)) }
                 },
             )
         },
@@ -114,22 +116,22 @@ fun NativeLegalScreen(kind: PreAuthLegalKind, onBack: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(10.dp))
-                    Text(stringResource(R.string.pop_brand_short), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text(popStringResource(R.string.pop_brand_short), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                 }
             }
             when {
                 loading -> item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                 failed || document == null -> item {
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(stringResource(R.string.generic_error), color = MaterialTheme.colorScheme.error)
-                        Button({ reload++ }, Modifier.padding(top = 12.dp)) { Text(stringResource(R.string.retry)) }
+                        Text(popStringResource(R.string.generic_error), color = MaterialTheme.colorScheme.error)
+                        Button({ reload++ }, Modifier.padding(top = 12.dp)) { Text(popStringResource(R.string.retry)) }
                     }
                 }
                 else -> {
                     item {
                         Text(document!!.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text(
-                            stringResource(R.string.legal_version_format, document!!.version),
+                            popStringResource(R.string.legal_version_format, document!!.version),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -140,7 +142,7 @@ fun NativeLegalScreen(kind: PreAuthLegalKind, onBack: () -> Unit) {
                 }
             }
             item { HorizontalDivider() }
-            item { Text(stringResource(R.string.legal_reading_not_consent), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item { Text(popStringResource(R.string.legal_reading_not_consent), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }

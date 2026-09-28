@@ -15,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.popwam.mobile.foundation.launch.IdentityPalette
 import com.popwam.mobile.foundation.launch.ThemeMode
 import com.popwam.mobile.onboarding.LanguageScreen
+import com.popwam.mobile.onboarding.LanguageChoice
 import com.popwam.mobile.onboarding.Phase3OnboardingTheme
 import com.popwam.mobile.onboarding.PopSplashScreen
 import com.popwam.mobile.onboarding.ThemeScreen
@@ -47,11 +48,11 @@ class Phase3ScreenshotTest {
     }
 
     @Test fun languageEnglish() = capture("language-en", "en", ThemeMode.LIGHT) {
-        LanguageScreen(listOf("en", "ar"), null, {}, Modifier.fillMaxSize())
+        LanguageScreen(listOf(LanguageChoice("en","English"),LanguageChoice("ar","Arabic")),null,{},Modifier.fillMaxSize())
     }
 
     @Test fun languageArabic() = capture("language-ar", "ar", ThemeMode.LIGHT) {
-        LanguageScreen(listOf("en", "ar"), "ar", {}, Modifier.fillMaxSize())
+        LanguageScreen(listOf(LanguageChoice("en","English"),LanguageChoice("ar","Arabic")),"ar",{},Modifier.fillMaxSize())
     }
 
     @Test fun themeLight() = capture("theme-light", "en", ThemeMode.LIGHT) {

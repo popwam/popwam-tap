@@ -7,7 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.popwam.pop.R
@@ -28,10 +28,10 @@ import kotlinx.coroutines.launch
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Default.Fingerprint, null, Modifier.size(32.dp))
-            Text(stringResource(R.string.p7_biometric_title), style = MaterialTheme.typography.titleLarge)
-            Text(stringResource(R.string.p7_biometric_help))
+            Text(popStringResource(R.string.p7_biometric_title), style = MaterialTheme.typography.titleLarge)
+            Text(popStringResource(R.string.p7_biometric_help))
             when {
-                enabled -> Text(stringResource(R.string.p7_enabled))
+                enabled -> Text(popStringResource(R.string.p7_enabled))
                 coordinator?.available() == true -> OutlinedButton(onClick = {
                     busy = true
                     scope.launch {
@@ -44,10 +44,10 @@ import kotlinx.coroutines.launch
                             failed = true
                         } finally { busy = false }
                     }
-                }, enabled = !busy) { Text(stringResource(R.string.p7_enable)) }
-                else -> Text(stringResource(R.string.p7_biometric_unavailable))
+                }, enabled = !busy) { Text(popStringResource(R.string.p7_enable)) }
+                else -> Text(popStringResource(R.string.p7_biometric_unavailable))
             }
-            if (failed) Text(stringResource(R.string.p7_biometric_failed))
+            if (failed) Text(popStringResource(R.string.p7_biometric_failed))
         }
     }
 }

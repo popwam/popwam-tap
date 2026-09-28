@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,17 +75,17 @@ fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainView
     val draft = profile.toDraft(selectedTemplateId)
     val publicUrl="${BuildConfig.PUBLIC_BASE_URL.trimEnd('/')}/${if(!profile.slug.isNullOrBlank()) "p/${profile.slug}" else "p/id/${profile.id}"}"
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { CardDetailsHeader(stringResource(R.string.vc_card_details), back) }
+        item { CardDetailsHeader(popStringResource(R.string.vc_card_details), back) }
         item { Column(Modifier.padding(horizontal = 20.dp)) { Text(card?.name ?: profile.displayName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold); card?.id?.let { FigmaLtrText(it, MaterialTheme.typography.bodySmall) } } }
         item { CardTemplatePreview(draft, selectedTemplate, Modifier.padding(horizontal = 20.dp)) }
         item {
             Row(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(edit, Modifier.weight(1f)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.vc_open_editor)) }
-                OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(publicUrl))) }, Modifier.weight(1f)) { Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.vc_open_public_page), maxLines = 1) }
+                OutlinedButton(edit, Modifier.weight(1f)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(6.dp)); Text(popStringResource(R.string.vc_open_editor)) }
+                OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(publicUrl))) }, Modifier.weight(1f)) { Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(6.dp)); Text(popStringResource(R.string.vc_open_public_page), maxLines = 1) }
             }
         }
-        item { Button(publish,Modifier.padding(horizontal=20.dp).fillMaxWidth()){Icon(Icons.Default.Visibility,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.publish_title))} }
-        item { Text(stringResource(R.string.vc_change_template), Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+        item { Button(publish,Modifier.padding(horizontal=20.dp).fillMaxWidth()){Icon(Icons.Default.Visibility,null);Spacer(Modifier.width(8.dp));Text(popStringResource(R.string.publish_title))} }
+        item { Text(popStringResource(R.string.vc_change_template), Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(state.templates, key = { it.id }) { template ->
@@ -96,9 +96,9 @@ fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainView
             }
         }
         if (state.wallet.googleAvailable && card != null) item {
-            Column(Modifier.padding(horizontal = 20.dp)) { GradientButton(stringResource(R.string.vc_google_wallet), icon = Icons.Default.Wallet) { vm.openGoogleWallet(card.id) { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } } }
+            Column(Modifier.padding(horizontal = 20.dp)) { GradientButton(popStringResource(R.string.vc_google_wallet), icon = Icons.Default.Wallet) { vm.openGoogleWallet(card.id) { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } } }
         } else if (vm.role == "ADMIN" && !state.wallet.googleConfigured) item {
-            Surface(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), color = Color(0xFFFFF7E6), shape = RoundedCornerShape(16.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.AdminPanelSettings, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.vc_wallet_setup_required)) } }
+            Surface(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), color = Color(0xFFFFF7E6), shape = RoundedCornerShape(16.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.AdminPanelSettings, null); Spacer(Modifier.width(8.dp)); Text(popStringResource(R.string.vc_wallet_setup_required)) } }
         }
     }
 }
@@ -107,7 +107,7 @@ fun VirtualCardDetailsScreen(profileId: String, state: MainUiState, vm: MainView
 private fun CardDetailsHeader(title: String, back: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+            IconButton(back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, popStringResource(R.string.back)) }
             Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
         }
     }
@@ -123,7 +123,7 @@ private fun TemplateTile(template: ProfileTemplateDto, selected: Boolean, onClic
             Box {
                 AsyncImage(template.previewImageUrl, null, Modifier.fillMaxWidth().height(150.dp), contentScale = ContentScale.Crop)
                 if (!template.allowed) Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = .45f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Lock, null, tint = Color.White) }
-                if (selected) Icon(Icons.Default.CheckCircle, stringResource(R.string.vc_selected), Modifier.align(Alignment.TopEnd).padding(8.dp), tint = Color(0xFF825BDD))
+                if (selected) Icon(Icons.Default.CheckCircle, popStringResource(R.string.vc_selected), Modifier.align(Alignment.TopEnd).padding(8.dp), tint = Color(0xFF825BDD))
             }
             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (currentLocale() == "ar") template.nameAr else template.nameEn, fontWeight = FontWeight.Bold, maxLines = 2)
@@ -136,14 +136,14 @@ private fun TemplateTile(template: ProfileTemplateDto, selected: Boolean, onClic
 @Composable
 fun CardTemplatePreview(draft: VirtualCardPreview, template: ProfileTemplateDto?, modifier: Modifier = Modifier) {
     val variant = template?.slug ?: "personal-free-links"
-    val name = draft.localized(draft.displayNameAr, draft.displayNameEn).ifBlank { stringResource(R.string.vc_public_identity) }
+    val name = draft.localized(draft.displayNameAr, draft.displayNameEn).ifBlank { popStringResource(R.string.vc_public_identity) }
     val title = draft.localized(draft.jobTitleAr, draft.jobTitleEn).ifBlank { draft.company }
     val bio = draft.localized(draft.bioAr, draft.bioEn)
     val links = draft.previewLinks()
     when (variant) {
         "personal-pro-hero" -> Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), shadowElevation = 6.dp) { Column { Box(Modifier.fillMaxWidth().height(310.dp)) { PreviewImage(draft.imageModel(), Modifier.matchParentSize()); Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.White.copy(.96f))))); Column(Modifier.align(Alignment.BottomCenter).padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center); if (title.isNotBlank()) Text(title, color = Color(0xFF5C6779)); if (bio.isNotBlank()) Text(bio, textAlign = TextAlign.Center, color = Color(0xFF5C6779), style = MaterialTheme.typography.bodySmall) } }; LinkList(links, Color.White, Color(0xFF121020), pill = true) } }
         "personal-plus-tabs" -> Surface(modifier.fillMaxWidth(), color = Color(0xFF1F1F20), shape = RoundedCornerShape(4.dp)) { Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) { Avatar(draft.imageModel(), 82.dp); Text(name, color = Color(0xFFEFEdf7), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center); Text(title, color = Color(0xFFB0ADBF), textAlign = TextAlign.Center); if (bio.isNotBlank()) Text(bio, color = Color(0xFFB0ADBF), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall); Row(Modifier.fillMaxWidth().background(Color(0xFF292933), RoundedCornerShape(8.dp)).padding(10.dp), horizontalArrangement = Arrangement.SpaceEvenly) { repeat(3) { Box(Modifier.width(54.dp).height(6.dp).background(if (it == 0) Color(0xFF46495A) else Color(0xFF30313A), CircleShape)) } }; LinkList(links, Color(0xFF30363F), Color(0xFFEFEdf7)) } }
-        "business-free-portfolio" -> Surface(modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(4.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEDEDED))) { Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) { Avatar(draft.imageModel(), 96.dp); Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium); Text(title, color = Color(0xFF4B5563)); if (bio.isNotBlank()) Text(bio, textAlign = TextAlign.Center); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { AssistChip({}, { Text(stringResource(R.string.vc_contact_label)) }); AssistChip({}, { Text(stringResource(R.string.vc_links_label)) }) }; LinkGrid(links, Color(0xFFF8F4FF), Color(0xFF6D3DD7)) } }
+        "business-free-portfolio" -> Surface(modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(4.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEDEDED))) { Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) { Avatar(draft.imageModel(), 96.dp); Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium); Text(title, color = Color(0xFF4B5563)); if (bio.isNotBlank()) Text(bio, textAlign = TextAlign.Center); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { AssistChip({}, { Text(popStringResource(R.string.vc_contact_label)) }); AssistChip({}, { Text(popStringResource(R.string.vc_links_label)) }) }; LinkGrid(links, Color(0xFFF8F4FF), Color(0xFF6D3DD7)) } }
         "business-pro-grid" -> Surface(modifier.fillMaxWidth(), color = Color(0xFF1E1E1E), shape = RoundedCornerShape(28.dp)) { Column(Modifier.background(Brush.verticalGradient(listOf(Color(0xFF2C4165), Color(0xFF0D1931)))).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) { Box(Modifier.size(150.dp).background(Color(0xFFFFB829), RoundedCornerShape(32.dp)), contentAlignment = Alignment.Center) { Avatar(draft.imageModel(), 132.dp, RoundedCornerShape(26.dp)) }; Text(name.uppercase(), color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(title, color = Color(0xFFC9D1D9)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { repeat(4) { Box(Modifier.size(40.dp).background(Color(0xFF3A4B6A), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Icon(listOf(Icons.Default.Language, Icons.Default.Email, Icons.Default.Work, Icons.Default.Link)[it], null, tint = Color.White) } } }; LinkGrid(links, Color(0xFF2C3F60), Color.White) } }
         "business-pro-social" -> Surface(modifier.fillMaxWidth(), color = Color(0xFF1E1E1E), shape = RoundedCornerShape(28.dp)) { Column(Modifier.background(Brush.verticalGradient(listOf(Color(0xFF2C4165), Color(0xFF101A31)))).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) { Box(Modifier.size(150.dp).background(Color(0xFFFFB829), RoundedCornerShape(32.dp)), contentAlignment = Alignment.Center) { Avatar(draft.imageModel(), 132.dp, RoundedCornerShape(26.dp)) }; Text(name, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(title, color = Color(0xFFC9D1D9)); if (bio.isNotBlank()) Text(bio, color = Color(0xFFC9D1D9), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall); links.forEachIndexed { index, link -> Surface(Modifier.fillMaxWidth(if (index % 3 == 2) 1f else .78f).align(if (index % 2 == 0) Alignment.Start else Alignment.End), color = if (index % 2 == 0) Color(0xFF183871) else Color(0xFF7A07A3), shape = RoundedCornerShape(14.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { LinkIcon(link.url, Color.White); Spacer(Modifier.width(10.dp)); Text(link.titleAr.ifBlank { link.titleEn }, color = Color.White, fontWeight = FontWeight.Bold) } } } } }
         else -> Surface(modifier.fillMaxWidth(), color = Color.Black, shape = RoundedCornerShape(4.dp)) { Column(Modifier.padding(horizontal = 28.dp, vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) { Avatar(draft.imageModel(), 112.dp); Text(name, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center); if (title.isNotBlank()) Text(title, color = Color.White, textAlign = TextAlign.Center); links.forEach { link -> Surface(Modifier.fillMaxWidth(), color = Color(0xFF3A8A8D), shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { LinkIcon(link.url, Color.White); Text(link.titleAr.ifBlank { link.titleEn }, color = Color.White, fontWeight = FontWeight.Bold) } } } } }
@@ -167,7 +167,7 @@ private fun GradientButton(label: String, icon: androidx.compose.ui.graphics.vec
 
 private fun VirtualCardPreview.localized(ar: String, en: String) = if (primaryLanguage == "ar") ar.ifBlank { en } else en.ifBlank { ar }
 private fun VirtualCardPreview.imageModel() = (if (cardType == "BUSINESS") companyLogoUri.ifBlank { profileImageUri } else profileImageUri).ifBlank { null }
-@Composable private fun VirtualCardPreview.previewLinks(): List<DraftLink> { if (links.isNotEmpty()) return links.take(6); val values = listOf(phone to stringResource(R.string.phone), email to stringResource(R.string.email), website to stringResource(R.string.website)).filter { it.first.isNotBlank() }; return values.map { DraftLink(titleAr = it.second, titleEn = it.second, url = it.first) }.ifEmpty { listOf(DraftLink(titleAr = stringResource(R.string.vc_links_label), titleEn = stringResource(R.string.vc_links_label), url = "https://popwam.com")) } }
+@Composable private fun VirtualCardPreview.previewLinks(): List<DraftLink> { if (links.isNotEmpty()) return links.take(6); val values = listOf(phone to popStringResource(R.string.phone), email to popStringResource(R.string.email), website to popStringResource(R.string.website)).filter { it.first.isNotBlank() }; return values.map { DraftLink(titleAr = it.second, titleEn = it.second, url = it.first) }.ifEmpty { listOf(DraftLink(titleAr = popStringResource(R.string.vc_links_label), titleEn = popStringResource(R.string.vc_links_label), url = "https://popwam.com")) } }
 private fun ProfileDto.toDraft(templateId: String) = VirtualCardPreview(
     cardType = virtualCard?.type ?: if (type == "ORGANIZATION") "BUSINESS" else "PERSONAL", cardName = virtualCard?.name ?: displayName, primaryLanguage = primaryLanguage,
     displayNameAr = displayNameAr ?: organizationNameAr.orEmpty(), displayNameEn = displayNameEn ?: organizationNameEn.orEmpty(),

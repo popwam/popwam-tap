@@ -18,7 +18,6 @@ import { getRuntimeLocalizationConfig } from "@/lib/localization-runtime";
 import {
   LOCALIZATION_SETTING_KEY,
   sanitizeLocalizationConfig,
-  type RuntimeLocale,
 } from "@/lib/localization-policy";
 import {
   filterTranslationKeys,
@@ -58,29 +57,9 @@ export default async function TranslationsPage({
     ...flattenTranslations(en),
     ...config.locales.find((item) => item.code === "en")?.translations,
   };
-  const localeFor = (code: string): RuntimeLocale =>
-    code === "en"
-      ? {
-          code,
-          name: "English",
-          nativeName: "English",
-          rtl: false,
-          enabled: true,
-          published: true,
-          displayOrder: 0,
-          translations: source,
-        }
-      : config.locales.find((item) => item.code === code) || {
-          code,
-          name: code,
-          nativeName: code,
-          rtl: code === "ar",
-          enabled: false,
-          published: false,
-          displayOrder: 99,
-          translations: {},
-        };
-  const locales = [localeFor("ar"), localeFor("en"), localeFor("fr")];
+  const locales = config.locales.map((item) =>
+    item.code === "en" ? { ...item, translations: source } : item,
+  );
   const keys = [
     ...new Set([
       ...Object.keys(source),
@@ -95,7 +74,9 @@ export default async function TranslationsPage({
     filtered = filtered.filter((key) =>
       params.missing === "all"
         ? locales.some((item) => !item.translations[key]?.trim())
-        : !localeFor(params.missing!).translations[key]?.trim(),
+        : !locales
+            .find((item) => item.code === params.missing)
+            ?.translations[key]?.trim(),
     );
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
     page = Math.min(Math.max(1, Number(params.page) || 1), pageCount),
@@ -125,12 +106,10 @@ export default async function TranslationsPage({
         eyebrow: "المحتوى المحلي",
         title: "اللغات والترجمات",
         description:
-          "إدارة مفاتيح العربية والإنجليزية والفرنسية دون تحميل محرر ضخم لكل المفاتيح.",
+          "إدارة اللغات ومفاتيح الترجمة التي يعتمدها المالك من قاعدة البيانات.",
         total: "إجمالي المفاتيح",
         complete: "مكتملة",
-        missingAr: "عربية ناقصة",
-        missingEn: "إنجليزية ناقصة",
-        missingFr: "فرنسية ناقصة",
+        missing: "ناقص",
         search: "ابحث بالمفتاح أو النص المترجم",
         allNamespaces: "كل الأقسام",
         allMissing: "أي ترجمة ناقصة",
@@ -148,12 +127,10 @@ export default async function TranslationsPage({
         eyebrow: "Localized content",
         title: "Languages & translations",
         description:
-          "Manage Arabic, English, and French keys without rendering a heavy editor for the full catalogue.",
+          "Manage the owner-approved language list and stable translation keys stored in the database.",
         total: "Total keys",
         complete: "Complete",
-        missingAr: "Missing Arabic",
-        missingEn: "Missing English",
-        missingFr: "Missing French",
+        missing: "Missing",
         search: "Search key or translated text",
         allNamespaces: "All namespaces",
         allMissing: "Any missing translation",
@@ -176,7 +153,7 @@ export default async function TranslationsPage({
         title={copy.title}
         description={copy.description}
       />
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title={copy.total}
           value={keys.length}
@@ -184,21 +161,14 @@ export default async function TranslationsPage({
           emphasis
         />
         <MetricCard title={copy.complete} value={complete} icon={Languages} />
-        <MetricCard
-          title={copy.missingAr}
-          value={coverage.ar.missing}
-          icon={TriangleAlert}
-        />
-        <MetricCard
-          title={copy.missingEn}
-          value={coverage.en.missing}
-          icon={TriangleAlert}
-        />
-        <MetricCard
-          title={copy.missingFr}
-          value={coverage.fr.missing}
-          icon={TriangleAlert}
-        />
+        {locales.map((item) => (
+          <MetricCard
+            title={`${copy.missing}: ${item.nativeName}`}
+            value={coverage[item.code].missing}
+            icon={TriangleAlert}
+            key={item.code}
+          />
+        ))}
       </div>
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         {locales.map((item) => (
@@ -255,9 +225,11 @@ export default async function TranslationsPage({
               {ar ? "كل حالات الاكتمال" : "All completion states"}
             </option>
             <option value="all">{copy.allMissing}</option>
-            <option value="ar">{copy.missingAr}</option>
-            <option value="en">{copy.missingEn}</option>
-            <option value="fr">{copy.missingFr}</option>
+            {locales.map((item) => (
+              <option value={item.code} key={item.code}>
+                {copy.missing}: {item.nativeName}
+              </option>
+            ))}
           </select>
           <button className="btn-secondary">{copy.filter}</button>
         </FilterBar>
@@ -348,7 +320,7 @@ export default async function TranslationsPage({
                     name={`value_${item.code}`}
                     defaultValue={selected.values[item.code] || ""}
                     dir={item.rtl ? "rtl" : "ltr"}
-                    required
+                    required={item.code === "en"}
                   />
                 </label>
               ))}
@@ -446,7 +418,6 @@ export default async function TranslationsPage({
                       type="checkbox"
                       name={`rtl_${item.code}`}
                       defaultChecked={item.rtl}
-                      disabled={item.code === "en"}
                     />{" "}
                     RTL
                   </label>
@@ -455,7 +426,6 @@ export default async function TranslationsPage({
                       type="checkbox"
                       name={`enabled_${item.code}`}
                       defaultChecked={item.enabled}
-                      disabled={item.code === "en"}
                     />{" "}
                     Enabled
                   </label>
@@ -464,7 +434,6 @@ export default async function TranslationsPage({
                       type="checkbox"
                       name={`published_${item.code}`}
                       defaultChecked={item.published}
-                      disabled={item.code === "en"}
                     />{" "}
                     Published
                   </label>

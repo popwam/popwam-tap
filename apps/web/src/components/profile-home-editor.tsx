@@ -42,10 +42,6 @@ function statusLabel(copy: Copy, lifecycle: string) {
   return copy[lifecycle.toLowerCase()] || lifecycle;
 }
 
-function visibilityLabel(copy: Copy, visibility: string) {
-  return visibility === "PUBLIC" ? copy.public : visibility === "FRIENDS" ? copy.friends : copy.onlyMe;
-}
-
 function moduleLabel(copy: Copy, key: string, fallback: string) {
   return copy[`section${key.charAt(0)}${key.slice(1).toLowerCase()}`] || fallback;
 }

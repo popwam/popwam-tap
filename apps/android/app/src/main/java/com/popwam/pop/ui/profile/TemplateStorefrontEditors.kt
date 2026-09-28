@@ -14,7 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -39,11 +39,11 @@ fun TemplateEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(Profile
     val saving=state.saveState==ProfileSaveState.SAVING
     LaunchedEffect(content.summary.id){onEvent(ProfileEvent.LoadTemplates)}
     Column(Modifier.fillMaxSize().imePadding().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-        Text(content.templateName.ifBlank{stringResource(R.string.pass6_template)},style=MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.pass6_draft_only),style=MaterialTheme.typography.bodySmall)
+        Text(content.templateName.ifBlank{popStringResource(R.string.pass6_template)},style=MaterialTheme.typography.titleMedium)
+        Text(popStringResource(R.string.pass6_draft_only),style=MaterialTheme.typography.bodySmall)
         if(state.templatesLoading)LinearProgressIndicator(Modifier.fillMaxWidth())
         state.errorCode?.let{Pass6Error(it)}
-        if(catalog.isEmpty() && !state.templatesLoading)TextButton({onEvent(ProfileEvent.LoadTemplates)}){Text(stringResource(R.string.pass6_retry))}
+        if(catalog.isEmpty() && !state.templatesLoading)TextButton({onEvent(ProfileEvent.LoadTemplates)}){Text(popStringResource(R.string.pass6_retry))}
         LazyVerticalGrid(GridCells.Fixed(2),Modifier.weight(1f),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             items(catalog,key={it.id}){template->
                 com.popwam.pop.ui.components.CompactTemplateCard(
@@ -53,8 +53,8 @@ fun TemplateEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(Profile
             }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedButton({preview=true},Modifier.weight(1f),enabled=chosen?.allowed==true && !saving){Text(stringResource(R.string.pass6_draft_preview))}
-            Button({chosen?.let{onEvent(ProfileEvent.Save(ProfileEditorMutation.TemplateSelect(it)))}},Modifier.weight(1f),enabled=chosen?.allowed==true && chosenId!=content.templateId && !saving){Text(stringResource(R.string.save))}
+            OutlinedButton({preview=true},Modifier.weight(1f),enabled=chosen?.allowed==true && !saving){Text(popStringResource(R.string.pass6_draft_preview))}
+            Button({chosen?.let{onEvent(ProfileEvent.Save(ProfileEditorMutation.TemplateSelect(it)))}},Modifier.weight(1f),enabled=chosen?.allowed==true && chosenId!=content.templateId && !saving){Text(popStringResource(R.string.save))}
         }
     }
     if(preview && chosenId!=null)DraftTemplatePreview(content.summary.id,chosenId!!){preview=false}
@@ -64,12 +64,12 @@ fun TemplateEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(Profile
     val locale=LocalConfiguration.current.locales[0].language
     return if(locale=="ar")template.nameAr.ifBlank{template.nameEn} else template.nameEn.ifBlank{template.nameAr}
 }
-@Composable private fun templateFamily(family:String)=stringResource(when(family){
+@Composable private fun templateFamily(family:String)=popStringResource(when(family){
     "personal"->R.string.pass6_family_personal;"professional"->R.string.pass6_family_professional
     "business"->R.string.pass6_family_business;"agency"->R.string.pass6_family_agency;"brand"->R.string.pass6_family_brand
     "tech"->R.string.pass6_family_tech;else->R.string.pass6_family_storefront
 })
-@Composable internal fun itemTypeLabel(type:String)=stringResource(if(type=="PRODUCT")R.string.pass6_product else R.string.pass6_service)
+@Composable internal fun itemTypeLabel(type:String)=popStringResource(if(type=="PRODUCT")R.string.pass6_product else R.string.pass6_service)
 
 @Composable
 fun StorefrontEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(ProfileEvent)->Unit) {
@@ -86,29 +86,29 @@ fun StorefrontEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(Profi
     LaunchedEffect(state.saveState){if(submitted && state.saveState==ProfileSaveState.SUCCESS){editing=null;deleting=null;submitted=false}}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
-            Text(stringResource(R.string.pass6_showcase_help))
+            Text(popStringResource(R.string.pass6_showcase_help))
             val module=content.modules.firstOrNull{it.key=="SERVICES"}
             if(module?.enabled!=true || module.visibility!="PUBLIC") {
-                Text(stringResource(R.string.pass6_section_hidden),style=MaterialTheme.typography.bodySmall)
+                Text(popStringResource(R.string.pass6_section_hidden),style=MaterialTheme.typography.bodySmall)
                 if(module!=null || content.addableModules.any{it.key=="SERVICES"})TextButton({
                     onEvent(ProfileEvent.Save(if(module==null)ProfileEditorMutation.AddModule("SERVICES") else ProfileEditorMutation.UpdateModule("SERVICES",true,"PUBLIC")))
-                },enabled=!busy && policy.storefrontEnabled){Text(stringResource(if(module==null)R.string.pass6_add_section else R.string.pass6_enable_section))}
+                },enabled=!busy && policy.storefrontEnabled){Text(popStringResource(if(module==null)R.string.pass6_add_section else R.string.pass6_enable_section))}
             }
-            Text(if(policy.storefrontMaxItems==null)stringResource(R.string.pass6_unlimited_count,items.size) else stringResource(R.string.pass6_item_count,items.size,policy.storefrontMaxItems),style=MaterialTheme.typography.titleMedium)
-            if(!policy.storefrontEnabled || types.isEmpty())Text(stringResource(R.string.pass6_plan_locked),color=MaterialTheme.colorScheme.error)
-            else if(!ShowcasePolicy.canAdd(policy,items.size))Text(stringResource(R.string.pass6_limit_reached),color=MaterialTheme.colorScheme.error)
-            Button({if(types.size==1)open(ProfileService(itemType=types.single())) else selectingType=true},enabled=!busy && ShowcasePolicy.canAdd(policy,items.size)){Text(stringResource(R.string.pass6_add))}
+            Text(if(policy.storefrontMaxItems==null)popStringResource(R.string.pass6_unlimited_count,items.size) else popStringResource(R.string.pass6_item_count,items.size,policy.storefrontMaxItems),style=MaterialTheme.typography.titleMedium)
+            if(!policy.storefrontEnabled || types.isEmpty())Text(popStringResource(R.string.pass6_plan_locked),color=MaterialTheme.colorScheme.error)
+            else if(!ShowcasePolicy.canAdd(policy,items.size))Text(popStringResource(R.string.pass6_limit_reached),color=MaterialTheme.colorScheme.error)
+            Button({if(types.size==1)open(ProfileService(itemType=types.single())) else selectingType=true},enabled=!busy && ShowcasePolicy.canAdd(policy,items.size)){Text(popStringResource(R.string.pass6_add))}
             if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
             state.errorCode?.let{Pass6Error(it)}
         }
         item {
             Card { Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                Text(stringResource(R.string.pass6_order_contacts),style=MaterialTheme.typography.titleSmall)
-                Text(stringResource(R.string.pass6_whatsapp)+": "+stringResource(if(policy.storefrontEnabled && policy.storefrontWhatsappOrder)R.string.pass6_allowed else R.string.pass6_plan_locked))
+                Text(popStringResource(R.string.pass6_order_contacts),style=MaterialTheme.typography.titleSmall)
+                Text(popStringResource(R.string.pass6_whatsapp)+": "+popStringResource(if(policy.storefrontEnabled && policy.storefrontWhatsappOrder)R.string.pass6_allowed else R.string.pass6_plan_locked))
                 if(policy.storefrontEnabled && policy.storefrontWhatsappOrder && (!policy.publicWhatsappReady || !policy.contactModulePublic))ContactNotice(R.string.pass6_missing_whatsapp,content,onEvent)
-                Text(stringResource(R.string.pass6_email)+": "+stringResource(if(policy.storefrontEnabled && policy.storefrontEmailOrder)R.string.pass6_allowed else R.string.pass6_plan_locked))
+                Text(popStringResource(R.string.pass6_email)+": "+popStringResource(if(policy.storefrontEnabled && policy.storefrontEmailOrder)R.string.pass6_allowed else R.string.pass6_plan_locked))
                 if(policy.storefrontEnabled && policy.storefrontEmailOrder && (!policy.publicEmailReady || !policy.contactModulePublic))ContactNotice(R.string.pass6_missing_email,content,onEvent)
-                Text(stringResource(R.string.pass6_contacts_publish),style=MaterialTheme.typography.bodySmall)
+                Text(popStringResource(R.string.pass6_contacts_publish),style=MaterialTheme.typography.bodySmall)
             } }
         }
         items(items,key={it.id}){item->
@@ -120,31 +120,31 @@ fun StorefrontEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(Profi
                         Text(itemTypeLabel(item.itemType),style=MaterialTheme.typography.labelMedium)
                         item.price?.let{Text(listOfNotNull(it,item.currency).joinToString(" "))}
                         item.category?.takeIf{it.isNotBlank()}?.let{Text(it,style=MaterialTheme.typography.bodySmall)}
-                        Text(stringResource(if(item.visibility=="PUBLIC")R.string.pass6_visible else R.string.pass6_hidden))
-                        if(item.featured)Text(stringResource(R.string.pass6_featured))
+                        Text(popStringResource(if(item.visibility=="PUBLIC")R.string.pass6_visible else R.string.pass6_hidden))
+                        if(item.featured)Text(popStringResource(R.string.pass6_featured))
                     }
                 }
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                    TextButton({open(item)},enabled=!busy){Text(stringResource(R.string.pass6_edit))}
-                    TextButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceUpsert(item.copy(visibility=if(item.visibility=="PUBLIC")"ONLY_ME" else "PUBLIC"))))},enabled=!busy && item.itemType in types){Text(stringResource(if(item.visibility=="PUBLIC")R.string.pass6_hide else R.string.pass6_show))}
-                    TextButton({deleting=item;submitted=false},enabled=!busy){Text(stringResource(R.string.pass6_delete))}
+                    TextButton({open(item)},enabled=!busy){Text(popStringResource(R.string.pass6_edit))}
+                    TextButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceUpsert(item.copy(visibility=if(item.visibility=="PUBLIC")"ONLY_ME" else "PUBLIC"))))},enabled=!busy && item.itemType in types){Text(popStringResource(if(item.visibility=="PUBLIC")R.string.pass6_hide else R.string.pass6_show))}
+                    TextButton({deleting=item;submitted=false},enabled=!busy){Text(popStringResource(R.string.pass6_delete))}
                 }
                 Row {
-                    TextButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceReorder(ShowcasePolicy.move(items.map{it.id},item.id,-1))))},enabled=!busy && items.firstOrNull()?.id!=item.id){Text(stringResource(R.string.pass6_move_up))}
-                    TextButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceReorder(ShowcasePolicy.move(items.map{it.id},item.id,1))))},enabled=!busy && items.lastOrNull()?.id!=item.id){Text(stringResource(R.string.pass6_move_down))}
+                    TextButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceReorder(ShowcasePolicy.move(items.map{it.id},item.id,-1))))},enabled=!busy && items.firstOrNull()?.id!=item.id){Text(popStringResource(R.string.pass6_move_up))}
+                    TextButton({onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceReorder(ShowcasePolicy.move(items.map{it.id},item.id,1))))},enabled=!busy && items.lastOrNull()?.id!=item.id){Text(popStringResource(R.string.pass6_move_down))}
                 }
             } }
         }
     }
-    if(selectingType)AlertDialog(onDismissRequest={selectingType=false},title={Text(stringResource(R.string.pass6_add))},text={Column{types.forEach{type->TextButton({selectingType=false;open(ProfileService(itemType=type))}){Text(itemTypeLabel(type))}}}},confirmButton={TextButton({selectingType=false}){Text(stringResource(R.string.cancel))}})
-    deleting?.let{item->AlertDialog(onDismissRequest={if(!busy)deleting=null},title={Text(stringResource(R.string.pass6_delete_confirm))},text={Text(item.name)},confirmButton={TextButton({submitted=true;onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceDelete(item.id)))},enabled=!busy){Text(stringResource(R.string.pass6_delete))}},dismissButton={TextButton({deleting=null},enabled=!busy){Text(stringResource(R.string.cancel))}})}
+    if(selectingType)AlertDialog(onDismissRequest={selectingType=false},title={Text(popStringResource(R.string.pass6_add))},text={Column{types.forEach{type->TextButton({selectingType=false;open(ProfileService(itemType=type))}){Text(itemTypeLabel(type))}}}},confirmButton={TextButton({selectingType=false}){Text(popStringResource(R.string.cancel))}})
+    deleting?.let{item->AlertDialog(onDismissRequest={if(!busy)deleting=null},title={Text(popStringResource(R.string.pass6_delete_confirm))},text={Text(item.name)},confirmButton={TextButton({submitted=true;onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceDelete(item.id)))},enabled=!busy){Text(popStringResource(R.string.pass6_delete))}},dismissButton={TextButton({deleting=null},enabled=!busy){Text(popStringResource(R.string.cancel))}})}
     editing?.let{item->ShowcaseItemSheet(item,state,types,{if(!busy){editing=null;onEvent(ProfileEvent.ClearItemImage)}},onEvent){submitted=true;onEvent(ProfileEvent.Save(ProfileEditorMutation.ServiceUpsert(it)))}}
 }
 
 @Composable private fun ContactNotice(message:Int,content:ProfileContent,onEvent:(ProfileEvent)->Unit) {
-    Text(stringResource(message),style=MaterialTheme.typography.bodySmall)
-    TextButton({onEvent(ProfileEvent.OpenSection(content.summary.id,ProfileEditorSection.CONTACT_LINKS))}){Text(stringResource(R.string.pass6_edit_contact))}
-    if(!content.storefront.contactModulePublic)TextButton({onEvent(ProfileEvent.OpenSection(content.summary.id,ProfileEditorSection.VISIBILITY))}){Text(stringResource(R.string.pass6_section_visibility))}
+    Text(popStringResource(message),style=MaterialTheme.typography.bodySmall)
+    TextButton({onEvent(ProfileEvent.OpenSection(content.summary.id,ProfileEditorSection.CONTACT_LINKS))}){Text(popStringResource(R.string.pass6_edit_contact))}
+    if(!content.storefront.contactModulePublic)TextButton({onEvent(ProfileEvent.OpenSection(content.summary.id,ProfileEditorSection.VISIBILITY))}){Text(popStringResource(R.string.pass6_section_visibility))}
 }
 
 @Composable private fun ShowcaseItemSheet(initial:ProfileService,state:ProfilesUiState,types:List<String>,dismiss:()->Unit,onEvent:(ProfileEvent)->Unit,save:(ProfileService)->Unit) {
@@ -165,33 +165,33 @@ fun StorefrontEditor(content:ProfileContent,state:ProfilesUiState,onEvent:(Profi
         upload.onSuccess{onEvent(ProfileEvent.UploadItemImage(it))}.onFailure{localError="PROFILE_MEDIA_UPLOAD_FAILED"}
     }}
     PopFormSheet(dismiss,{Text(itemTypeLabel(item.itemType),style=MaterialTheme.typography.titleLarge)},action={
-        Button({if(ShowcasePolicy.itemValid(item))save(item.copy(name=item.nameEn.ifBlank{item.nameAr},price=item.price?.trim()?.takeIf{it.isNotEmpty()},currency=item.currency?.trim()?.uppercase()?.takeIf{it.isNotEmpty()}))else localError=if(!ShowcasePolicy.priceValid(item.price.orEmpty()))"SHOWCASE_PRICE_INVALID" else if(!ShowcasePolicy.currencyValid(item.currency.orEmpty()))"SHOWCASE_CURRENCY_INVALID" else "PROFILE_REQUIRED_DATA_INCOMPLETE"},Modifier.fillMaxWidth(),enabled=!busy && item.itemType in types){Text(stringResource(R.string.save))}
-        TextButton(dismiss,enabled=!busy){Text(stringResource(R.string.cancel))}
+        Button({if(ShowcasePolicy.itemValid(item))save(item.copy(name=item.nameEn.ifBlank{item.nameAr},price=item.price?.trim()?.takeIf{it.isNotEmpty()},currency=item.currency?.trim()?.uppercase()?.takeIf{it.isNotEmpty()}))else localError=if(!ShowcasePolicy.priceValid(item.price.orEmpty()))"SHOWCASE_PRICE_INVALID" else if(!ShowcasePolicy.currencyValid(item.currency.orEmpty()))"SHOWCASE_CURRENCY_INVALID" else "PROFILE_REQUIRED_DATA_INCOMPLETE"},Modifier.fillMaxWidth(),enabled=!busy && item.itemType in types){Text(popStringResource(R.string.save))}
+        TextButton(dismiss,enabled=!busy){Text(popStringResource(R.string.cancel))}
     },content={focus->
         Row {types.forEach{type->FilterChip(selected=item.itemType==type,onClick={item=item.copy(itemType=type)},label={Text(itemTypeLabel(type))},enabled=!busy)}}
-        if(item.itemType !in types)Text(stringResource(R.string.pass6_plan_locked))
+        if(item.itemType !in types)Text(popStringResource(R.string.pass6_plan_locked))
         ItemField(focus,R.string.pass6_name_ar,item.nameAr,{item=item.copy(nameAr=it)},!busy)
         ItemField(focus,R.string.pass6_name_en,item.nameEn,{item=item.copy(nameEn=it)},!busy)
         ItemField(focus,R.string.pass6_description_ar,item.descriptionAr,{item=item.copy(descriptionAr=it)},!busy)
         ItemField(focus,R.string.pass6_description_en,item.descriptionEn,{item=item.copy(descriptionEn=it)},!busy)
         item.imageUrl?.let{AsyncImage(profileAssetUrl(it),null,Modifier.fillMaxWidth().height(150.dp))}
         Row {
-            TextButton({picker.launch("image/*")},enabled=!busy){Text(stringResource(if(item.imageUrl==null)R.string.pass6_choose_image else R.string.pass6_replace_image))}
-            if(item.imageUrl!=null)TextButton({item=item.copy(imageUrl=null);onEvent(ProfileEvent.ClearItemImage)},enabled=!busy){Text(stringResource(R.string.pass6_remove_image))}
+            TextButton({picker.launch("image/*")},enabled=!busy){Text(popStringResource(if(item.imageUrl==null)R.string.pass6_choose_image else R.string.pass6_replace_image))}
+            if(item.imageUrl!=null)TextButton({item=item.copy(imageUrl=null);onEvent(ProfileEvent.ClearItemImage)},enabled=!busy){Text(popStringResource(R.string.pass6_remove_image))}
         }
         ItemField(focus,R.string.pass6_price,item.price.orEmpty(),{item=item.copy(price=it)},!busy,KeyboardType.Decimal)
         ItemField(focus,R.string.pass6_currency,item.currency.orEmpty(),{item=item.copy(currency=it)},!busy)
         ItemField(focus,R.string.pass6_category,item.category.orEmpty(),{item=item.copy(category=it)},!busy)
-        Row {Checkbox(item.featured,{item=item.copy(featured=it)},enabled=!busy);Text(stringResource(R.string.pass6_featured))}
-        Text(stringResource(R.string.pass6_featured_help),style=MaterialTheme.typography.bodySmall)
-        Row {Switch(item.visibility=="PUBLIC",{item=item.copy(visibility=if(it)"PUBLIC" else "ONLY_ME")},enabled=!busy);Text(stringResource(if(item.visibility=="PUBLIC")R.string.pass6_visible else R.string.pass6_hidden))}
+        Row {Checkbox(item.featured,{item=item.copy(featured=it)},enabled=!busy);Text(popStringResource(R.string.pass6_featured))}
+        Text(popStringResource(R.string.pass6_featured_help),style=MaterialTheme.typography.bodySmall)
+        Row {Switch(item.visibility=="PUBLIC",{item=item.copy(visibility=if(it)"PUBLIC" else "ONLY_ME")},enabled=!busy);Text(popStringResource(if(item.visibility=="PUBLIC")R.string.pass6_visible else R.string.pass6_hidden))}
         if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
         (localError ?: state.errorCode)?.let{Pass6Error(it)}
     })
 }
 
 @Composable private fun ItemField(focus:PopFormFocusController,label:Int,value:String,change:(String)->Unit,enabled:Boolean,type:KeyboardType=KeyboardType.Text) {
-    PopFormTextField(fieldKey="showcase-$label",focusController=focus,value=value,onValueChange=change,label={Text(stringResource(label))},modifier=Modifier.fillMaxWidth(),enabled=enabled,keyboardType=type,valueIsLtr=type==KeyboardType.Decimal || label in setOf(R.string.pass6_currency,R.string.pass6_name_en,R.string.pass6_description_en),singleLine=label !in setOf(R.string.pass6_description_ar,R.string.pass6_description_en))
+    PopFormTextField(fieldKey="showcase-$label",focusController=focus,value=value,onValueChange=change,label={Text(popStringResource(label))},modifier=Modifier.fillMaxWidth(),enabled=enabled,keyboardType=type,valueIsLtr=type==KeyboardType.Decimal || label in setOf(R.string.pass6_currency,R.string.pass6_name_en,R.string.pass6_description_en),singleLine=label !in setOf(R.string.pass6_description_ar,R.string.pass6_description_en))
 }
 
 @Composable internal fun Pass6Error(code:String) {Text(profileErrorMessage(code),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodyMedium)}

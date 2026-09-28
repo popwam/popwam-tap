@@ -32,7 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import com.popwam.pop.data.localization.popStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -118,23 +118,23 @@ fun HowItWorksSheet(show: Boolean, onDismiss: () -> Unit, onStart: () -> Unit) {
     ModalBottomSheet(onDismissRequest = { viewed(); onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.how_it_works), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                TextButton({ viewed(); onDismiss() }) { Text(stringResource(R.string.skip)) }
+                Text(popStringResource(R.string.how_it_works), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                TextButton({ viewed(); onDismiss() }) { Text(popStringResource(R.string.skip)) }
             }
             HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().height(330.dp)) { index ->
                 val page = pages[index]
                 Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Surface(shape = CircleShape, color = Color(0xFFFFF6D5), modifier = Modifier.size(116.dp)) { Box(contentAlignment = Alignment.Center) { Icon(page.icon, null, Modifier.size(58.dp), tint = Color(0xFFD4AF37)) } }
                     Spacer(Modifier.height(24.dp))
-                    Text(stringResource(page.title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text(popStringResource(page.title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(10.dp))
-                    Text(stringResource(page.body), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(popStringResource(page.body), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Text(stringResource(R.string.page_count, pager.currentPage + 1, pages.size), style = MaterialTheme.typography.labelLarge)
+            Text(popStringResource(R.string.page_count, pager.currentPage + 1, pages.size), style = MaterialTheme.typography.labelLarge)
             Row(Modifier.padding(20.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton({ scope.launch { pager.animateScrollToPage((pager.currentPage - 1).coerceAtLeast(0)) } }, Modifier.weight(1f), enabled = pager.currentPage > 0) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null); Text(stringResource(R.string.back)) }
-                Button({ if (pager.currentPage == pages.lastIndex) { viewed(); onDismiss(); onStart() } else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } }, Modifier.weight(1f)) { Text(stringResource(if (pager.currentPage == pages.lastIndex) R.string.start_now else R.string.next)); Icon(Icons.AutoMirrored.Filled.ArrowForward, null) }
+                OutlinedButton({ scope.launch { pager.animateScrollToPage((pager.currentPage - 1).coerceAtLeast(0)) } }, Modifier.weight(1f), enabled = pager.currentPage > 0) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null); Text(popStringResource(R.string.back)) }
+                Button({ if (pager.currentPage == pages.lastIndex) { viewed(); onDismiss(); onStart() } else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } }, Modifier.weight(1f)) { Text(popStringResource(if (pager.currentPage == pages.lastIndex) R.string.start_now else R.string.next)); Icon(Icons.AutoMirrored.Filled.ArrowForward, null) }
             }
         }
     }

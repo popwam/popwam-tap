@@ -6,7 +6,7 @@ import { calculateInventoryByProduct } from "@/lib/inventory";
 
 export default async function InventoryPage() {
   const [items, movements, counts] = await Promise.all([
-    prisma.inventoryItem.findMany({ include: { supplier: true }, orderBy: { nameEn: "asc" } }),
+    prisma.inventoryItem.findMany({ orderBy: { nameEn: "asc" } }),
     prisma.inventoryMovement.findMany({ select: { inventoryItemId: true, type: true, quantity: true } }),
     prisma.card.groupBy({ by: ["inventoryStatus"], _count: { _all: true } }),
   ]);

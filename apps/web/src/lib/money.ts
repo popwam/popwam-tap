@@ -8,7 +8,3 @@ export function parseMoney(raw: string | null | undefined, field = "money") {
   if (!MONEY_PATTERN.test(value)) throw new Error(`INVALID_MONEY:${field}`);
   return new Prisma.Decimal(value);
 }
-
-export function decimalZero() {
-  return new Prisma.Decimal(0);
-}

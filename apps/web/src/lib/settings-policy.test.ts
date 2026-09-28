@@ -6,6 +6,8 @@ describe("Phase H settings policy", () => {
     expect(parseSettingsPatch({ theme: "SYSTEM", language: "ARABIC", font: "CAIRO" })).toEqual({ theme: "SYSTEM", language: "ARABIC", font: "CAIRO" });
     expect(parseSettingsPatch({ theme: "LIGHT", language: "ENGLISH", font: "ABEEZEE" })).toEqual({ theme: "LIGHT", language: "ENGLISH", font: "ABEEZEE" });
     expect(parseSettingsPatch({ theme: "DARK", font: "DEFAULT" })).toEqual({ theme: "DARK", font: "DEFAULT" });
+    expect(parseSettingsPatch({ locale: "PT-BR" })).toEqual({ locale: "pt-br" });
+    expect(parseSettingsPatch({ locale: "not_a_locale" })).toBeNull();
     expect(parseSettingsPatch({ theme: "NEON" })).toBeNull();
     expect(parseSettingsPatch({ font: "remote-font-url" })).toBeNull();
   });

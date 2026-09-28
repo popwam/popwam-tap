@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="share_figma_title">Share your POP</string>
+    <string name="share_figma_subtitle">Share your profile in multiple ways</string>
+    <string name="share_figma_your_link">Your POP Link</string>
+    <string name="share_figma_scan">Scan to view my POP</string>
+    <string name="share_figma_share_link">Share</string>
+    <string name="share_figma_share_link_subtitle">Share via any app</string>
+    <string name="share_figma_whatsapp">WhatsApp</string>
+    <string name="share_figma_whatsapp_subtitle">Share on WhatsApp</string>
+    <string name="share_figma_messages">Messages</string>
+    <string name="share_figma_messages_subtitle">Share via SMS</string>
+    <string name="share_figma_hce">Tap to Share</string>
+    <string name="share_figma_hce_subtitle">Bring phones close with NFC</string>
+    <string name="share_figma_nfc">Program Card</string>
+    <string name="share_figma_nfc_subtitle">Write your POP link to an NFC card</string>
+    <string name="share_figma_download_qr">Download QR</string>
+    <string name="share_figma_download_qr_subtitle">Save QR code</string>
+    <string name="share_figma_privacy_title">Your privacy is important</string>
+    <string name="share_figma_privacy_body">You control what others see. Manage your privacy settings in your profile.</string>
+    <string name="share_figma_privacy_action">Privacy Settings</string>
+    <string name="share_figma_qr_subtitle">Show, save, or share your QR</string>
+</resources>

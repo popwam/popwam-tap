@@ -26,17 +26,11 @@ export const ENGLISH_ONLY_LOCALIZATION: RuntimeLocalizationConfig = {
     name: "English",
     nativeName: "English",
     rtl: false,
-    enabled: true,
-    published: true,
+    enabled: false,
+    published: false,
     displayOrder: 0,
     translations: {},
   }],
-};
-
-const KNOWN_LOCALE_METADATA: Record<string, Pick<RuntimeLocale, "name" | "nativeName" | "rtl">> = {
-  en: { name: "English", nativeName: "English", rtl: false },
-  ar: { name: "Arabic", nativeName: "العربية", rtl: true },
-  fr: { name: "French", nativeName: "Français", rtl: false },
 };
 
 function cleanTranslations(value: unknown) {
@@ -56,16 +50,11 @@ export function sanitizeLocalizationConfig(value: unknown): RuntimeLocalizationC
     const locale = item as Record<string, unknown>;
     const code = String(locale.code || "").trim().toLowerCase();
     if (!/^[a-z]{2}(?:-[a-z0-9]{2,8})?$/.test(code)) return [];
-    const metadata = KNOWN_LOCALE_METADATA[code] || {
-      name: code.toUpperCase(),
-      nativeName: code.toUpperCase(),
-      rtl: false,
-    };
     return [{
       code,
-      name: String(locale.name || metadata.name).slice(0, 80),
-      nativeName: String(locale.nativeName || metadata.nativeName).slice(0, 80),
-      rtl: locale.rtl === true || metadata.rtl,
+      name: String(locale.name || code.toUpperCase()).slice(0, 80),
+      nativeName: String(locale.nativeName || locale.name || code.toUpperCase()).slice(0, 80),
+      rtl: locale.rtl === true,
       enabled: locale.enabled === true,
       published: locale.published === true,
       displayOrder: Number.isSafeInteger(locale.displayOrder) ? Number(locale.displayOrder) : 999,
@@ -75,9 +64,6 @@ export function sanitizeLocalizationConfig(value: unknown): RuntimeLocalizationC
   const unique = new Map(locales.map(locale => [locale.code, locale]));
   unique.set(SOURCE_LOCALE, {
     ...(unique.get(SOURCE_LOCALE) || ENGLISH_ONLY_LOCALIZATION.locales[0]),
-    enabled: true,
-    published: true,
-    rtl: false,
     displayOrder: 0,
   });
   const normalized = [...unique.values()].sort((a,b)=>a.displayOrder-b.displayOrder || a.code.localeCompare(b.code));
@@ -99,10 +85,26 @@ export function publicLocalizationBootstrap(config: RuntimeLocalizationConfig) {
     translationVersion: sanitized.translationVersion,
     availableLocales: sanitized.locales
       .filter(locale => locale.enabled && locale.published)
-      .map(({ code, name, nativeName, rtl, translations }) => ({ code, name, nativeName, rtl, translations })),
+      .map(({ code, name, nativeName, rtl }) => ({
+        code,
+        name,
+        nativeName,
+        rtl,
+        revision: sanitized.translationVersion,
+      })),
   };
 }
 
-export function missingTranslationKeys(source: Record<string, string>, locale: RuntimeLocale) {
-  return Object.keys(source).filter(key => !locale.translations[key]?.trim());
+export function publicLocalizationPack(config: RuntimeLocalizationConfig, code: string) {
+  const sanitized = sanitizeLocalizationConfig(config);
+  const normalizedCode = code.trim().toLowerCase();
+  const locale = sanitized.locales.find(item =>
+    item.code === normalizedCode && item.enabled && item.published
+  );
+  if (!locale) return null;
+  return {
+    code: locale.code,
+    revision: sanitized.translationVersion,
+    translations: locale.translations,
+  };
 }

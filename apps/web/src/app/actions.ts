@@ -87,10 +87,6 @@ export async function updateProfile(data: FormData) {
   publicRevalidate({ id: profile.id, slug: slugResult?.code });
 }
 
-export async function updateProfileTheme(data: FormData) {
-  const user=await requireUser();const profile=await prisma.profile.findFirst({where:{id:text(data,"profileId"),...(user.role==="ADMIN"?{}:{userId:user.id})}});const theme=text(data,"theme") as ProfileTheme;if(!profile||!Object.values(ProfileTheme).includes(theme))throw new Error("THEME_INVALID");const {effective}=await getUserEntitlements(profile.userId);if(theme!==profile.theme&&!effective.allowThemes)throw new Error("FEATURE_THEMES_REQUIRED");if(Array.isArray(effective.availableThemes)&&!effective.availableThemes.map(String).includes(theme))throw new Error("THEME_NOT_AVAILABLE");await prisma.profile.update({where:{id:profile.id},data:{theme,draftRevision:{increment:1}}});revalidatePath("/dashboard/appearance");revalidatePath("/dashboard/profile");publicRevalidate(profile);
-}
-
 export async function createProfile(data: FormData) {
   const user = await requireUser();
   const requested = (text(data, "cardType") || (text(data, "type") === "ORGANIZATION" ? "BUSINESS" : "PERSONAL")) as VirtualCardTypeValue;
@@ -159,19 +155,6 @@ export async function deleteDestination(data: FormData) {
   revalidatePath("/dashboard/cards"); revalidatePath("/dashboard/tags"); if (current?.profile) publicRevalidate(current.profile);
 }
 
-export async function toggleDestinationVisibility(data: FormData) {
-  const user = await requireUser(); const id = text(data, "id"); if (!await canManageDestination(user, id)) throw new Error("DESTINATION_NOT_FOUND");
-  const item = await prisma.destination.findUniqueOrThrow({ where: { id }, include: { profile: { select: { id: true, slug: true } }, activeForTags: { select: { id: true, shortCode: true, token: true } } } });
-  await prisma.destination.update({ where: { id }, data: { isVisible: !item.isVisible } }); revalidatePath("/dashboard/cards"); revalidatePath("/admin/links"); if (item.profile) publicRevalidate(item.profile); for (const tag of item.activeForTags) { revalidatePath(`/${tag.shortCode}`); revalidatePath(`/t/${tag.token}`); }
-}
-
-export async function moveDestination(data: FormData) {
-  const user = await requireUser(); const id = text(data, "id"); if (!await canManageDestination(user, id)) throw new Error("DESTINATION_NOT_FOUND");
-  const item = await prisma.destination.findUniqueOrThrow({ where: { id }, include: { profile: { select: { id: true, slug: true } } } }); const direction = text(data, "direction") === "up" ? -1 : 1;
-  const neighbor = await prisma.destination.findFirst({ where: { profileId: item.profileId, sortOrder: direction < 0 ? { lt: item.sortOrder } : { gt: item.sortOrder } }, orderBy: { sortOrder: direction < 0 ? "desc" : "asc" } });
-  if (neighbor) await prisma.$transaction([prisma.destination.update({ where: { id }, data: { sortOrder: neighbor.sortOrder } }),prisma.destination.update({ where: { id: neighbor.id }, data: { sortOrder: item.sortOrder } })]); revalidatePath("/dashboard/cards"); if (item.profile) publicRevalidate(item.profile);
-}
-
 export async function createProfileField(data: FormData) {
   const user = await requireUser();
   const profile = await prisma.profile.findFirst({ where: { id: text(data, "profileId"), userId: user.id } });
@@ -235,15 +218,6 @@ export async function updateOwnedTag(data: FormData) {
     prisma.tagEvent.create({ data: { tagId: id, type: status !== tag.status ? TagEventType.STATUS_CHANGE : TagEventType.UPDATED } }),
   ]);
   revalidatePath("/dashboard"); revalidatePath("/dashboard/tags"); revalidatePath(`/dashboard/tags/${id}`); revalidatePath(`/${tag.shortCode}`); revalidatePath(`/t/${tag.token}`);
-}
-
-export async function updateTagDetails(data: FormData) {
-  const user = await requireUser(); const id = text(data, "id"); const existing = await prisma.tag.findFirst({ where: { id, ownerId: user.id } });
-  if (!existing) throw new Error("TAG_NOT_FOUND"); const name = text(data, "name"); const result = validateShortCode(text(data, "shortCode")); if (!name || !result.valid) throw new Error(result.valid ? "TAG_INVALID" : `SHORT_CODE_${result.reason.toUpperCase()}`);
-  if (result.code !== existing.shortCode) { const { effective } = await getUserEntitlements(user.id); if (!effective.allowCustomSlug) throw new Error("FEATURE_CUSTOM_SLUG_REQUIRED"); }
-  try { await prisma.$transaction(async tx => { const [collision,alias] = await Promise.all([tx.tag.findUnique({ where: { shortCode: result.code } }),tx.tagAlias.findUnique({ where: { code: result.code } })]); if ((collision && collision.id !== existing.id) || (alias && alias.tagId !== existing.id)) throw new Error("SHORT_CODE_IN_USE"); if (!alias) await tx.tagAlias.create({ data: { code: result.code, tagId: existing.id } }); await tx.tag.update({ where: { id }, data: { name, shortCode: result.code } }); await tx.tagEvent.create({ data: { tagId: id, type: TagEventType.UPDATED } }); }); }
-  catch (error) { if (isUniqueConstraintError(error)) throw new Error("SHORT_CODE_IN_USE"); throw error; }
-  revalidatePath("/dashboard/tags"); revalidatePath(`/dashboard/tags/${id}`); revalidatePath(`/${existing.shortCode}`); revalidatePath(`/${result.code}`);
 }
 
 export type CreateUserState = { ok: boolean; code?: string; temporaryPassword?: string };
@@ -322,8 +296,6 @@ export async function saveAdminPlan(_previous:PlanActionState,data:FormData):Pro
 
 export async function duplicateAdminPlan(data:FormData){const admin=await requireAdmin();const source=await prisma.plan.findUnique({where:{id:text(data,"id")}});if(!source)throw new Error("PLAN_NOT_FOUND");const {id,createdAt,updatedAt,availableProfileTypes,availableThemes,...copy}=source;let suffix=1;let slug=`${source.slug}-copy`;while(await prisma.plan.findUnique({where:{slug}}))slug=`${source.slug}-copy-${++suffix}`;const plan=await prisma.plan.create({data:{...copy,availableProfileTypes:availableProfileTypes===null?Prisma.JsonNull:availableProfileTypes as Prisma.InputJsonValue,availableThemes:availableThemes===null?Prisma.JsonNull:availableThemes as Prisma.InputJsonValue,name:`${source.name} Copy`,nameEn:`${source.nameEn||source.name} Copy`,nameAr:`نسخة ${source.nameAr||source.name}`,slug,isActive:false,sortOrder:source.sortOrder+1}});await audit(admin.id,"admin.plan.duplicate",plan.id,{sourceId:id});revalidatePath("/admin/plans");}
 
-export async function deleteAdminPlan(data:FormData){const admin=await requireAdmin();const id=text(data,"id");const assigned=await prisma.userPlan.count({where:{planId:id}});if(assigned>0)throw new Error("PLAN_ASSIGNED_USERS");await prisma.plan.delete({where:{id}});await audit(admin.id,"admin.plan.delete",id);revalidatePath("/admin/plans");}
-
 export async function updateUserLimits(data: FormData) {
   const admin = await requireAdmin(); const userId = text(data, "userId");
   const storageMegabytes = text(data, "maxStorageMegabytes");
@@ -363,10 +335,4 @@ export async function resetUserPassword(data: FormData) {
 
 export async function repairUserAccount(data: FormData) {
   const admin = await requireAdmin(); const userId = text(data, "userId"); await ensureUserDefaults(userId); await audit(admin.id, "admin.user.repair", userId); revalidatePath(`/admin/users/${userId}`);
-}
-
-export async function deleteAdminUser(data: FormData) {
-  await requireAdmin();
-  void data;
-  throw new Error("USE_SAFE_USER_DELETE_FLOW");
 }

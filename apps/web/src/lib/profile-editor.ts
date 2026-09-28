@@ -42,7 +42,6 @@ export const PROFILE_EDITOR_MODULE_KEYS = [
   "CATALOG",
 ] as const;
 
-export type ProfileEditorModuleKey = (typeof PROFILE_EDITOR_MODULE_KEYS)[number];
 const editorKeys = new Set<string>(PROFILE_EDITOR_MODULE_KEYS);
 const visibilityValues = new Set<ProfileModuleVisibility>(["PUBLIC", "FRIENDS", "ONLY_ME"]);
 const editableDestinationTypes = new Set<DestinationType>([

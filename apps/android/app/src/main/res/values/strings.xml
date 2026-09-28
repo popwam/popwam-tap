@@ -485,6 +485,17 @@
     <string name="language_choice_fr">Français</string>
     <string name="pre_auth_language_title">Choose your language</string>
     <string name="pre_auth_language_help">POP will use this language now. You can change it later in Settings.</string>
+    <string name="localization_language_selected">%1$s selected</string>
+    <string name="localization_theme_title">Choose the theme</string>
+    <string name="localization_theme_subtitle">Make POP yours</string>
+    <string name="localization_theme_style">Style your POP</string>
+    <string name="localization_theme_selected">%1$s selected</string>
+    <string name="localization_palette_mint">MINT</string>
+    <string name="localization_palette_pulse">PULSE</string>
+    <string name="localization_palette_violet">VIOLET</string>
+    <string name="localization_palette_coral">CORAL</string>
+    <string name="localization_palette_solar">SOLAR</string>
+    <string name="localization_palette_graphite">GRAPHITE</string>
     <string name="pre_auth_appearance_title">Choose your appearance</string>
     <string name="pre_auth_appearance_help">Make POP feel right for you. Your choice applies immediately and can be changed later.</string>
     <string name="pre_auth_theme_system_help">Follow your device light or dark appearance.</string>
@@ -694,6 +705,8 @@
     <string name="settings_logout_confirm_title">Log out of POP?</string>
     <string name="settings_logout_confirm_body">Your local session and sensitive cached account data will be cleared. Your Profiles and preferences stay safe.</string>
     <string name="settings_language_help">Choose from the languages currently available to this POP installation. The interface updates immediately.</string>
+    <string name="settings_languages_unavailable">No owner-enabled languages are currently available. POP will continue using its built-in English fallback.</string>
+    <string name="settings_font_current">Current typography configuration</string>
     <string name="settings_region">Device region</string>
     <string name="settings_region_help">Region is informative and never changes your verified phone identity.</string>
     <string name="settings_open_notification_settings">Open notification settings</string>

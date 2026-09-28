@@ -4,10 +4,22 @@ import { getMobileUser, mobileUnauthorized } from "@/lib/mobile-auth";
 import { assertWithinLimitLocked } from "@/lib/plans";
 import { normalizeAndValidate } from "@/lib/url";
 
+const destinationSelect = {
+  id: true,
+  profileId: true,
+  title: true,
+  titleAr: true,
+  titleEn: true,
+  type: true,
+  url: true,
+  iconKey: true,
+  isActive: true,
+} satisfies Prisma.DestinationSelect;
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getMobileUser(request); if (!user) return mobileUnauthorized(); const { id } = await params;
   if (!await prisma.profile.findFirst({ where: { id, userId: user.id } })) return Response.json({ ok: false, error: "PROFILE_NOT_FOUND" }, { status: 404 });
-  const destinations = await prisma.destination.findMany({ where: { profileId: id, userId: user.id }, orderBy: { sortOrder: "asc" } });
+  const destinations = await prisma.destination.findMany({ where: { profileId: id, userId: user.id }, select: destinationSelect, orderBy: { sortOrder: "asc" } });
   return Response.json({ ok: true, destinations }, { headers: { "cache-control": "no-store" } });
 }
 
@@ -24,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!await tx.profile.findFirst({ where: { id, userId: user.id }, select: { id: true } })) throw new Error("PROFILE_NOT_FOUND");
       await assertWithinLimitLocked(tx, user.id, "links");
       const sortOrder = await tx.destination.count({ where: { profileId: id } });
-      return tx.destination.create({ data: { userId: user.id, profileId: id, type, title, titleAr: String(body.titleAr || "").trim() || null, titleEn: String(body.titleEn || "").trim() || null, url: normalized.url, iconKey: safeIconKey(String(body.iconKey || ""), defaultIconKeys[type]), sortOrder } });
+      return tx.destination.create({ data: { userId: user.id, profileId: id, type, title, titleAr: String(body.titleAr || "").trim() || null, titleEn: String(body.titleEn || "").trim() || null, url: normalized.url, iconKey: safeIconKey(String(body.iconKey || ""), defaultIconKeys[type]), sortOrder }, select: destinationSelect });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     return Response.json({ ok: true, destination }, { status: 201, headers: { "cache-control": "no-store" } });
   } catch (error) {

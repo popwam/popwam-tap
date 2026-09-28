@@ -2,6 +2,7 @@ import { prisma } from "@popwam/db";
 import { csrfRejected, getCurrentPopUser, isTrustedPopMutation, unauthorized } from "@/lib/api-auth";
 import { parseSettingsPatch } from "@/lib/settings-policy";
 import { nearbyStatus } from "@/lib/nearby-domain";
+import { getRuntimeLocalizationConfig } from "@/lib/localization-runtime";
 
 async function projection(userId: string) {
   const [preference, user, primary, blockedUsers] = await Promise.all([
@@ -14,6 +15,7 @@ async function projection(userId: string) {
   return {
     theme: preference?.theme || "SYSTEM",
     language: preference?.language || "SYSTEM",
+    locale: user?.locale || null,
     font: preference?.font || "DEFAULT",
     privacy: {
       shareActivityIdentity: user?.shareActivityIdentity || false,
@@ -43,12 +45,19 @@ export async function PATCH(request: Request) {
   if (!user) return unauthorized();
   const patch = parseSettingsPatch(await request.json().catch(() => null));
   if (!patch || !Object.keys(patch).length) return Response.json({ ok: false, error: "SETTINGS_INVALID" }, { status: 422 });
-  const { shareActivityIdentity, ...preference } = patch;
+  const { shareActivityIdentity, locale, ...preference } = patch;
+  if (locale) {
+    const config = await getRuntimeLocalizationConfig();
+    if (!config.locales.some(item => item.code === locale && item.enabled && item.published)) {
+      return Response.json({ ok: false, error: "SETTINGS_LOCALE_UNAVAILABLE" }, { status: 422 });
+    }
+  }
   await prisma.$transaction(async tx => {
     if (Object.keys(preference).length) {
       await tx.userPreference.upsert({ where: { userId: user.id }, update: preference, create: { userId: user.id, ...preference } });
       if (preference.language) await tx.user.update({ where: { id: user.id }, data: { locale: preference.language === "ARABIC" ? "ar" : preference.language === "ENGLISH" ? "en" : null } });
     }
+    if (locale) await tx.user.update({ where: { id: user.id }, data: { locale } });
     if (shareActivityIdentity !== undefined) await tx.user.update({ where: { id: user.id }, data: { shareActivityIdentity } });
     await tx.auditLog.create({ data: { actorId: user.id, operation: "settings.preferences.updated", metadata: { categories: Object.keys(patch).sort() } } });
   });

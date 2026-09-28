@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, createHmac } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { Prisma, prisma } from "@popwam/db";
 import { getPublicAppUrl } from "@popwam/shared";
 import { createOpaqueToken, activationScratchSecretMatches, hashActivationToken } from "./card-tokens";
@@ -459,12 +459,4 @@ export function publishedShareDestination(projection: Awaited<ReturnType<typeof 
   if (!projection?.publiclyReadable) return null;
   const destination = projection.profile.destinations.find((item) => item.id === destinationId);
   return destination && isSafeDestinationUrl(destination.url) ? destination : null;
-}
-
-export function shareDestinationIsCurrentlyPublished(projection: Awaited<ReturnType<typeof getPublicProfileProjectionById>>, destinationId: string) {
-  return Boolean(publishedShareDestination(projection, destinationId));
-}
-
-export function activationAttemptFingerprintForTest(value: string) {
-  return createHash("sha256").update(value).digest("hex");
 }

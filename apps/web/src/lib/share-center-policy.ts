@@ -1,4 +1,3 @@
-export const SHARE_SOURCE_VALUES = ["qr", "nfc", "native_share", "card", "copy"] as const;
 export const SCRATCH_ATTEMPT_LIMITS = {
   product: 5,
   account: 12,

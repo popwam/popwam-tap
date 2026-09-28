@@ -31,7 +31,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 
 class TapApplication:Application(),SingletonImageLoader.Factory{
     lateinit var container:AppContainer
-    override fun onCreate(){super.onCreate();LocalizationAuthorityStore.configureCachedPolicy(this);val selected=AndroidLaunchStatePersistence.peekSelectedLanguage(this);if(selected!=null&&selected in com.popwam.pop.ui.LocalePolicy.availableLocales())applyPopLanguage(selected) else applyPopLanguage(com.popwam.pop.ui.LocalePolicy.resolve(null,""));container=AppContainer(this)}
+    override fun onCreate(){super.onCreate();val selected=AndroidLaunchStatePersistence.peekSelectedLanguage(this);LocalizationAuthorityStore.configureCachedPolicy(this,selected);applyPopLanguage(com.popwam.pop.ui.LocalePolicy.resolve(selected,""));container=AppContainer(this)}
     override fun newImageLoader(context:android.content.Context)=ImageLoader.Builder(context).components{add(coil3.svg.SvgDecoder.Factory());add(OkHttpNetworkFetcherFactory(callFactory={container.apiClient}))}.build()
 }
 class AppContainer(application:Application){
@@ -75,5 +75,5 @@ class AppContainer(application:Application){
         localFirst.clearCurrentAccount()
     }) }
     val authSetup=AuthSetupRepository(api)
-    fun persistSelectedLanguage(language:String){lifecycleScope.launch{launchState.update{it.copy(hasSelectedLanguage=true,selectedLanguageTag=language)}}}
+    fun persistSelectedLanguage(language:String){lifecycleScope.launch{launchState.update{it.copy(hasSelectedLanguage=true,selectedLanguageTag=language)};localization.selectLanguage(language)}}
 }

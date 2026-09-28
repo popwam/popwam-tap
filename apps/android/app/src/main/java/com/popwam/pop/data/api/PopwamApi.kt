@@ -7,6 +7,7 @@ import retrofit2.http.*
 
 interface AuthApi {
     @GET("api/localization/bootstrap") suspend fun localizationBootstrap():LocalizationBootstrapResponse
+    @GET("api/localization/{code}") suspend fun localizationPack(@Path("code") code:String):LocalizationPackResponse
     @GET("api/platform/bootstrap") suspend fun platformBootstrap():PlatformBootstrapResponse
     @POST("api/mobile/auth/otp/request") suspend fun requestOtp(@Body body:OtpRequest):OtpRequestResponse
     @POST("api/mobile/auth/otp/verify") suspend fun verifyOtp(@Body body:OtpVerifyRequest):AuthResponse

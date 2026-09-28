@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ENGLISH_ONLY_LOCALIZATION, publicLocalizationBootstrap, sanitizeLocalizationConfig } from "./localization-policy";
+import { ENGLISH_ONLY_LOCALIZATION, publicLocalizationBootstrap, publicLocalizationPack, sanitizeLocalizationConfig } from "./localization-policy";
 
 describe("runtime localization authority", () => {
-  it("falls back to English only", () => {
-    expect(publicLocalizationBootstrap(ENGLISH_ONLY_LOCALIZATION).availableLocales.map(locale => locale.code)).toEqual(["en"]);
+  it("keeps English as a non-selectable local fallback when no language is configured", () => {
+    expect(publicLocalizationBootstrap(ENGLISH_ONLY_LOCALIZATION).availableLocales).toEqual([]);
   });
 
   it("exposes exactly enabled and published locales", () => {
@@ -19,8 +19,13 @@ describe("runtime localization authority", () => {
     expect(publicLocalizationBootstrap(config)).toMatchObject({
       defaultLocale: "ar",
       translationVersion: 7,
-      availableLocales: [{ code: "en", rtl: false }, { code: "ar", rtl: true }],
+      availableLocales: [
+        { code: "en", rtl: false, revision: 7 },
+        { code: "ar", rtl: true, revision: 7 },
+      ],
     });
+    expect(publicLocalizationBootstrap(config).availableLocales[0]).not.toHaveProperty("translations");
+    expect(publicLocalizationPack(config, "ar")).toEqual({ code: "ar", revision: 7, translations: {} });
   });
 
   it("never lets a disabled bundled locale become the default", () => {
@@ -29,6 +34,6 @@ describe("runtime localization authority", () => {
       locales: [{ code: "fr", enabled: false, published: false }],
     }));
     expect(bootstrap.defaultLocale).toBe("en");
-    expect(bootstrap.availableLocales.map(locale => locale.code)).toEqual(["en"]);
+    expect(bootstrap.availableLocales).toEqual([]);
   });
 });

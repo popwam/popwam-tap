@@ -2,13 +2,12 @@ import {
   Prisma,
   ProfileKind,
   ProfileLifecycle,
-  ProfileModuleVisibility,
   prisma,
 } from "@popwam/db";
 import { randomUUID } from "node:crypto";
 import { mergeEntitlements } from "@/lib/plans";
 import { requireValidProfileModuleConfiguration } from "@/lib/profile-module-config";
-import { idempotentProfileCreationDecision, primaryProfileDecision, profileModuleDecision, profileQuotaDecision } from "@/lib/profile-domain-policy";
+import { idempotentProfileCreationDecision, primaryProfileDecision, profileQuotaDecision } from "@/lib/profile-domain-policy";
 import { defaultProfileSlug } from "@/lib/profile-slugs";
 
 import { resolveInitialTemplate } from "./profile-bootstrap-template";
@@ -27,23 +26,11 @@ export type CreateProfileInput = {
   creationKey?: string | null;
 };
 
-export type AddProfileModuleInput = {
-  userId: string;
-  profileId: string;
-  moduleKey: string;
-  instanceKey?: string;
-  enabled?: boolean;
-  visibility?: ProfileModuleVisibility;
-  sortOrder?: number;
-  configuration?: unknown;
-};
-
 type Tx = Prisma.TransactionClient;
 
 async function lockUser(tx: Tx, userId: string) {
   await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`);
 }
-
 async function profileQuotaContext(tx: Tx, userId: string) {
   const now = new Date();
   const [subscription, override, plan, entitlements, used] = await Promise.all([
@@ -162,33 +149,12 @@ async function createProfileInTransaction(tx: Tx, input: CreateProfileInput, isP
   return profile;
 }
 
-export async function createPrimaryProfile(input: CreateProfileInput) {
-  return prisma.$transaction((tx) => createProfileInTransaction(tx, input, true), {
-    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-    maxWait: 10_000,
-    timeout: 30_000,
-  });
-}
-
 export async function createAdditionalProfile(input: CreateProfileInput) {
   return prisma.$transaction((tx) => createProfileInTransaction(tx, input, false), {
     isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     maxWait: 10_000,
     timeout: 30_000,
   });
-}
-
-export async function setPrimaryProfile(userId: string, profileId: string) {
-  return prisma.$transaction(async (tx) => {
-    await lockUser(tx, userId);
-    const target = await tx.profile.findFirst({ where: { id: profileId, userId } });
-    const decision = primaryProfileDecision({ activePrimaryIds: [], targetId: target?.id, targetArchived: Boolean(!target || target.archivedAt || target.lifecycle === "ARCHIVED"), operation: "SET_PRIMARY" });
-    if (!decision.allowed) throw new Error(decision.reason);
-    await tx.profile.updateMany({ where: { userId, isPrimary: true, id: { not: profileId } }, data: { isPrimary: false } });
-    const updated = await tx.profile.update({ where: { id: profileId }, data: { isPrimary: true } });
-    await tx.auditLog.create({ data: { actorId: userId, operation: "profile.primary.set", targetId: profileId } });
-    return updated;
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function archiveProfile(userId: string, profileId: string, replacementProfileId?: string) {
@@ -206,26 +172,5 @@ export async function archiveProfile(userId: string, profileId: string, replacem
     const archived = await tx.profile.update({ where: { id: profile.id }, data: { isPrimary: false, lifecycle: "ARCHIVED", archivedAt: new Date() } });
     await tx.auditLog.create({ data: { actorId: userId, operation: "profile.archive", targetId: profileId, metadata: { replacementProfileId: replacementProfileId || null } } });
     return archived;
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-}
-
-export async function addProfileModule(input: AddProfileModuleInput) {
-  return prisma.$transaction(async (tx) => {
-    const profile = await tx.profile.findUnique({ where: { id: input.profileId }, include: { organization: { select: { memberships: { where: { userId: input.userId }, select: { role: true } } } } } });
-    const organizationRole = profile?.organization?.memberships[0]?.role;
-    const canManage = profile?.userId === input.userId || organizationRole === "OWNER" || organizationRole === "ORG_ADMIN";
-    if (!profile || !canManage || profile.archivedAt || profile.lifecycle === "ARCHIVED") throw new Error("PROFILE_MODULE_PROFILE_INVALID");
-    const definition = await tx.profileModuleDefinition.findUnique({ where: { key: input.moduleKey } });
-    if (!definition) throw new Error("PROFILE_MODULE_DEFINITION_UNAVAILABLE");
-    const instanceKey = input.instanceKey?.trim() || "default";
-    const rule = profile.templateId ? await tx.profileTemplateModule.findUnique({ where: { templateId_moduleDefinitionId: { templateId: profile.templateId, moduleDefinitionId: definition.id } } }) : null;
-    const enabled = input.enabled ?? true;
-    const visibility = input.visibility || "PUBLIC";
-    const decision = profileModuleDecision({ definitionActive: definition.isActive, supportsMultiple: definition.supportsMultiple, instanceKey, profileHasTemplate: Boolean(profile.templateId), templateAllows: rule?.allowed, templateRequires: rule?.required, enabled, supportsVisibility: definition.supportsVisibility, nonPublicVisibility: visibility !== "PUBLIC" });
-    if (!decision.allowed) throw new Error(decision.reason);
-    const configuration = requireValidProfileModuleConfiguration(definition.key, input.configuration);
-    const module = await tx.profileModule.create({ data: { profileId: profile.id, moduleDefinitionId: definition.id, instanceKey, enabled, visibility, sortOrder: input.sortOrder ?? 0, configurationVersion: definition.schemaVersion, configuration } });
-    await tx.auditLog.create({ data: { actorId: input.userId, operation: "profile.module.create", targetId: module.id, metadata: { profileId: profile.id, moduleKey: definition.key } } });
-    return module;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
